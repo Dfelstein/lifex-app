@@ -29,7 +29,7 @@ Deno.serve(async (req) => {
 
     // Fetch from Acuity
     const auth = btoa(`${ACUITY_USER_ID}:${ACUITY_API_KEY}`);
-    const url = `https://acuityscheduling.com/api/v1/appointments?minDate=${today}&maxDate=${today}&max=50`;
+    const url = `https://acuityscheduling.com/api/v1/appointments?minDate=${today}&maxDate=${today}&max=200`;
 
     const res = await fetch(url, {
       headers: { 'Authorization': `Basic ${auth}` },
@@ -42,15 +42,20 @@ Deno.serve(async (req) => {
 
     const appointments = await res.json();
 
-    // Sort by time
-    appointments.sort((a: any, b: any) => new Date(a.datetime).getTime() - new Date(b.datetime).getTime());
+    // Filter to only today's appointments and sort by time
+    const todayFiltered = appointments.filter((a: any) => {
+      if (!a.datetime) return false;
+      const apptDate = new Date(a.datetime).toLocaleDateString('en-CA', { timeZone: 'Australia/Sydney' });
+      return apptDate === today;
+    });
+    todayFiltered.sort((a: any, b: any) => new Date(a.datetime).getTime() - new Date(b.datetime).getTime());
 
     // Look up Supabase UUID for each client email
     const sb = createClient(SUPABASE_URL, SUPABASE_SERVICE_KEY, {
       auth: { autoRefreshToken: false, persistSession: false }
     });
 
-    const mapped = await Promise.all(appointments.map(async (a: any) => {
+    const mapped = await Promise.all(todayFiltered.map(async (a: any) => {
       let clientId = null;
 
       if (a.email) {
