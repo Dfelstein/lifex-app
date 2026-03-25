@@ -195,6 +195,8 @@ html, body { height: 100%; background: var(--bg); color: var(--text); font-famil
 .appt-collapsed-bar { display:flex;align-items:center;justify-content:space-between;gap:8px; }
 .expand-btn { background:transparent;border:1px solid var(--border2);border-radius:6px;padding:3px 10px;color:var(--muted2);font-size:11px;cursor:pointer;white-space:nowrap; }
 .expand-btn:hover { background:var(--surface2);color:var(--text); }
+.card-toggle-btn { background:transparent;border:none;color:var(--muted2);font-size:12px;cursor:pointer;padding:4px 6px;border-radius:5px;line-height:1;flex-shrink:0; }
+.card-toggle-btn:hover { background:var(--surface2);color:var(--text); }
 
 /* WEEK APPOINTMENT GRID */
 .week-col { min-width:0; }
@@ -204,8 +206,10 @@ html, body { height: 100%; background: var(--bg); color: var(--text); font-famil
 .week-col-day-num { font-family:'Bebas Neue',sans-serif;font-size:22px;line-height:1.2; }
 .week-appt-chip { padding:6px 8px;background:var(--surface2);border:1px solid var(--border);border-radius:7px;margin-bottom:4px;cursor:pointer;transition:border-color 0.15s; }
 .week-appt-chip:hover { border-color:var(--blue); }
-.week-appt-chip.has-account { border-left:3px solid var(--green); }
-.week-appt-chip.no-account { border-left:3px solid var(--muted); opacity:0.6; }
+.week-appt-chip.confirmed-scans { border-left:3px solid var(--green); }
+.week-appt-chip.confirmed-noscans { border-left:3px solid var(--teal); }
+.week-appt-chip.pending { border-left:3px solid var(--gold); }
+.week-appt-chip.no-account { border-left:3px solid var(--muted);opacity:0.55; }
 .week-chip-time { font-size:10px;color:var(--muted2);margin-bottom:2px; }
 .week-chip-name { font-size:11px;font-weight:600;overflow:hidden;text-overflow:ellipsis;white-space:nowrap; }
 .week-col-empty { font-size:11px;color:var(--muted);text-align:center;padding:8px 0;opacity:0.5; }
@@ -272,8 +276,8 @@ html, body { height: 100%; background: var(--bg); color: var(--text); font-famil
     <div class="page-title">Previous Appointments</div>
     <div class="page-subtitle" id="prev-subtitle" style="margin-bottom:16px;">Select a day to view appointments</div>
     <div class="view-toggle">
-      <button class="view-toggle-btn" id="btn-week-view" onclick="setPrevView('week')">Week</button>
-      <button class="view-toggle-btn active" id="btn-month-view" onclick="setPrevView('month')">Month</button>
+      <button class="view-toggle-btn active" id="btn-week-view" onclick="setPrevView('week')">Week</button>
+      <button class="view-toggle-btn" id="btn-month-view" onclick="setPrevView('month')">Month</button>
     </div>
     <div id="prev-week-view" style="display:none;">
       <div class="week-nav">
@@ -430,10 +434,11 @@ function renderApptCard(a) {
   <div class="appt-card ${hasClient ? 'has-client' : 'no-client'}">
     <div class="appt-header">
       <div class="appt-avatar">${initials}</div>
-      <div>
+      <div style="flex:1">
         <div class="appt-name ${hasClient ? 'clickable' : ''}" ${hasClient ? `onclick="viewClientProfile('${a.clientId}','${a.firstName}','${a.lastName}')"` : ''}>${a.firstName} ${a.lastName}</div>
         <div class="appt-meta">${time} · ${a.type || 'Appointment'}${!hasClient ? ' · <span style="color:var(--red)">No Life X account</span>' : ''}</div>
       </div>
+      <button class="card-toggle-btn" id="toggle-${a.id}" onclick="toggleCardCollapse('${a.id}','${a.clientId||''}','${a.firstName}')">▼</button>
     </div>
     <div class="appt-body">
       ${hasClient ? `
@@ -501,6 +506,29 @@ async function handleDrop(e, appt) {
   }
 }
 
+function toggleCardCollapse(apptId, clientId, firstName) {
+  const card = document.getElementById(`toggle-${apptId}`)?.closest('.appt-card');
+  if (!card) return;
+  const isCollapsed = card.classList.contains('collapsed');
+  if (isCollapsed) {
+    // Expand
+    expandApptCard(apptId);
+    document.getElementById(`toggle-${apptId}`).textContent = '▼';
+  } else {
+    // Collapse
+    const uploaded = JSON.parse(sessionStorage.getItem(`uploads-${apptId}`) || '[]');
+    card.classList.add('collapsed');
+    const body = card.querySelector('.appt-body');
+    if (uploaded.length) {
+      const badgeHtml = uploaded.map(t => `<span class="scan-badge done">✅ ${t}</span>`).join('');
+      body.innerHTML = `<div class="appt-collapsed-bar"><div class="scan-badges">${badgeHtml}</div><button class="expand-btn" onclick="toggleCardCollapse('${apptId}','${clientId}','${firstName}')">+ Add More</button></div>`;
+    } else {
+      body.innerHTML = `<div class="appt-collapsed-bar"><span style="font-size:12px;color:var(--muted2);">No scan uploaded yet</span><button class="expand-btn" onclick="toggleCardCollapse('${apptId}','${clientId}','${firstName}')">▲ Expand</button></div>`;
+    }
+    document.getElementById(`toggle-${apptId}`).textContent = '▶';
+  }
+}
+
 function collapseApptCard(appt, uploaded) {
   const card = document.getElementById(`drop-${appt.id}`)?.closest('.appt-card');
   if (!card) return;
@@ -512,6 +540,8 @@ function collapseApptCard(appt, uploaded) {
       <div class="scan-badges">${badgeHtml}</div>
       <button class="expand-btn" onclick="expandApptCard('${appt.id}')">+ Add More</button>
     </div>`;
+  const toggleBtn = document.getElementById(`toggle-${appt.id}`);
+  if (toggleBtn) toggleBtn.textContent = '▶';
 }
 
 function expandApptCard(apptId) {
@@ -621,6 +651,18 @@ async function loadWeekView() {
     }).then(r => r.json()).catch(() => ({ appointments: [] }))
   ));
 
+  // Collect all clientIds to check who has scans
+  const allAppts = results.flatMap(r => r.appointments || []);
+  const clientIds = [...new Set(allAppts.filter(a => a.clientId).map(a => a.clientId))];
+  let hasScansSet = new Set();
+  if (clientIds.length) {
+    const [dexaRes, rmrRes] = await Promise.all([
+      sb.from('dexa_scans').select('client_id').in('client_id', clientIds),
+      sb.from('rmr_tests').select('client_id').in('client_id', clientIds),
+    ]);
+    [...(dexaRes.data||[]), ...(rmrRes.data||[])].forEach(r => hasScansSet.add(r.client_id));
+  }
+
   days.forEach((d, i) => {
     const col = document.getElementById(`week-col-${dateToStr(d)}`);
     if (!col) return;
@@ -629,9 +671,15 @@ async function loadWeekView() {
     col.innerHTML = appts.map(a => {
       const time = new Date(a.datetime).toLocaleTimeString('en-AU', { hour:'numeric', minute:'2-digit', hour12:true });
       const name = `${a.firstName||''} ${a.lastName||''}`.trim();
-      const hasClient = !!a.clientId;
-      return `<div class="week-appt-chip ${hasClient?'has-account':'no-account'}"
-        onclick="${hasClient ? `viewClientProfile('${a.clientId}','${a.firstName}','${a.lastName}')` : `toast('No Life X account yet','error')`}">
+      let chipClass = 'no-account';
+      let tooltip = 'No Life X account';
+      if (a.clientId) {
+        if (!a.emailConfirmed) { chipClass = 'pending'; tooltip = 'Invite sent — not yet confirmed'; }
+        else if (!hasScansSet.has(a.clientId)) { chipClass = 'confirmed-noscans'; tooltip = 'Account active — no scans yet'; }
+        else { chipClass = 'confirmed-scans'; tooltip = 'Account active — scans uploaded'; }
+      }
+      return `<div class="week-appt-chip ${chipClass}" title="${tooltip}"
+        onclick="${a.clientId ? `viewClientProfile('${a.clientId}','${a.firstName}','${a.lastName}')` : `toast('No Life X account yet — use Today\\'s Appointments to create one','error')`}">
         <div class="week-chip-time">${time}</div>
         <div class="week-chip-name">${name}</div>
       </div>`;
@@ -757,21 +805,70 @@ async function viewClientProfile(clientId, firstName, lastName) {
     if (hp)   parts.push('Hormones: ' + fmtDate(hp.panel_date));
     document.getElementById('cp-meta').textContent = parts.length ? parts.join(' · ') : 'No scan data yet';
 
+    // ── Life X Score ──
+    let dexaScore = null, bloodScore = null, rmrScore = null;
+    if (dexa?.fat_pct != null) {
+      const fp = dexa.fat_pct;
+      if(fp<=12)dexaScore=95; else if(fp<=17)dexaScore=85; else if(fp<=22)dexaScore=74; else if(fp<=27)dexaScore=58; else dexaScore=42;
+    }
+    if (bm.length) {
+      const opt = bm.filter(m=>m.status==='optimal').length;
+      const nor = bm.filter(m=>m.status==='normal').length;
+      bloodScore = Math.round(((opt + nor*0.75)/bm.length)*100);
+    }
+    if (rmr?.fat_pct != null) {
+      const fp = rmr.fat_pct;
+      if(fp>=80)rmrScore=90; else if(fp>=75)rmrScore=76; else if(fp>=65)rmrScore=60; else rmrScore=45;
+    }
+    const scores = [dexaScore, bloodScore, rmrScore].filter(s => s !== null);
+    const lifexScore = scores.length ? Math.round(scores.reduce((a,b)=>a+b,0)/scores.length) : null;
+
     let html = '';
+
+    // Score card
+    if (lifexScore !== null) {
+      const circumference = 2 * Math.PI * 65;
+      const offset = circumference * (1 - lifexScore / 100);
+      const scoreColour = lifexScore >= 80 ? 'var(--green)' : lifexScore >= 60 ? 'var(--gold)' : 'var(--orange)';
+      html += `<div class="card" style="margin-bottom:20px;display:flex;align-items:center;gap:32px;flex-wrap:wrap;">
+        <div style="display:flex;align-items:center;justify-content:center;position:relative;flex-shrink:0;">
+          <svg width="120" height="120" viewBox="0 0 160 160">
+            <circle cx="80" cy="80" r="65" fill="none" stroke="var(--surface3)" stroke-width="10"/>
+            <circle cx="80" cy="80" r="65" fill="none" stroke="${scoreColour}" stroke-width="10"
+              stroke-dasharray="${circumference.toFixed(1)}" stroke-dashoffset="${offset.toFixed(1)}" stroke-linecap="round" transform="rotate(-90 80 80)"/>
+          </svg>
+          <div style="position:absolute;text-align:center;">
+            <div style="font-family:'Bebas Neue',sans-serif;font-size:36px;line-height:1;color:${scoreColour};">${lifexScore}</div>
+            <div style="font-size:10px;color:var(--muted2);letter-spacing:1px;">LIFE X SCORE</div>
+          </div>
+        </div>
+        <div style="flex:1;display:flex;flex-direction:column;gap:10px;min-width:180px;">
+          ${dexaScore !== null ? `<div style="display:flex;align-items:center;gap:10px;"><div style="width:40px;font-size:11px;color:var(--muted2);">DEXA</div><div style="flex:1;height:8px;background:var(--surface3);border-radius:4px;overflow:hidden;"><div style="width:${dexaScore}%;height:100%;background:var(--blue);border-radius:4px;"></div></div><div style="width:24px;font-size:12px;font-weight:600;text-align:right;">${dexaScore}</div></div>` : ''}
+          ${bloodScore !== null ? `<div style="display:flex;align-items:center;gap:10px;"><div style="width:40px;font-size:11px;color:var(--muted2);">Blood</div><div style="flex:1;height:8px;background:var(--surface3);border-radius:4px;overflow:hidden;"><div style="width:${bloodScore}%;height:100%;background:var(--green);border-radius:4px;"></div></div><div style="width:24px;font-size:12px;font-weight:600;text-align:right;">${bloodScore}</div></div>` : ''}
+          ${rmrScore !== null ? `<div style="display:flex;align-items:center;gap:10px;"><div style="width:40px;font-size:11px;color:var(--muted2);">RMR</div><div style="flex:1;height:8px;background:var(--surface3);border-radius:4px;overflow:hidden;"><div style="width:${rmrScore}%;height:100%;background:var(--orange);border-radius:4px;"></div></div><div style="width:24px;font-size:12px;font-weight:600;text-align:right;">${rmrScore}</div></div>` : ''}
+        </div>
+      </div>`;
+    }
 
     // ── DEXA ──
     if (dexa) {
+      const vatStatus = dexa.vat_g != null ? (dexa.vat_g < 100 ? {c:'green',t:'Normal (<100g)'} : dexa.vat_g < 160 ? {c:'gold',t:'Increased Risk'} : {c:'red',t:'High Risk'}) : null;
+      const agStatus = dexa.ag_ratio != null ? (dexa.ag_ratio < 1 ? {c:'green',t:'Pear shape — lower CVD risk'} : {c:'red',t:'Apple shape — higher CVD risk'}) : null;
+      const tStatus = dexa.t_score != null ? (dexa.t_score >= -1 ? {c:'green',t:'Normal'} : dexa.t_score >= -2.5 ? {c:'gold',t:'Osteopenia'} : {c:'red',t:'Osteoporosis'}) : null;
       html += `<div class="card" style="margin-bottom:20px;">
         <div class="card-title">DEXA Scan — ${fmtDate(dexa.scan_date)}</div>
         <div class="profile-stats">
           ${dexa.fat_pct != null ? `<div class="stat-chip orange"><div class="stat-chip-label">Body Fat</div><div class="stat-chip-value">${dexa.fat_pct}<span class="stat-chip-unit">%</span></div></div>` : ''}
-          ${dexa.lean_g != null ? `<div class="stat-chip green"><div class="stat-chip-label">Lean Mass</div><div class="stat-chip-value">${fmt(Math.round(dexa.lean_g/1000*10)/10)}<span class="stat-chip-unit">kg</span></div></div>` : ''}
-          ${dexa.fat_g != null ? `<div class="stat-chip red"><div class="stat-chip-label">Fat Mass</div><div class="stat-chip-value">${fmt(Math.round(dexa.fat_g/1000*10)/10)}<span class="stat-chip-unit">kg</span></div></div>` : ''}
-          ${dexa.total_g != null ? `<div class="stat-chip blue"><div class="stat-chip-label">Total Mass</div><div class="stat-chip-value">${fmt(Math.round(dexa.total_g/1000*10)/10)}<span class="stat-chip-unit">kg</span></div></div>` : ''}
+          ${dexa.lean_g != null ? `<div class="stat-chip green"><div class="stat-chip-label">Lean Mass</div><div class="stat-chip-value">${(dexa.lean_g/1000).toFixed(1)}<span class="stat-chip-unit">kg</span></div></div>` : ''}
+          ${dexa.fat_g != null ? `<div class="stat-chip red"><div class="stat-chip-label">Fat Mass</div><div class="stat-chip-value">${(dexa.fat_g/1000).toFixed(1)}<span class="stat-chip-unit">kg</span></div></div>` : ''}
+          ${dexa.total_g != null ? `<div class="stat-chip blue"><div class="stat-chip-label">Total Mass</div><div class="stat-chip-value">${(dexa.total_g/1000).toFixed(1)}<span class="stat-chip-unit">kg</span></div></div>` : ''}
           ${dexa.bmd != null ? `<div class="stat-chip gold"><div class="stat-chip-label">Bone Density</div><div class="stat-chip-value">${dexa.bmd}<span class="stat-chip-unit">g/cm²</span></div></div>` : ''}
-          ${dexa.t_score != null ? `<div class="stat-chip ${dexa.t_score >= -1 ? 'green' : dexa.t_score >= -2.5 ? 'gold' : 'red'}"><div class="stat-chip-label">T-Score</div><div class="stat-chip-value">${dexa.t_score}</div></div>` : ''}
-          ${dexa.vat_g != null ? `<div class="stat-chip ${dexa.vat_g < 200 ? 'green' : 'orange'}"><div class="stat-chip-label">VAT</div><div class="stat-chip-value">${dexa.vat_g}<span class="stat-chip-unit">g</span></div></div>` : ''}
-          ${dexa.ag_ratio != null ? `<div class="stat-chip ${dexa.ag_ratio < 1 ? 'green' : 'red'}"><div class="stat-chip-label">A:G Ratio</div><div class="stat-chip-value">${dexa.ag_ratio}</div></div>` : ''}
+          ${tStatus ? `<div class="stat-chip ${tStatus.c}"><div class="stat-chip-label">T-Score</div><div class="stat-chip-value">${dexa.t_score}</div><div class="stat-chip-unit">${tStatus.t}</div></div>` : ''}
+          ${vatStatus ? `<div class="stat-chip ${vatStatus.c}"><div class="stat-chip-label">VAT</div><div class="stat-chip-value">${dexa.vat_g}<span class="stat-chip-unit">g</span></div><div class="stat-chip-unit">${vatStatus.t}</div></div>` : ''}
+          ${agStatus ? `<div class="stat-chip ${agStatus.c}"><div class="stat-chip-label">A:G Ratio</div><div class="stat-chip-value">${dexa.ag_ratio}</div><div class="stat-chip-unit">${agStatus.t}</div></div>` : ''}
+          ${dexa.android_fat_pct != null ? `<div class="stat-chip orange"><div class="stat-chip-label">Android Fat</div><div class="stat-chip-value">${dexa.android_fat_pct}<span class="stat-chip-unit">%</span></div></div>` : ''}
+          ${dexa.gynoid_fat_pct != null ? `<div class="stat-chip blue"><div class="stat-chip-label">Gynoid Fat</div><div class="stat-chip-value">${dexa.gynoid_fat_pct}<span class="stat-chip-unit">%</span></div></div>` : ''}
+          ${dexa.pr_pct != null ? `<div class="stat-chip ${dexa.pr_pct>=85?'green':'gold'}"><div class="stat-chip-label">PR %</div><div class="stat-chip-value">${dexa.pr_pct}<span class="stat-chip-unit">%</span></div></div>` : ''}
         </div>
       </div>`;
     }
@@ -973,7 +1070,7 @@ function showPanel(id) {
   document.querySelectorAll('.nav-item').forEach(n => n.classList.remove('active'));
   document.getElementById('panel-' + id).classList.add('active');
   document.querySelector(`[data-panel="${id}"]`)?.classList.add('active');
-  if (id === 'previous') setPrevView('month');
+  if (id === 'previous') setPrevView('week');
 }
 
 /* ══ TOAST ══ */

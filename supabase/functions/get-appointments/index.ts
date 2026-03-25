@@ -62,9 +62,13 @@ Deno.serve(async (req) => {
 
     const mapped = filtered.map((a: any) => {
       let clientId = null;
+      let emailConfirmed = false;
       if (a.email) {
         const user = users.find((u: any) => u.email?.toLowerCase() === a.email?.toLowerCase());
-        if (user) clientId = user.id;
+        if (user) {
+          clientId = user.id;
+          emailConfirmed = !!user.email_confirmed_at;
+        }
       }
       return {
         id: a.id,
@@ -76,6 +80,7 @@ Deno.serve(async (req) => {
         type: a.type,
         duration: a.duration,
         clientId,
+        emailConfirmed,
       };
     });
 
