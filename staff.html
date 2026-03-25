@@ -506,6 +506,9 @@ function expandApptCard(apptId) {
   const uploaded = JSON.parse(sessionStorage.getItem(`uploads-${apptId}`) || '[]');
   const badgeHtml = uploaded.map(t => `<span class="scan-badge done">✅ ${t}</span>`).join('');
   card.querySelector('.appt-body').innerHTML = `
+    <div style="display:flex;justify-content:flex-end;margin-bottom:8px;">
+      <button class="expand-btn" onclick="collapseApptCard({id:'${apptId}'}, JSON.parse(sessionStorage.getItem('uploads-${apptId}')||'[]'))">▲ Collapse</button>
+    </div>
     <div class="drop-zone" id="drop-${apptId}">
       <div class="drop-icon">📄</div>
       <div>Drop another PDF or click to browse</div>
