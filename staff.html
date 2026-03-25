@@ -121,6 +121,22 @@ html, body { height: 100%; background: var(--bg); color: var(--text); font-famil
 .week-day.active .week-day-name { color:var(--blue); }
 .week-day-num { font-family:'Bebas Neue',sans-serif;font-size:22px;line-height:1.2; }
 
+/* VIEW TOGGLE */
+.view-toggle { display:flex;gap:6px;margin-bottom:16px; }
+.view-toggle-btn { padding:6px 16px;border-radius:8px;border:1px solid var(--border2);background:var(--surface);color:var(--muted2);cursor:pointer;font-family:'Outfit',sans-serif;font-size:12px;font-weight:600;transition:all 0.15s; }
+.view-toggle-btn.active { background:rgba(77,166,255,0.12);border-color:var(--blue);color:var(--blue); }
+
+/* MONTH VIEW */
+.month-nav { display:flex;align-items:center;justify-content:space-between;margin-bottom:12px; }
+.month-title { font-size:16px;font-weight:600; }
+.month-grid { display:grid;grid-template-columns:repeat(7,1fr);gap:4px;margin-bottom:20px; }
+.month-day-header { text-align:center;font-size:10px;font-weight:600;text-transform:uppercase;letter-spacing:0.8px;color:var(--muted);padding:6px 0; }
+.month-cell { min-height:44px;border-radius:8px;border:1px solid var(--border);background:var(--surface);display:flex;align-items:center;justify-content:center;cursor:pointer;transition:all 0.15s;font-size:14px; }
+.month-cell:hover { border-color:var(--blue); }
+.month-cell.active { background:rgba(77,166,255,0.12);border-color:var(--blue);color:var(--blue);font-weight:700; }
+.month-cell.today { border-color:var(--gold); }
+.month-cell.empty { cursor:default;background:transparent;border-color:transparent; }
+
 /* TODAY'S APPOINTMENTS */
 .today-grid { display:grid;grid-template-columns:repeat(auto-fill,minmax(320px,1fr));gap:20px; }
 .appt-card { background:var(--surface);border:1px solid var(--border);border-radius:14px;overflow:hidden;transition:border-color 0.2s; }
@@ -211,10 +227,24 @@ html, body { height: 100%; background: var(--bg); color: var(--text); font-famil
   <div id="panel-previous" class="panel">
     <div class="page-title">Previous Appointments</div>
     <div class="page-subtitle" id="prev-subtitle" style="margin-bottom:16px;">Select a day to view appointments</div>
-    <div class="week-nav">
-      <button class="week-nav-btn" onclick="shiftWeek(-1)">◀ Prev</button>
-      <div class="week-days" id="week-days"></div>
-      <button class="week-nav-btn" onclick="shiftWeek(1)">Next ▶</button>
+    <div class="view-toggle">
+      <button class="view-toggle-btn active" id="btn-week-view" onclick="setPrevView('week')">Week</button>
+      <button class="view-toggle-btn" id="btn-month-view" onclick="setPrevView('month')">Month</button>
+    </div>
+    <div id="prev-week-view">
+      <div class="week-nav">
+        <button class="week-nav-btn" onclick="shiftWeek(-1)">◀ Prev</button>
+        <div class="week-days" id="week-days"></div>
+        <button class="week-nav-btn" onclick="shiftWeek(1)">Next ▶</button>
+      </div>
+    </div>
+    <div id="prev-month-view" style="display:none;">
+      <div class="month-nav">
+        <button class="week-nav-btn" onclick="shiftMonth(-1)">◀ Prev</button>
+        <div class="month-title" id="month-title"></div>
+        <button class="week-nav-btn" onclick="shiftMonth(1)">Next ▶</button>
+      </div>
+      <div class="month-grid" id="month-grid"></div>
     </div>
     <div id="prev-grid" class="today-grid">
       <div class="no-acuity"><div class="no-acuity-icon">🗓️</div><div>Select a day above</div></div>
@@ -591,9 +621,48 @@ function shiftWeek(dir) {
   renderWeek();
 }
 
+let monthYear = new Date().getFullYear();
+let monthMonth = new Date().getMonth();
+const MONTH_NAMES_FULL = ['January','February','March','April','May','June','July','August','September','October','November','December'];
+
+function setPrevView(view) {
+  document.getElementById('prev-week-view').style.display = view === 'week' ? '' : 'none';
+  document.getElementById('prev-month-view').style.display = view === 'month' ? '' : 'none';
+  document.getElementById('btn-week-view').classList.toggle('active', view === 'week');
+  document.getElementById('btn-month-view').classList.toggle('active', view === 'month');
+  if (view === 'month') renderMonth();
+}
+
+function shiftMonth(dir) {
+  monthMonth += dir;
+  if (monthMonth > 11) { monthMonth = 0; monthYear++; }
+  if (monthMonth < 0)  { monthMonth = 11; monthYear--; }
+  renderMonth();
+}
+
+function renderMonth() {
+  const title = document.getElementById('month-title');
+  const grid = document.getElementById('month-grid');
+  const todayStr = dateToStr(new Date());
+  title.textContent = `${MONTH_NAMES_FULL[monthMonth]} ${monthYear}`;
+  const pad = n => String(n).padStart(2,'0');
+  const firstDayOfWeek = new Date(monthYear, monthMonth, 1).getDay();
+  const daysInMonth = new Date(monthYear, monthMonth + 1, 0).getDate();
+  let html = DAY_NAMES.map(d => `<div class="month-day-header">${d}</div>`).join('');
+  for (let i = 0; i < firstDayOfWeek; i++) html += `<div class="month-cell empty"></div>`;
+  for (let d = 1; d <= daysInMonth; d++) {
+    const str = `${monthYear}-${pad(monthMonth+1)}-${pad(d)}`;
+    const isToday = str === todayStr;
+    const isSelected = str === selectedDate;
+    html += `<div class="month-cell ${isSelected?'active':''} ${isToday&&!isSelected?'today':''}" onclick="selectWeekDay('${str}')">${d}</div>`;
+  }
+  grid.innerHTML = html;
+}
+
 function selectWeekDay(date) {
   selectedDate = date;
   renderWeek();
+  if (document.getElementById('prev-month-view').style.display !== 'none') renderMonth();
   loadPreviousAppointments(date);
 }
 

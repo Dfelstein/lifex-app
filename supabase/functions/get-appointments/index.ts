@@ -21,16 +21,14 @@ Deno.serve(async (req) => {
   if (req.method === 'OPTIONS') return new Response(null, { status: 204, headers: { 'Access-Control-Allow-Origin': '*', 'Access-Control-Allow-Headers': 'authorization, content-type' } });
 
   try {
-    const pad = (n: number) => String(n).padStart(2, '0');
-
     // Allow ?date=YYYY-MM-DD param, otherwise use today in Sydney time
     const urlParams = new URL(req.url).searchParams;
     let targetDate = urlParams.get('date') || '';
 
+    const dateFmt = new Intl.DateTimeFormat('en-CA', { timeZone: 'Australia/Sydney', year: 'numeric', month: '2-digit', day: '2-digit' });
+
     if (!targetDate) {
-      const now = new Date();
-      const sydney = new Date(now.toLocaleString('en-AU', { timeZone: 'Australia/Sydney' }));
-      targetDate = `${sydney.getFullYear()}-${pad(sydney.getMonth() + 1)}-${pad(sydney.getDate())}`;
+      targetDate = dateFmt.format(new Date());
     }
 
     // Fetch from Acuity
@@ -47,10 +45,9 @@ Deno.serve(async (req) => {
     const appointments = await res.json();
 
     // Filter strictly to the target date in AEST
-    const fmt = new Intl.DateTimeFormat('en-CA', { timeZone: 'Australia/Sydney', year: 'numeric', month: '2-digit', day: '2-digit' });
     const filtered = appointments.filter((a: any) => {
       if (!a.datetime) return false;
-      return fmt.format(new Date(a.datetime)) === targetDate;
+      return dateFmt.format(new Date(a.datetime)) === targetDate;
     });
 
     filtered.sort((a: any, b: any) => new Date(a.datetime).getTime() - new Date(b.datetime).getTime());
