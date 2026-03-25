@@ -407,12 +407,10 @@ async function loadTodayAppointments() {
     if (data.error) throw new Error(data.error);
 
     const appts = data.appointments || [];
-    const dateStr = data.date || new Date().toISOString().slice(0,10);
-    const [y, m, d] = dateStr.split('-').map(Number);
+    const now = new Date();
     const monthNames = ['January','February','March','April','May','June','July','August','September','October','November','December'];
     const dayNames = ['Sunday','Monday','Tuesday','Wednesday','Thursday','Friday','Saturday'];
-    const dateObj = new Date(y, m - 1, d);
-    dateEl.textContent = `${dayNames[dateObj.getDay()]}, ${d} ${monthNames[m-1]}`;
+    dateEl.textContent = `${dayNames[now.getDay()]}, ${now.getDate()} ${monthNames[now.getMonth()]}`;
     subtitle.textContent = appts.length === 0 ? 'No appointments today' : `${appts.length} appointment${appts.length > 1 ? 's' : ''} booked`;
 
     if (appts.length === 0) {
