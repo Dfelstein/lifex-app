@@ -47,11 +47,10 @@ Deno.serve(async (req) => {
     const appointments = await res.json();
 
     // Filter strictly to the target date in AEST
+    const fmt = new Intl.DateTimeFormat('en-CA', { timeZone: 'Australia/Sydney', year: 'numeric', month: '2-digit', day: '2-digit' });
     const filtered = appointments.filter((a: any) => {
       if (!a.datetime) return false;
-      const apptSydney = new Date(new Date(a.datetime).toLocaleString('en-AU', { timeZone: 'Australia/Sydney' }));
-      const apptDateStr = `${apptSydney.getFullYear()}-${pad(apptSydney.getMonth()+1)}-${pad(apptSydney.getDate())}`;
-      return apptDateStr === targetDate;
+      return fmt.format(new Date(a.datetime)) === targetDate;
     });
 
     filtered.sort((a: any, b: any) => new Date(a.datetime).getTime() - new Date(b.datetime).getTime());

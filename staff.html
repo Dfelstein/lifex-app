@@ -108,6 +108,19 @@ html, body { height: 100%; background: var(--bg); color: var(--text); font-famil
 .client-meta { font-size:12px;color:var(--muted2);margin-top:2px; }
 .client-actions { display:flex;gap:8px; }
 
+/* WEEK VIEW */
+.week-nav { display:flex;align-items:center;gap:8px;margin-bottom:20px; }
+.week-nav-btn { background:var(--surface);border:1px solid var(--border2);border-radius:8px;padding:6px 12px;color:var(--text);cursor:pointer;font-size:13px; }
+.week-nav-btn:hover { background:var(--surface2); }
+.week-days { display:flex;gap:6px;flex:1; }
+.week-day { flex:1;text-align:center;padding:10px 4px;border-radius:10px;cursor:pointer;border:1px solid var(--border);background:var(--surface);transition:all 0.15s; }
+.week-day:hover { border-color:var(--blue); }
+.week-day.active { background:rgba(77,166,255,0.12);border-color:var(--blue);color:var(--blue); }
+.week-day.today { border-color:var(--gold); }
+.week-day-name { font-size:10px;font-weight:600;text-transform:uppercase;letter-spacing:0.8px;color:var(--muted2); }
+.week-day.active .week-day-name { color:var(--blue); }
+.week-day-num { font-family:'Bebas Neue',sans-serif;font-size:22px;line-height:1.2; }
+
 /* TODAY'S APPOINTMENTS */
 .today-grid { display:grid;grid-template-columns:repeat(auto-fill,minmax(320px,1fr));gap:20px; }
 .appt-card { background:var(--surface);border:1px solid var(--border);border-radius:14px;overflow:hidden;transition:border-color 0.2s; }
@@ -196,15 +209,15 @@ html, body { height: 100%; background: var(--bg); color: var(--text); font-famil
 
   <!-- ── PREVIOUS APPOINTMENTS ── -->
   <div id="panel-previous" class="panel">
-    <div class="date-header">
-      <div>
-        <div class="page-title">Previous Appointments</div>
-        <div class="page-subtitle" id="prev-subtitle">Select a date to load appointments</div>
-      </div>
-      <input type="date" id="prev-date-picker" style="background:var(--surface2);border:1px solid var(--border2);border-radius:8px;padding:8px 12px;color:var(--text);font-family:'Outfit',sans-serif;font-size:13px;outline:none;cursor:pointer;" onchange="loadPreviousAppointments(this.value)">
+    <div class="page-title">Previous Appointments</div>
+    <div class="page-subtitle" id="prev-subtitle" style="margin-bottom:16px;">Select a day to view appointments</div>
+    <div class="week-nav">
+      <button class="week-nav-btn" onclick="shiftWeek(-1)">◀ Prev</button>
+      <div class="week-days" id="week-days"></div>
+      <button class="week-nav-btn" onclick="shiftWeek(1)">Next ▶</button>
     </div>
     <div id="prev-grid" class="today-grid">
-      <div class="no-acuity"><div class="no-acuity-icon">🗓️</div><div>Pick a date above to view appointments</div></div>
+      <div class="no-acuity"><div class="no-acuity-icon">🗓️</div><div>Select a day above</div></div>
     </div>
   </div>
 
@@ -537,6 +550,53 @@ async function handleDrop(e, appt) {
   }
 }
 
+let weekOffset = 0;
+let selectedDate = null;
+const DAY_NAMES = ['Sun','Mon','Tue','Wed','Thu','Fri','Sat'];
+
+function getWeekDates(offset) {
+  const now = new Date();
+  const day = now.getDay();
+  const sunday = new Date(now);
+  sunday.setDate(now.getDate() - day + (offset * 7));
+  return Array.from({length: 7}, (_, i) => {
+    const d = new Date(sunday);
+    d.setDate(sunday.getDate() + i);
+    return d;
+  });
+}
+
+function dateToStr(d) {
+  const pad = n => String(n).padStart(2,'0');
+  return `${d.getFullYear()}-${pad(d.getMonth()+1)}-${pad(d.getDate())}`;
+}
+
+function renderWeek() {
+  const days = getWeekDates(weekOffset);
+  const todayStr = dateToStr(new Date());
+  const container = document.getElementById('week-days');
+  container.innerHTML = days.map(d => {
+    const str = dateToStr(d);
+    const isToday = str === todayStr;
+    const isSelected = str === selectedDate;
+    return `<div class="week-day ${isSelected?'active':''} ${isToday&&!isSelected?'today':''}" onclick="selectWeekDay('${str}')">
+      <div class="week-day-name">${DAY_NAMES[d.getDay()]}</div>
+      <div class="week-day-num">${d.getDate()}</div>
+    </div>`;
+  }).join('');
+}
+
+function shiftWeek(dir) {
+  weekOffset += dir;
+  renderWeek();
+}
+
+function selectWeekDay(date) {
+  selectedDate = date;
+  renderWeek();
+  loadPreviousAppointments(date);
+}
+
 async function loadPreviousAppointments(date) {
   const grid = document.getElementById('prev-grid');
   const subtitle = document.getElementById('prev-subtitle');
@@ -654,6 +714,7 @@ function showPanel(id) {
   document.querySelectorAll('.nav-item').forEach(n => n.classList.remove('active'));
   document.getElementById('panel-' + id).classList.add('active');
   document.querySelector(`[data-panel="${id}"]`)?.classList.add('active');
+  if (id === 'previous') renderWeek();
 }
 
 /* ══ TOAST ══ */
