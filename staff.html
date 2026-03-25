@@ -145,6 +145,36 @@ html, body { height: 100%; background: var(--bg); color: var(--text); font-famil
 .appt-header { display:flex;align-items:center;gap:12px;padding:16px 18px;border-bottom:1px solid var(--border); }
 .appt-avatar { width:44px;height:44px;border-radius:50%;background:linear-gradient(135deg,var(--blue),var(--teal));display:flex;align-items:center;justify-content:center;font-family:'Bebas Neue',sans-serif;font-size:20px;color:#000;flex-shrink:0; }
 .appt-name { font-weight:600;font-size:15px;line-height:1.2; }
+.appt-name.clickable { cursor:pointer;color:var(--blue);text-decoration:underline;text-underline-offset:2px; }
+.appt-name.clickable:hover { color:#3d9aff; }
+
+/* CLIENT PROFILE PANEL */
+.profile-header { display:flex;align-items:center;gap:16px;margin-bottom:24px; }
+.profile-avatar { width:60px;height:60px;border-radius:50%;background:linear-gradient(135deg,var(--blue),var(--teal));display:flex;align-items:center;justify-content:center;font-family:'Bebas Neue',sans-serif;font-size:26px;color:#000;flex-shrink:0; }
+.profile-stats { display:grid;grid-template-columns:repeat(auto-fill,minmax(140px,1fr));gap:12px;margin-bottom:20px; }
+.stat-chip { background:var(--surface);border:1px solid var(--border);border-radius:10px;padding:14px 16px; }
+.stat-chip-label { font-size:10px;font-weight:600;text-transform:uppercase;letter-spacing:0.8px;color:var(--muted2);margin-bottom:4px; }
+.stat-chip-value { font-family:'Bebas Neue',sans-serif;font-size:26px;line-height:1;letter-spacing:0.5px; }
+.stat-chip-unit { font-size:11px;color:var(--muted2);font-family:'Outfit',sans-serif; }
+.stat-chip.orange { border-color:rgba(255,159,67,0.3); }
+.stat-chip.orange .stat-chip-value { color:var(--orange); }
+.stat-chip.green { border-color:rgba(57,224,122,0.3); }
+.stat-chip.green .stat-chip-value { color:var(--green); }
+.stat-chip.blue { border-color:rgba(77,166,255,0.3); }
+.stat-chip.blue .stat-chip-value { color:var(--blue); }
+.stat-chip.gold { border-color:rgba(245,200,66,0.3); }
+.stat-chip.gold .stat-chip-value { color:var(--gold); }
+.stat-chip.red { border-color:rgba(255,85,85,0.3); }
+.stat-chip.red .stat-chip-value { color:var(--red); }
+.markers-table { width:100%;border-collapse:collapse;font-size:12px; }
+.markers-table th { text-align:left;padding:6px 10px;font-size:10px;font-weight:600;text-transform:uppercase;letter-spacing:0.6px;color:var(--muted);border-bottom:1px solid var(--border2); }
+.markers-table td { padding:8px 10px;border-bottom:1px solid var(--border); }
+.markers-table tr:last-child td { border-bottom:none; }
+.status-badge { display:inline-block;padding:2px 8px;border-radius:10px;font-size:10px;font-weight:700; }
+.status-badge.normal { background:rgba(57,224,122,0.12);color:var(--green); }
+.status-badge.high { background:rgba(255,85,85,0.12);color:var(--red); }
+.status-badge.low { background:rgba(77,166,255,0.12);color:var(--blue); }
+.status-badge.optimal { background:rgba(245,200,66,0.12);color:var(--gold); }
 .appt-meta { font-size:12px;color:var(--muted2);margin-top:2px; }
 .appt-body { padding:16px 18px; }
 .drop-zone {
@@ -193,6 +223,7 @@ html, body { height: 100%; background: var(--bg); color: var(--text); font-famil
     <div class="nav-item" data-panel="previous" onclick="showPanel('previous')"><span class="nav-icon">🗓️</span> Previous Appointments</div>
 
     <div class="nav-group-label" style="margin-top:8px;">Clients</div>
+    <div class="nav-item" data-panel="client-profile" id="nav-client-profile" onclick="showPanel('client-profile')" style="display:none;"><span class="nav-icon">👤</span> <span id="nav-client-name">Client Profile</span></div>
     <div class="nav-item" data-panel="clients" onclick="showPanel('clients')"><span class="nav-icon">👥</span> All Clients</div>
     <div class="nav-item" data-panel="new-client" onclick="showPanel('new-client')"><span class="nav-icon">➕</span> New Client</div>
 
@@ -249,6 +280,18 @@ html, body { height: 100%; background: var(--bg); color: var(--text); font-famil
     <div id="prev-grid" class="today-grid">
       <div class="no-acuity"><div class="no-acuity-icon">🗓️</div><div>Select a day above</div></div>
     </div>
+  </div>
+
+  <!-- ── CLIENT PROFILE ── -->
+  <div id="panel-client-profile" class="panel">
+    <div class="profile-header">
+      <div class="profile-avatar" id="cp-avatar">?</div>
+      <div>
+        <div class="page-title" id="cp-name">Client Profile</div>
+        <div class="page-subtitle" id="cp-meta"></div>
+      </div>
+    </div>
+    <div id="cp-content"><div style="color:var(--muted2);">Loading…</div></div>
   </div>
 
   <!-- ── CLIENTS LIST ── -->
@@ -506,7 +549,7 @@ function renderApptCard(a) {
     <div class="appt-header">
       <div class="appt-avatar">${initials}</div>
       <div>
-        <div class="appt-name">${a.firstName} ${a.lastName}</div>
+        <div class="appt-name ${hasClient ? 'clickable' : ''}" ${hasClient ? `onclick="viewClientProfile('${a.clientId}','${a.firstName}','${a.lastName}')"` : ''}>${a.firstName} ${a.lastName}</div>
         <div class="appt-meta">${time} · ${a.type || 'Appointment'}${!hasClient ? ' · <span style="color:var(--red)">No Life X account</span>' : ''}</div>
       </div>
     </div>
@@ -701,6 +744,136 @@ async function loadPreviousAppointments(date) {
     });
   } catch (e) {
     grid.innerHTML = `<div class="no-acuity"><div class="no-acuity-icon">⚠️</div><div>${e.message}</div></div>`;
+  }
+}
+
+async function viewClientProfile(clientId, firstName, lastName) {
+  const fullName = `${firstName} ${lastName}`;
+  const initials = `${firstName?.[0]||''}${lastName?.[0]||''}`.toUpperCase();
+
+  // Update nav
+  document.getElementById('nav-client-profile').style.display = '';
+  document.getElementById('nav-client-name').textContent = fullName;
+  document.getElementById('cp-avatar').textContent = initials;
+  document.getElementById('cp-name').textContent = fullName;
+  document.getElementById('cp-meta').textContent = 'Loading data…';
+
+  showPanel('client-profile');
+
+  const el = document.getElementById('cp-content');
+  el.innerHTML = '<div style="color:var(--muted2);padding:20px 0;">Loading…</div>';
+
+  try {
+    const [dexaRes, rmrRes, bloodRes, hormoneRes] = await Promise.all([
+      sb.from('dexa_scans').select('*').eq('client_id', clientId).order('scan_date', { ascending: false }).limit(1),
+      sb.from('rmr_tests').select('*').eq('client_id', clientId).order('test_date', { ascending: false }).limit(1),
+      sb.from('blood_panels').select('*').eq('client_id', clientId).order('panel_date', { ascending: false }).limit(1),
+      sb.from('hormone_panels').select('*').eq('client_id', clientId).order('panel_date', { ascending: false }).limit(1),
+    ]);
+
+    const dexa = dexaRes.data?.[0] || null;
+    const rmr  = rmrRes.data?.[0] || null;
+    const bp   = bloodRes.data?.[0] || null;
+    const hp   = hormoneRes.data?.[0] || null;
+
+    // Fetch markers if panels exist
+    const [bmRes, hmRes] = await Promise.all([
+      bp ? sb.from('blood_markers').select('*').eq('panel_id', bp.id).order('category') : Promise.resolve({ data: [] }),
+      hp ? sb.from('hormone_markers').select('*').eq('panel_id', hp.id) : Promise.resolve({ data: [] }),
+    ]);
+
+    const bm = bmRes.data || [];
+    const hm = hmRes.data || [];
+
+    const fmtDate = d => d ? new Date(d + 'T00:00:00').toLocaleDateString('en-AU', { day:'numeric', month:'short', year:'numeric' }) : '';
+    const fmt = n => n != null ? Number(n).toLocaleString() : '—';
+
+    let parts = [];
+    if (dexa) parts.push('DEXA: ' + fmtDate(dexa.scan_date));
+    if (rmr)  parts.push('RMR: ' + fmtDate(rmr.test_date));
+    if (bp)   parts.push('Blood: ' + fmtDate(bp.panel_date));
+    if (hp)   parts.push('Hormones: ' + fmtDate(hp.panel_date));
+    document.getElementById('cp-meta').textContent = parts.length ? parts.join(' · ') : 'No scan data yet';
+
+    let html = '';
+
+    // ── DEXA ──
+    if (dexa) {
+      html += `<div class="card" style="margin-bottom:20px;">
+        <div class="card-title">DEXA Scan — ${fmtDate(dexa.scan_date)}</div>
+        <div class="profile-stats">
+          ${dexa.fat_pct != null ? `<div class="stat-chip orange"><div class="stat-chip-label">Body Fat</div><div class="stat-chip-value">${dexa.fat_pct}<span class="stat-chip-unit">%</span></div></div>` : ''}
+          ${dexa.lean_g != null ? `<div class="stat-chip green"><div class="stat-chip-label">Lean Mass</div><div class="stat-chip-value">${fmt(Math.round(dexa.lean_g/1000*10)/10)}<span class="stat-chip-unit">kg</span></div></div>` : ''}
+          ${dexa.fat_g != null ? `<div class="stat-chip red"><div class="stat-chip-label">Fat Mass</div><div class="stat-chip-value">${fmt(Math.round(dexa.fat_g/1000*10)/10)}<span class="stat-chip-unit">kg</span></div></div>` : ''}
+          ${dexa.total_g != null ? `<div class="stat-chip blue"><div class="stat-chip-label">Total Mass</div><div class="stat-chip-value">${fmt(Math.round(dexa.total_g/1000*10)/10)}<span class="stat-chip-unit">kg</span></div></div>` : ''}
+          ${dexa.bmd != null ? `<div class="stat-chip gold"><div class="stat-chip-label">Bone Density</div><div class="stat-chip-value">${dexa.bmd}<span class="stat-chip-unit">g/cm²</span></div></div>` : ''}
+          ${dexa.t_score != null ? `<div class="stat-chip ${dexa.t_score >= -1 ? 'green' : dexa.t_score >= -2.5 ? 'gold' : 'red'}"><div class="stat-chip-label">T-Score</div><div class="stat-chip-value">${dexa.t_score}</div></div>` : ''}
+          ${dexa.vat_g != null ? `<div class="stat-chip ${dexa.vat_g < 200 ? 'green' : 'orange'}"><div class="stat-chip-label">VAT</div><div class="stat-chip-value">${dexa.vat_g}<span class="stat-chip-unit">g</span></div></div>` : ''}
+          ${dexa.ag_ratio != null ? `<div class="stat-chip ${dexa.ag_ratio < 1 ? 'green' : 'red'}"><div class="stat-chip-label">A:G Ratio</div><div class="stat-chip-value">${dexa.ag_ratio}</div></div>` : ''}
+        </div>
+      </div>`;
+    }
+
+    // ── RMR ──
+    if (rmr) {
+      html += `<div class="card" style="margin-bottom:20px;">
+        <div class="card-title">RMR Test — ${fmtDate(rmr.test_date)}</div>
+        <div class="profile-stats">
+          ${rmr.kcal != null ? `<div class="stat-chip orange"><div class="stat-chip-label">Resting Metabolism</div><div class="stat-chip-value">${fmt(rmr.kcal)}<span class="stat-chip-unit">kcal/day</span></div></div>` : ''}
+          ${rmr.fat_pct != null ? `<div class="stat-chip green"><div class="stat-chip-label">Fat Burning</div><div class="stat-chip-value">${rmr.fat_pct}<span class="stat-chip-unit">%</span></div></div>` : ''}
+          ${rmr.glucose_pct != null ? `<div class="stat-chip blue"><div class="stat-chip-label">Glucose</div><div class="stat-chip-value">${rmr.glucose_pct}<span class="stat-chip-unit">%</span></div></div>` : ''}
+          ${rmr.feo2 != null ? `<div class="stat-chip gold"><div class="stat-chip-label">FEO2</div><div class="stat-chip-value">${rmr.feo2}<span class="stat-chip-unit">%</span></div></div>` : ''}
+        </div>
+      </div>`;
+    }
+
+    // ── BLOOD ──
+    if (bm.length) {
+      html += `<div class="card" style="margin-bottom:20px;">
+        <div class="card-title">Blood Panel — ${fmtDate(bp.panel_date)}${bp.lab_name ? ' · ' + bp.lab_name : ''}</div>
+        <div style="overflow-x:auto;">
+          <table class="markers-table">
+            <thead><tr><th>Marker</th><th>Value</th><th>Range</th><th>Status</th></tr></thead>
+            <tbody>
+              ${bm.map(m => `<tr>
+                <td><div style="font-weight:600;">${m.name}</div>${m.category ? `<div style="font-size:11px;color:var(--muted2);">${m.category}</div>` : ''}</td>
+                <td style="font-family:'Bebas Neue',sans-serif;font-size:18px;">${m.value} <span style="font-size:11px;font-family:'Outfit',sans-serif;color:var(--muted2);">${m.unit}</span></td>
+                <td style="color:var(--muted2);font-size:12px;">${m.ref_min} – ${m.ref_max} ${m.unit}</td>
+                <td><span class="status-badge ${m.status || 'normal'}">${(m.status||'normal').toUpperCase()}</span></td>
+              </tr>`).join('')}
+            </tbody>
+          </table>
+        </div>
+      </div>`;
+    }
+
+    // ── HORMONES ──
+    if (hm.length) {
+      html += `<div class="card" style="margin-bottom:20px;">
+        <div class="card-title">Hormone Panel — ${fmtDate(hp.panel_date)}</div>
+        <div style="overflow-x:auto;">
+          <table class="markers-table">
+            <thead><tr><th>Hormone</th><th>Value</th><th>Range</th><th>Status</th></tr></thead>
+            <tbody>
+              ${hm.map(m => `<tr>
+                <td style="font-weight:600;">${m.name}</td>
+                <td style="font-family:'Bebas Neue',sans-serif;font-size:18px;">${m.value} <span style="font-size:11px;font-family:'Outfit',sans-serif;color:var(--muted2);">${m.unit}</span></td>
+                <td style="color:var(--muted2);font-size:12px;">${m.ref_min} – ${m.ref_max} ${m.unit}</td>
+                <td><span class="status-badge ${m.status || 'normal'}">${(m.status||'normal').toUpperCase()}</span></td>
+              </tr>`).join('')}
+            </tbody>
+          </table>
+        </div>
+      </div>`;
+    }
+
+    if (!html) {
+      html = `<div style="text-align:center;padding:60px 20px;color:var(--muted2);"><div style="font-size:48px;opacity:0.3;margin-bottom:12px;">📋</div><div>No scan data uploaded yet for this client.</div></div>`;
+    }
+
+    el.innerHTML = html;
+  } catch(e) {
+    el.innerHTML = `<div style="color:var(--red);">Error: ${e.message}</div>`;
   }
 }
 
