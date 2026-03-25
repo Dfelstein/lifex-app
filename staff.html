@@ -191,6 +191,10 @@ html, body { height: 100%; background: var(--bg); color: var(--text); font-famil
 .scan-badge.pending { background:var(--surface2);color:var(--muted2);border:1px solid var(--border); }
 .scan-badge.done { background:rgba(57,224,122,0.12);color:var(--green);border:1px solid rgba(57,224,122,0.25); }
 .no-acuity { text-align:center;padding:60px 20px;color:var(--muted2); }
+.appt-card.collapsed .appt-body { padding:8px 18px; }
+.appt-collapsed-bar { display:flex;align-items:center;justify-content:space-between;gap:8px; }
+.expand-btn { background:transparent;border:1px solid var(--border2);border-radius:6px;padding:3px 10px;color:var(--muted2);font-size:11px;cursor:pointer;white-space:nowrap; }
+.expand-btn:hover { background:var(--surface2);color:var(--text); }
 .no-acuity-icon { font-size:48px;opacity:0.3;margin-bottom:12px; }
 .date-header { display:flex;align-items:center;justify-content:space-between;margin-bottom:24px; }
 .date-pill { background:var(--surface);border:1px solid var(--border2);border-radius:8px;padding:6px 14px;font-size:13px;color:var(--muted2); }
@@ -410,7 +414,7 @@ function renderApptCard(a) {
     </div>
     <div class="appt-body">
       ${hasClient ? `
-        <div class="drop-zone" id="drop-${a.id}">
+        <div class="drop-zone" id="drop-${a.id}" data-client-id="${a.clientId}" data-first-name="${a.firstName}">
           <div class="drop-icon">📄</div>
           <div>Drop PDF here or click to browse</div>
           <div style="font-size:11px;margin-top:4px;opacity:0.6">DEXA · Blood · RMR · Hormones — auto-detected</div>
@@ -455,19 +459,15 @@ async function handleDrop(e, appt) {
     const result = await res.json();
     if (result.error) throw new Error(result.error);
 
-    // Update drop zone to done state
-    zone.classList.remove('uploading');
-    zone.classList.add('done');
-    zone.innerHTML = `<div class="drop-icon">✅</div><div>${result.type} uploaded successfully</div><div style="font-size:11px;margin-top:4px;opacity:0.6">Drop another PDF to add more</div>`;
+    // Track uploaded scans for this card
+    const card = zone.closest('.appt-card');
+    const uploadedKey = `uploads-${appt.id}`;
+    const uploaded = JSON.parse(sessionStorage.getItem(uploadedKey) || '[]');
+    uploaded.push(result.type);
+    sessionStorage.setItem(uploadedKey, JSON.stringify(uploaded));
 
-    // Add badge
-    const badges = document.getElementById(`badges-${appt.id}`);
-    const badge = document.createElement('span');
-    badge.className = 'scan-badge done';
-    badge.textContent = `✅ ${result.type}`;
-    badges.appendChild(badge);
-
-    setTimeout(() => { zone.classList.remove('done'); zone.innerHTML = `<div class="drop-icon">📄</div><div>Drop another PDF or click to browse</div>`; }, 3000);
+    // Collapse the card after upload
+    collapseApptCard(appt, uploaded);
     toast(`${result.type} scan saved for ${appt.firstName}!`, 'success');
 
   } catch (err) {
@@ -475,6 +475,42 @@ async function handleDrop(e, appt) {
     zone.innerHTML = `<div class="drop-icon">❌</div><div>${err.message}</div>`;
     setTimeout(() => { zone.innerHTML = `<div class="drop-icon">📄</div><div>Drop PDF here or click to browse</div>`; }, 3000);
     toast('Upload failed: ' + err.message, 'error');
+  }
+}
+
+function collapseApptCard(appt, uploaded) {
+  const card = document.getElementById(`drop-${appt.id}`)?.closest('.appt-card');
+  if (!card) return;
+  card.classList.add('collapsed');
+  const body = card.querySelector('.appt-body');
+  const badgeHtml = uploaded.map(t => `<span class="scan-badge done">✅ ${t}</span>`).join('');
+  body.innerHTML = `
+    <div class="appt-collapsed-bar">
+      <div class="scan-badges">${badgeHtml}</div>
+      <button class="expand-btn" onclick="expandApptCard('${appt.id}')">+ Add More</button>
+    </div>`;
+}
+
+function expandApptCard(apptId) {
+  const card = document.querySelector(`.appt-card .appt-body button[onclick="expandApptCard('${apptId}')"]`)?.closest('.appt-card');
+  if (!card) return;
+  card.classList.remove('collapsed');
+  const uploaded = JSON.parse(sessionStorage.getItem(`uploads-${apptId}`) || '[]');
+  const badgeHtml = uploaded.map(t => `<span class="scan-badge done">✅ ${t}</span>`).join('');
+  card.querySelector('.appt-body').innerHTML = `
+    <div class="drop-zone" id="drop-${apptId}">
+      <div class="drop-icon">📄</div>
+      <div>Drop another PDF or click to browse</div>
+      <div style="font-size:11px;margin-top:4px;opacity:0.6">DEXA · Blood · RMR · Hormones — auto-detected</div>
+    </div>
+    <div class="scan-badges" id="badges-${apptId}">${badgeHtml}</div>`;
+  // Re-wire drop events — find the appt from the card's context
+  const zone = document.getElementById(`drop-${apptId}`);
+  if (zone) {
+    zone.addEventListener('dragover', e => { e.preventDefault(); zone.classList.add('drag-over'); });
+    zone.addEventListener('dragleave', () => zone.classList.remove('drag-over'));
+    zone.addEventListener('drop', e => { e.preventDefault(); zone.classList.remove('drag-over'); handleDrop(e, { id: apptId, clientId: zone.dataset.clientId, firstName: zone.dataset.firstName }); });
+    zone.addEventListener('click', () => { const inp = document.createElement('input'); inp.type='file'; inp.accept='application/pdf'; inp.onchange = ev => handleDrop({ dataTransfer: { files: ev.target.files } }, { id: apptId, clientId: zone.dataset.clientId, firstName: zone.dataset.firstName }); inp.click(); });
   }
 }
 
