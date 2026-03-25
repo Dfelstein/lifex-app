@@ -1,0 +1,25 @@
+{
+  "name": "Life X",
+  "short_name": "Life X",
+  "description": "Your personal health dashboard",
+  "start_url": "/lifex-app/",
+  "scope": "/lifex-app/",
+  "display": "standalone",
+  "orientation": "portrait",
+  "background_color": "#08090b",
+  "theme_color": "#08090b",
+  "icons": [
+    {
+      "src": "icons/icon-192.png",
+      "sizes": "192x192",
+      "type": "image/png",
+      "purpose": "any maskable"
+    },
+    {
+      "src": "icons/icon-512.png",
+      "sizes": "512x512",
+      "type": "image/png",
+      "purpose": "any maskable"
+    }
+  ]
+}
