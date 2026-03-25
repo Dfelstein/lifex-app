@@ -507,25 +507,40 @@ async function handleDrop(e, appt) {
 }
 
 function toggleCardCollapse(apptId, clientId, firstName) {
-  const card = document.getElementById(`toggle-${apptId}`)?.closest('.appt-card');
+  const btn = document.getElementById(`toggle-${apptId}`);
+  const card = btn?.closest('.appt-card');
   if (!card) return;
   const isCollapsed = card.classList.contains('collapsed');
+  const body = card.querySelector('.appt-body');
+  const uploaded = JSON.parse(sessionStorage.getItem(`uploads-${apptId}`) || '[]');
+
   if (isCollapsed) {
-    // Expand
-    expandApptCard(apptId);
-    document.getElementById(`toggle-${apptId}`).textContent = '▼';
+    card.classList.remove('collapsed');
+    btn.textContent = '▼';
+    const badgeHtml = uploaded.map(t => `<span class="scan-badge done">✅ ${t}</span>`).join('');
+    body.innerHTML = `
+      <div class="drop-zone" id="drop-${apptId}" data-client-id="${clientId}" data-first-name="${firstName}">
+        <div class="drop-icon">📄</div>
+        <div>${uploaded.length ? 'Drop another PDF or click to browse' : 'Drop PDF here or click to browse'}</div>
+        <div style="font-size:11px;margin-top:4px;opacity:0.6">DEXA · Blood · RMR · Hormones — auto-detected</div>
+      </div>
+      <div class="scan-badges" id="badges-${apptId}">${badgeHtml}</div>`;
+    const zone = document.getElementById(`drop-${apptId}`);
+    if (zone) {
+      zone.addEventListener('dragover', e => { e.preventDefault(); zone.classList.add('drag-over'); });
+      zone.addEventListener('dragleave', () => zone.classList.remove('drag-over'));
+      zone.addEventListener('drop', e => { e.preventDefault(); zone.classList.remove('drag-over'); handleDrop(e, { id: apptId, clientId, firstName }); });
+      zone.addEventListener('click', () => { const inp = document.createElement('input'); inp.type='file'; inp.accept='application/pdf'; inp.onchange = ev => handleDrop({ dataTransfer: { files: ev.target.files } }, { id: apptId, clientId, firstName }); inp.click(); });
+    }
   } else {
-    // Collapse
-    const uploaded = JSON.parse(sessionStorage.getItem(`uploads-${apptId}`) || '[]');
     card.classList.add('collapsed');
-    const body = card.querySelector('.appt-body');
+    btn.textContent = '▶';
+    const badgeHtml = uploaded.map(t => `<span class="scan-badge done">✅ ${t}</span>`).join('');
     if (uploaded.length) {
-      const badgeHtml = uploaded.map(t => `<span class="scan-badge done">✅ ${t}</span>`).join('');
       body.innerHTML = `<div class="appt-collapsed-bar"><div class="scan-badges">${badgeHtml}</div><button class="expand-btn" onclick="toggleCardCollapse('${apptId}','${clientId}','${firstName}')">+ Add More</button></div>`;
     } else {
       body.innerHTML = `<div class="appt-collapsed-bar"><span style="font-size:12px;color:var(--muted2);">No scan uploaded yet</span><button class="expand-btn" onclick="toggleCardCollapse('${apptId}','${clientId}','${firstName}')">▲ Expand</button></div>`;
     }
-    document.getElementById(`toggle-${apptId}`).textContent = '▶';
   }
 }
 
