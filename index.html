@@ -1,0 +1,226 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Life X — Sign In</title>
+<link href="https://fonts.googleapis.com/css2?family=Bebas+Neue&family=Outfit:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+<style>
+:root {
+  --bg: #08090b; --surface: #0f1114; --surface2: #161a1f;
+  --border: rgba(255,255,255,0.06); --border2: rgba(255,255,255,0.1);
+  --gold: #f5c842; --gold2: #e8a020; --red: #ff5555;
+  --text: #eef0f3; --muted: #5a6272; --muted2: #8a94a6;
+}
+*, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+html, body {
+  height: 100%; background: var(--bg); color: var(--text);
+  font-family: 'Outfit', sans-serif;
+  display: flex; align-items: center; justify-content: center;
+}
+.wrap { width: 100%; max-width: 400px; padding: 24px; }
+.logo { text-align: center; margin-bottom: 40px; }
+.logo-mark {
+  width: 64px; height: 64px; background: var(--gold); border-radius: 16px;
+  display: inline-flex; align-items: center; justify-content: center;
+  font-family: 'Bebas Neue', sans-serif; font-size: 30px; color: #000; margin-bottom: 14px;
+}
+.logo-name { font-family: 'Bebas Neue', sans-serif; font-size: 40px; letter-spacing: 5px; line-height: 1; }
+.logo-sub { font-size: 11px; color: var(--muted2); letter-spacing: 2px; text-transform: uppercase; margin-top: 5px; }
+.card { background: var(--surface); border: 1px solid var(--border); border-radius: 16px; padding: 32px; }
+.card-title { font-family: 'Bebas Neue', sans-serif; font-size: 24px; letter-spacing: 2px; margin-bottom: 24px; }
+.field { margin-bottom: 16px; }
+.field label { display: block; font-size: 11px; font-weight: 600; text-transform: uppercase; letter-spacing: 1px; color: var(--muted2); margin-bottom: 6px; }
+.field input {
+  width: 100%; background: var(--surface2); border: 1px solid var(--border2);
+  border-radius: 8px; padding: 13px 14px; color: var(--text);
+  font-family: 'Outfit', sans-serif; font-size: 14px; outline: none;
+  transition: border-color 0.15s;
+}
+.field input:focus { border-color: var(--gold); }
+.btn {
+  width: 100%; padding: 14px; background: var(--gold); color: #000; border: none;
+  border-radius: 8px; font-family: 'Bebas Neue', sans-serif; font-size: 20px;
+  letter-spacing: 2px; cursor: pointer; transition: background 0.15s; margin-top: 8px;
+}
+.btn:hover { background: var(--gold2); }
+.btn:disabled { opacity: 0.5; cursor: not-allowed; }
+.error {
+  margin-top: 12px; padding: 11px 14px;
+  background: rgba(255,85,85,0.08); border: 1px solid rgba(255,85,85,0.25);
+  border-radius: 8px; color: var(--red); font-size: 13px; display: none;
+}
+.success {
+  margin-top: 12px; padding: 11px 14px;
+  background: rgba(80,200,120,0.08); border: 1px solid rgba(80,200,120,0.25);
+  border-radius: 8px; color: #50c878; font-size: 13px; display: none;
+}
+.forgot-link {
+  display: block; text-align: center; margin-top: 16px;
+  font-size: 12px; color: var(--muted2); cursor: pointer;
+  text-decoration: underline; text-underline-offset: 3px;
+}
+.forgot-link:hover { color: var(--text); }
+#reset-card { display: none; }
+</style>
+</head>
+<body>
+<div class="wrap">
+  <div class="logo">
+    <div class="logo-mark">LX</div>
+    <div class="logo-name">Life X</div>
+    <div class="logo-sub">Body Intelligence</div>
+  </div>
+  <div class="card" id="reset-card">
+    <div class="card-title">Set New Password</div>
+    <div class="field">
+      <label>New Password</label>
+      <input type="password" id="new-password" placeholder="••••••••">
+    </div>
+    <button class="btn" id="reset-btn" onclick="setNewPassword()">Update Password</button>
+    <div class="error" id="reset-error"></div>
+    <div class="success" id="reset-success"></div>
+  </div>
+
+  <div class="card" id="login-card">
+    <div class="card-title">Sign In</div>
+    <div class="field">
+      <label>Email</label>
+      <input type="email" id="email" placeholder="you@example.com" autocomplete="email">
+    </div>
+    <div class="field">
+      <label>Password</label>
+      <input type="password" id="password" placeholder="••••••••" autocomplete="current-password">
+    </div>
+    <button class="btn" id="btn" onclick="signIn()">Sign In</button>
+    <div class="error" id="error"></div>
+    <div class="success" id="success"></div>
+    <span class="forgot-link" onclick="forgotPassword()">Forgot password?</span>
+  </div>
+</div>
+
+<script>
+const SUPABASE_URL = 'https://shvpwgrjqskccsdzajkj.supabase.co';
+const SUPABASE_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InNodnB3Z3JqcXNrY2NzZHphamtqIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzM5MDUzNTIsImV4cCI6MjA4OTQ4MTM1Mn0.2dL3J9XbzU8q8ogPPqhwR4w7_vSB0FxVKMzsAOxCgk4';
+const sb = window.supabase.createClient(SUPABASE_URL, SUPABASE_KEY);
+
+// Check for password recovery link immediately (before any redirect)
+const isRecovery = window.location.hash.includes('type=recovery');
+if (isRecovery) {
+  document.getElementById('login-card').style.display = 'none';
+  document.getElementById('reset-card').style.display = 'block';
+}
+
+sb.auth.onAuthStateChange((event, session) => {
+  if (event === 'PASSWORD_RECOVERY') {
+    document.getElementById('login-card').style.display = 'none';
+    document.getElementById('reset-card').style.display = 'block';
+  }
+});
+
+(async () => {
+  if (isRecovery) return; // skip auto-redirect for recovery links
+  const { data: { session } } = await sb.auth.getSession();
+  if (session) await redirect(session.user.id);
+})();
+
+async function redirect(uid) {
+  const { data } = await sb.from('profiles').select('is_staff').eq('id', uid).single();
+  window.location.href = data?.is_staff ? 'staff.html' : 'dashboard.html';
+}
+
+async function signIn() {
+  const email    = document.getElementById('email').value.trim();
+  const password = document.getElementById('password').value;
+  const errEl    = document.getElementById('error');
+  const btn      = document.getElementById('btn');
+
+  errEl.style.display = 'none';
+  btn.disabled = true;
+  btn.textContent = 'Signing in…';
+
+  const { data, error } = await sb.auth.signInWithPassword({ email, password });
+  if (error) {
+    errEl.textContent = error.message;
+    errEl.style.display = 'block';
+    btn.disabled = false;
+    btn.textContent = 'Sign In';
+    return;
+  }
+  await redirect(data.user.id);
+}
+
+async function setNewPassword() {
+  const password = document.getElementById('new-password').value;
+  const errEl = document.getElementById('reset-error');
+  const sucEl = document.getElementById('reset-success');
+  const btn   = document.getElementById('reset-btn');
+  errEl.style.display = 'none';
+  sucEl.style.display = 'none';
+
+  if (password.length < 6) {
+    errEl.textContent = 'Password must be at least 6 characters.';
+    errEl.style.display = 'block';
+    return;
+  }
+
+  btn.disabled = true;
+  btn.textContent = 'Updating…';
+
+  // Ensure session is established before updating
+  const { data: { session } } = await sb.auth.getSession();
+  if (!session) {
+    errEl.textContent = 'Session expired — please request a new reset email.';
+    errEl.style.display = 'block';
+    btn.disabled = false;
+    btn.textContent = 'Update Password';
+    return;
+  }
+
+  const { error } = await sb.auth.updateUser({ password });
+  if (error) {
+    errEl.textContent = error.message;
+    errEl.style.display = 'block';
+    btn.disabled = false;
+    btn.textContent = 'Update Password';
+  } else {
+    sucEl.textContent = 'Password updated! Signing you in…';
+    sucEl.style.display = 'block';
+    setTimeout(async () => {
+      const { data: { session } } = await sb.auth.getSession();
+      if (session) await redirect(session.user.id);
+    }, 1500);
+  }
+}
+
+async function forgotPassword() {
+  const email = document.getElementById('email').value.trim();
+  const errEl = document.getElementById('error');
+  const sucEl = document.getElementById('success');
+  errEl.style.display = 'none';
+  sucEl.style.display = 'none';
+
+  if (!email) {
+    errEl.textContent = 'Enter your email above first.';
+    errEl.style.display = 'block';
+    return;
+  }
+
+  const { error } = await sb.auth.resetPasswordForEmail(email, {
+    redirectTo: window.location.origin + '/index.html'
+  });
+
+  if (error) {
+    errEl.textContent = error.message;
+    errEl.style.display = 'block';
+  } else {
+    sucEl.textContent = 'Password reset email sent — check your inbox.';
+    sucEl.style.display = 'block';
+  }
+}
+
+document.addEventListener('keydown', e => { if (e.key === 'Enter') signIn(); });
+</script>
+</body>
+</html>

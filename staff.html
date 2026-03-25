@@ -1,0 +1,979 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Life X — Staff Portal</title>
+<link href="https://fonts.googleapis.com/css2?family=Bebas+Neue&family=Outfit:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+<style>
+:root {
+  --bg: #08090b; --surface: #0f1114; --surface2: #161a1f; --surface3: #1c2128;
+  --border: rgba(255,255,255,0.06); --border2: rgba(255,255,255,0.1);
+  --gold: #f5c842; --gold2: #e8a020; --green: #39e07a; --red: #ff5555;
+  --blue: #4da6ff; --orange: #ff9f43; --teal: #2dd4bf;
+  --text: #eef0f3; --muted: #5a6272; --muted2: #8a94a6;
+}
+*, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+html, body { height: 100%; background: var(--bg); color: var(--text); font-family: 'Outfit', sans-serif; font-size: 14px; display: flex; }
+::-webkit-scrollbar { width: 4px; } ::-webkit-scrollbar-track { background: transparent; } ::-webkit-scrollbar-thumb { background: var(--surface3); border-radius: 2px; }
+
+/* LOADING */
+#loading { position:fixed;inset:0;background:var(--bg);display:flex;flex-direction:column;align-items:center;justify-content:center;gap:16px;z-index:100; }
+.loading-mark { width:64px;height:64px;background:var(--gold);border-radius:16px;display:flex;align-items:center;justify-content:center;font-family:'Bebas Neue',sans-serif;font-size:30px;color:#000;animation:pulse 1.2s ease-in-out infinite; }
+@keyframes pulse{0%,100%{opacity:1}50%{opacity:0.4}}
+#app { display:none;width:100%; }
+
+/* SIDEBAR */
+.sidebar { width:240px;min-width:240px;background:var(--surface);border-right:1px solid var(--border);display:flex;flex-direction:column;height:100vh;overflow-y:auto; }
+.sidebar-logo { display:flex;align-items:center;gap:10px;padding:20px 16px 16px;border-bottom:1px solid var(--border); }
+.logo-mark { width:32px;height:32px;background:var(--gold);border-radius:8px;display:flex;align-items:center;justify-content:center;font-family:'Bebas Neue',sans-serif;font-size:16px;color:#000; }
+.logo-text { font-family:'Bebas Neue',sans-serif;font-size:22px;letter-spacing:3px; }
+.logo-sub { font-size:9px;color:var(--muted2);letter-spacing:1px;text-transform:uppercase;margin-top:1px; }
+.staff-badge { display:inline-block;padding:2px 8px;background:rgba(77,166,255,0.15);color:var(--blue);border-radius:10px;font-size:10px;font-weight:700;letter-spacing:0.5px;margin-top:8px; }
+.sidebar-nav { flex:1;padding:8px 0; }
+.nav-group-label { font-size:9px;font-weight:600;letter-spacing:1.5px;text-transform:uppercase;color:var(--muted);padding:12px 16px 4px; }
+.nav-item { display:flex;align-items:center;gap:10px;padding:9px 16px;cursor:pointer;color:var(--muted2);font-size:13px;transition:all 0.15s;border-left:2px solid transparent; }
+.nav-item:hover { background:var(--surface2);color:var(--text); }
+.nav-item.active { background:rgba(77,166,255,0.08);color:var(--blue);border-left:2px solid var(--blue);font-weight:500; }
+.nav-icon { font-size:15px;width:18px;text-align:center;flex-shrink:0; }
+.sidebar-footer { border-top:1px solid var(--border);padding:12px 16px; }
+.signout-btn { width:100%;padding:8px;background:transparent;border:1px solid var(--border2);border-radius:7px;color:var(--muted2);font-family:'Outfit',sans-serif;font-size:12px;cursor:pointer;transition:all 0.15s; }
+.signout-btn:hover { background:var(--surface2);color:var(--text); }
+
+/* MAIN */
+.main { flex:1;overflow-y:auto;height:100vh; }
+.panel { display:none;padding:28px 32px;min-height:100%; }
+.panel.active { display:block; }
+.page-title { font-family:'Bebas Neue',sans-serif;font-size:32px;letter-spacing:2px;margin-bottom:4px; }
+.page-subtitle { color:var(--muted2);font-size:13px;margin-bottom:24px; }
+
+/* CARDS */
+.card { background:var(--surface);border:1px solid var(--border);border-radius:12px;padding:24px;margin-bottom:20px; }
+.card-title { font-size:11px;font-weight:600;letter-spacing:1px;text-transform:uppercase;color:var(--muted2);margin-bottom:16px; }
+
+/* FORM */
+.form-grid { display:grid;grid-template-columns:1fr 1fr;gap:16px; }
+.form-grid-3 { display:grid;grid-template-columns:1fr 1fr 1fr;gap:16px; }
+.field { display:flex;flex-direction:column;gap:5px; }
+.field label { font-size:11px;font-weight:600;text-transform:uppercase;letter-spacing:0.8px;color:var(--muted2); }
+.field input, .field select, .field textarea {
+  background:var(--surface2);border:1px solid var(--border2);border-radius:8px;padding:10px 12px;
+  color:var(--text);font-family:'Outfit',sans-serif;font-size:13px;outline:none;transition:border-color 0.15s;
+}
+.field input:focus, .field select:focus { border-color:var(--blue); }
+.field select option { background:var(--surface2); }
+.field-full { grid-column:1/-1; }
+
+/* BUTTONS */
+.btn { display:inline-flex;align-items:center;gap:8px;padding:10px 20px;border-radius:8px;font-family:'Outfit',sans-serif;font-size:13px;font-weight:600;cursor:pointer;border:none;transition:all 0.15s; }
+.btn-blue { background:var(--blue);color:#000; }
+.btn-blue:hover { background:#3d9aff; }
+.btn-blue:disabled { opacity:0.5;cursor:not-allowed; }
+.btn-gold { background:var(--gold);color:#000; }
+.btn-gold:hover { background:var(--gold2); }
+.btn-outline { background:transparent;color:var(--text);border:1px solid var(--border2); }
+.btn-outline:hover { background:var(--surface2); }
+.btn-danger { background:rgba(255,85,85,0.15);color:var(--red);border:1px solid rgba(255,85,85,0.3); }
+.btn-danger:hover { background:rgba(255,85,85,0.25); }
+.btn-sm { padding:6px 12px;font-size:12px; }
+
+/* TOAST */
+.toast { position:fixed;bottom:24px;right:24px;padding:12px 20px;border-radius:10px;font-size:13px;font-weight:500;z-index:1000;transition:all 0.3s;transform:translateY(20px);opacity:0; }
+.toast.show { transform:translateY(0);opacity:1; }
+.toast.success { background:rgba(57,224,122,0.15);border:1px solid rgba(57,224,122,0.3);color:var(--green); }
+.toast.error   { background:rgba(255,85,85,0.15);border:1px solid rgba(255,85,85,0.3);color:var(--red); }
+
+/* CLIENT SELECT BAR */
+.client-bar { background:var(--surface);border:1px solid var(--border);border-radius:10px;padding:14px 20px;margin-bottom:20px;display:flex;align-items:center;gap:16px; }
+.client-bar label { font-size:11px;font-weight:600;text-transform:uppercase;letter-spacing:0.8px;color:var(--muted2);white-space:nowrap; }
+.client-bar select { flex:1;background:var(--surface2);border:1px solid var(--border2);border-radius:8px;padding:9px 12px;color:var(--text);font-family:'Outfit',sans-serif;font-size:13px;outline:none; }
+
+/* MARKER ROWS */
+.marker-row { display:grid;grid-template-columns:1fr 1fr 80px 80px 80px 80px 80px 90px 36px;gap:8px;align-items:end;padding:10px 0;border-bottom:1px solid var(--border); }
+.marker-row:last-child { border-bottom:none; }
+.marker-header { display:grid;grid-template-columns:1fr 1fr 80px 80px 80px 80px 80px 90px 36px;gap:8px;padding:0 0 6px;border-bottom:1px solid var(--border2); }
+.marker-header span { font-size:10px;font-weight:600;text-transform:uppercase;letter-spacing:0.6px;color:var(--muted); }
+.marker-row input, .marker-row select { background:var(--surface2);border:1px solid var(--border);border-radius:6px;padding:7px 8px;color:var(--text);font-family:'Outfit',sans-serif;font-size:12px;outline:none;width:100%; }
+.marker-row input:focus, .marker-row select:focus { border-color:var(--blue); }
+.del-btn { width:32px;height:32px;background:rgba(255,85,85,0.1);border:none;border-radius:6px;color:var(--red);cursor:pointer;display:flex;align-items:center;justify-content:center;font-size:14px; }
+
+/* CLIENT LIST */
+.client-list { display:flex;flex-direction:column;gap:8px; }
+.client-card { display:flex;align-items:center;gap:14px;padding:14px 16px;background:var(--surface2);border:1px solid var(--border);border-radius:10px;cursor:pointer;transition:border-color 0.15s; }
+.client-card:hover { border-color:var(--blue); }
+.client-avatar { width:40px;height:40px;border-radius:50%;background:linear-gradient(135deg,var(--blue),var(--teal));display:flex;align-items:center;justify-content:center;font-family:'Bebas Neue',sans-serif;font-size:18px;color:#000;flex-shrink:0; }
+.client-info { flex:1; }
+.client-name { font-weight:600;font-size:14px; }
+.client-meta { font-size:12px;color:var(--muted2);margin-top:2px; }
+.client-actions { display:flex;gap:8px; }
+
+/* TODAY'S APPOINTMENTS */
+.today-grid { display:grid;grid-template-columns:repeat(auto-fill,minmax(320px,1fr));gap:20px; }
+.appt-card { background:var(--surface);border:1px solid var(--border);border-radius:14px;overflow:hidden;transition:border-color 0.2s; }
+.appt-card.has-client { border-color:var(--border2); }
+.appt-card.no-client { opacity:0.6; }
+.appt-header { display:flex;align-items:center;gap:12px;padding:16px 18px;border-bottom:1px solid var(--border); }
+.appt-avatar { width:44px;height:44px;border-radius:50%;background:linear-gradient(135deg,var(--blue),var(--teal));display:flex;align-items:center;justify-content:center;font-family:'Bebas Neue',sans-serif;font-size:20px;color:#000;flex-shrink:0; }
+.appt-name { font-weight:600;font-size:15px;line-height:1.2; }
+.appt-meta { font-size:12px;color:var(--muted2);margin-top:2px; }
+.appt-body { padding:16px 18px; }
+.drop-zone {
+  border:2px dashed var(--border2);border-radius:10px;padding:28px 20px;
+  text-align:center;cursor:pointer;transition:all 0.2s;margin-bottom:14px;
+  font-size:13px;color:var(--muted2);
+}
+.drop-zone:hover, .drop-zone.drag-over { border-color:var(--blue);background:rgba(77,166,255,0.05);color:var(--text); }
+.drop-zone.uploading { border-color:var(--gold);color:var(--gold);animation:pulse 1s ease-in-out infinite; }
+.drop-zone.done { border-color:var(--green);color:var(--green);background:rgba(57,224,122,0.04); }
+.drop-icon { font-size:28px;margin-bottom:8px; }
+.scan-badges { display:flex;flex-wrap:wrap;gap:6px; }
+.scan-badge { display:inline-flex;align-items:center;gap:5px;padding:4px 10px;border-radius:20px;font-size:11px;font-weight:600; }
+.scan-badge.pending { background:var(--surface2);color:var(--muted2);border:1px solid var(--border); }
+.scan-badge.done { background:rgba(57,224,122,0.12);color:var(--green);border:1px solid rgba(57,224,122,0.25); }
+.no-acuity { text-align:center;padding:60px 20px;color:var(--muted2); }
+.no-acuity-icon { font-size:48px;opacity:0.3;margin-bottom:12px; }
+.date-header { display:flex;align-items:center;justify-content:space-between;margin-bottom:24px; }
+.date-pill { background:var(--surface);border:1px solid var(--border2);border-radius:8px;padding:6px 14px;font-size:13px;color:var(--muted2); }
+</style>
+</head>
+<body>
+
+<div id="loading">
+  <div class="loading-mark">LX</div>
+  <div style="font-size:13px;color:var(--muted2);letter-spacing:1px;">Staff Portal Loading…</div>
+</div>
+
+<div id="app">
+<nav class="sidebar">
+  <div class="sidebar-logo">
+    <div class="logo-mark">LX</div>
+    <div>
+      <div class="logo-text">Life X</div>
+      <div class="logo-sub">Staff Portal</div>
+    </div>
+  </div>
+  <div style="padding:0 16px 12px;border-bottom:1px solid var(--border);">
+    <span class="staff-badge">🔑 STAFF ACCESS</span>
+  </div>
+
+  <div class="sidebar-nav">
+    <div class="nav-group-label">Today</div>
+    <div class="nav-item active" data-panel="today" onclick="showPanel('today')"><span class="nav-icon">📅</span> Today's Appointments</div>
+
+    <div class="nav-group-label" style="margin-top:8px;">Clients</div>
+    <div class="nav-item" data-panel="clients" onclick="showPanel('clients')"><span class="nav-icon">👥</span> All Clients</div>
+    <div class="nav-item" data-panel="new-client" onclick="showPanel('new-client')"><span class="nav-icon">➕</span> New Client</div>
+
+    <div class="nav-group-label" style="margin-top:8px;">Upload Data</div>
+    <div class="nav-item" data-panel="dexa" onclick="showPanel('dexa')"><span class="nav-icon">🫀</span> DEXA Scan</div>
+    <div class="nav-item" data-panel="blood" onclick="showPanel('blood')"><span class="nav-icon">🩸</span> Blood Panel</div>
+    <div class="nav-item" data-panel="hormones" onclick="showPanel('hormones')"><span class="nav-icon">⚗️</span> Hormones</div>
+    <div class="nav-item" data-panel="rmr" onclick="showPanel('rmr')"><span class="nav-icon">🔥</span> RMR Test</div>
+  </div>
+
+  <div class="sidebar-footer">
+    <div style="font-size:12px;color:var(--muted2);margin-bottom:8px;" id="staff-name">Staff</div>
+    <button class="signout-btn" onclick="signOut()">↩ Sign Out</button>
+  </div>
+</nav>
+
+<main class="main">
+
+  <!-- ── TODAY'S APPOINTMENTS ── -->
+  <div id="panel-today" class="panel active">
+    <div class="date-header">
+      <div>
+        <div class="page-title">Today's Appointments</div>
+        <div class="page-subtitle" id="today-subtitle">Loading…</div>
+      </div>
+      <div class="date-pill" id="today-date">—</div>
+    </div>
+    <div id="today-grid" class="today-grid"></div>
+  </div>
+
+  <!-- ── CLIENTS LIST ── -->
+  <div id="panel-clients" class="panel">
+    <div class="page-title">All Clients</div>
+    <div class="page-subtitle">Click a client to jump to their data entry</div>
+    <div id="clients-list" class="client-list">
+      <div style="color:var(--muted2);font-size:13px;">Loading clients…</div>
+    </div>
+  </div>
+
+  <!-- ── NEW CLIENT ── -->
+  <div id="panel-new-client" class="panel">
+    <div class="page-title">New Client</div>
+    <div class="page-subtitle">Two steps to set up a new client account</div>
+
+    <div class="card" style="max-width:560px;margin-bottom:16px;">
+      <div class="card-title">Step 1 — Create Login Account in Supabase</div>
+      <div style="display:flex;flex-direction:column;gap:10px;font-size:13px;color:var(--muted2);line-height:1.7;">
+        <div>1. Open <strong style="color:var(--text)">supabase.com</strong> → your project → <strong style="color:var(--text)">Authentication → Users</strong></div>
+        <div>2. Click <strong style="color:var(--text)">Add user → Create new user</strong></div>
+        <div>3. Enter the client's email + a temporary password (e.g. <code style="background:var(--surface3);padding:1px 6px;border-radius:4px;">LifeX2025!</code>)</div>
+        <div>4. Tick <strong style="color:var(--text)">"Auto Confirm User"</strong> so they can log in immediately</div>
+        <div>5. Copy their <strong style="color:var(--gold)">UUID</strong> (shown after creating) and paste it below</div>
+      </div>
+    </div>
+
+    <div class="card" style="max-width:560px;">
+      <div class="card-title">Step 2 — Set Up Their Profile</div>
+      <div style="display:flex;flex-direction:column;gap:16px;">
+        <div class="field"><label>Client UUID (from Supabase)</label><input type="text" id="nc-uuid" placeholder="xxxxxxxx-xxxx-xxxx-xxxx-xxxxxxxxxxxx"></div>
+        <div class="field"><label>Full Name</label><input type="text" id="nc-name" placeholder="e.g. Sarah Johnson"></div>
+        <div class="field"><label>Initials</label><input type="text" id="nc-initials" placeholder="e.g. SJ" maxlength="2" style="width:80px;"></div>
+        <div class="field">
+          <label>Member Level</label>
+          <select id="nc-level"><option>Standard</option><option>Gold</option><option>Platinum</option></select>
+        </div>
+        <button class="btn btn-blue" onclick="createClientProfile()" id="nc-btn">➕ Create Client Profile</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- ── DEXA SCAN ── -->
+  <div id="panel-dexa" class="panel">
+    <div class="page-title">Upload DEXA Scan</div>
+    <div class="page-subtitle">Enter body composition data from the DEXA scan report</div>
+    <div class="client-bar">
+      <label>Client</label>
+      <select id="dexa-client"><option value="">— Select client —</option></select>
+    </div>
+    <div style="margin-bottom:16px;">
+      <input type="file" id="dexa-pdf" accept=".pdf,image/*" style="display:none" onchange="autofillDEXA(this)">
+      <button class="btn btn-gold" onclick="document.getElementById('dexa-pdf').click()">📄 Upload PDF / Image to Auto-Fill</button>
+    </div>
+    <div class="card">
+      <div class="card-title">Scan Info</div>
+      <div class="form-grid">
+        <div class="field"><label>Scan Date</label><input type="date" id="dexa-date"></div>
+        <div class="field"><label>Scan Number</label><input type="number" id="dexa-num" placeholder="e.g. 1, 2, 3…" min="1"></div>
+      </div>
+    </div>
+    <div class="card">
+      <div class="card-title">Body Composition</div>
+      <div class="form-grid">
+        <div class="field"><label>Body Fat %</label><input type="number" id="dexa-fat-pct" step="0.1" placeholder="e.g. 22.4"></div>
+        <div class="field"><label>Fat Mass (g)</label><input type="number" id="dexa-fat-g" placeholder="e.g. 17952"></div>
+        <div class="field"><label>Lean Mass (g)</label><input type="number" id="dexa-lean-g" placeholder="e.g. 59705"></div>
+        <div class="field"><label>Total Mass (g)</label><input type="number" id="dexa-total-g" placeholder="e.g. 80147"></div>
+        <div class="field"><label>Est. VAT (g)</label><input type="number" id="dexa-vat" placeholder="e.g. 381"></div>
+        <div class="field"><label>Android Fat %</label><input type="number" id="dexa-android" step="0.1" placeholder="e.g. 23.7"></div>
+        <div class="field"><label>Gynoid Fat %</label><input type="number" id="dexa-gynoid" step="0.1" placeholder="e.g. 27.2"></div>
+        <div class="field"><label>A:G Ratio</label><input type="number" id="dexa-ag" step="0.01" placeholder="e.g. 0.87"></div>
+      </div>
+    </div>
+    <div class="card">
+      <div class="card-title">Bone Density</div>
+      <div class="form-grid">
+        <div class="field"><label>BMD (g/cm²)</label><input type="number" id="dexa-bmd" step="0.001" placeholder="e.g. 1.143"></div>
+        <div class="field"><label>T-Score</label><input type="number" id="dexa-tscore" step="0.1" placeholder="e.g. -0.5"></div>
+        <div class="field"><label>Z-Score</label><input type="number" id="dexa-zscore" step="0.1" placeholder="e.g. 0.2"></div>
+        <div class="field"><label>PR %</label><input type="number" id="dexa-pr" step="0.1" placeholder="e.g. 93"></div>
+      </div>
+    </div>
+    <button class="btn btn-blue" onclick="saveDEXA()" id="dexa-btn">💾 Save DEXA Scan</button>
+  </div>
+
+  <!-- ── BLOOD PANEL ── -->
+  <div id="panel-blood" class="panel">
+    <div class="page-title">Upload Blood Panel</div>
+    <div class="page-subtitle">Enter blood marker results from the lab report</div>
+    <div class="client-bar">
+      <label>Client</label>
+      <select id="blood-client"><option value="">— Select client —</option></select>
+    </div>
+    <div style="margin-bottom:16px;">
+      <input type="file" id="blood-pdf" accept=".pdf,image/*" style="display:none" onchange="autofillBlood(this)">
+      <button class="btn btn-gold" onclick="document.getElementById('blood-pdf').click()">📄 Upload PDF / Image to Auto-Fill</button>
+    </div>
+    <div class="card">
+      <div class="card-title">Panel Info</div>
+      <div class="form-grid">
+        <div class="field"><label>Panel Date</label><input type="date" id="blood-date"></div>
+        <div class="field"><label>Lab Name</label><input type="text" id="blood-lab" placeholder="e.g. Laverty Pathology"></div>
+      </div>
+    </div>
+    <div class="card">
+      <div class="card-title">Blood Markers &nbsp;<button class="btn btn-outline btn-sm" onclick="addBloodMarker()">+ Add Marker</button> &nbsp;<button class="btn btn-outline btn-sm" onclick="loadBloodTemplate()">📋 Load Template</button></div>
+      <div class="marker-header">
+        <span>Category</span><span>Marker Name</span><span>Value</span><span>Unit</span>
+        <span>Disp Min</span><span>Disp Max</span><span>Ref Min</span><span>Ref Max</span><span>Status</span><span></span>
+      </div>
+      <div id="blood-markers-list"></div>
+    </div>
+    <button class="btn btn-blue" onclick="saveBloodPanel()" id="blood-btn">💾 Save Blood Panel</button>
+  </div>
+
+  <!-- ── HORMONES ── -->
+  <div id="panel-hormones" class="panel">
+    <div class="page-title">Upload Hormone Panel</div>
+    <div class="page-subtitle">Enter hormone results from the lab report</div>
+    <div class="client-bar">
+      <label>Client</label>
+      <select id="hormones-client"><option value="">— Select client —</option></select>
+    </div>
+    <div style="margin-bottom:16px;">
+      <input type="file" id="hormones-pdf" accept=".pdf,image/*" style="display:none" onchange="autofillHormones(this)">
+      <button class="btn btn-gold" onclick="document.getElementById('hormones-pdf').click()">📄 Upload PDF / Image to Auto-Fill</button>
+    </div>
+    <div class="card">
+      <div class="card-title">Panel Info</div>
+      <div class="form-grid">
+        <div class="field"><label>Panel Date</label><input type="date" id="hormones-date"></div>
+      </div>
+    </div>
+    <div class="card">
+      <div class="card-title">Hormone Markers &nbsp;<button class="btn btn-outline btn-sm" onclick="addHormoneMarker()">+ Add Marker</button> &nbsp;<button class="btn btn-outline btn-sm" onclick="loadHormoneTemplate()">📋 Load Template</button></div>
+      <div class="marker-header" style="grid-template-columns:1fr 80px 80px 80px 80px 80px 90px 1fr 36px;">
+        <span>Hormone Name</span><span>Value</span><span>Unit</span>
+        <span>Disp Min</span><span>Disp Max</span><span>Ref Min</span><span>Ref Max</span><span>Status / Note</span><span></span>
+      </div>
+      <div id="hormone-markers-list"></div>
+    </div>
+    <button class="btn btn-blue" onclick="saveHormonePanel()" id="hormones-btn">💾 Save Hormone Panel</button>
+  </div>
+
+  <!-- ── RMR ── -->
+  <div id="panel-rmr" class="panel">
+    <div class="page-title">Upload RMR Test</div>
+    <div class="page-subtitle">Enter resting metabolic rate results from ECAL calorimetry</div>
+    <div class="client-bar">
+      <label>Client</label>
+      <select id="rmr-client"><option value="">— Select client —</option></select>
+    </div>
+    <div style="margin-bottom:16px;">
+      <input type="file" id="rmr-pdf" accept=".pdf,image/*" style="display:none" onchange="autofillRMR(this)">
+      <button class="btn btn-gold" onclick="document.getElementById('rmr-pdf').click()">📄 Upload PDF / Image to Auto-Fill</button>
+    </div>
+    <div class="card">
+      <div class="card-title">Test Results</div>
+      <div class="form-grid">
+        <div class="field"><label>Test Date</label><input type="date" id="rmr-date"></div>
+        <div class="field"><label>RMR (kcal/day)</label><input type="number" id="rmr-kcal" placeholder="e.g. 2219"></div>
+        <div class="field"><label>RMR (kJ/day)</label><input type="number" id="rmr-kj" placeholder="e.g. 9283"></div>
+        <div class="field"><label>Fat Burning %</label><input type="number" id="rmr-fat" step="0.1" placeholder="e.g. 76.1"></div>
+        <div class="field"><label>Glucose %</label><input type="number" id="rmr-glucose" step="0.1" placeholder="e.g. 23.9"></div>
+        <div class="field"><label>FEO2 %</label><input type="number" id="rmr-feo2" step="0.01" placeholder="e.g. 16.55"></div>
+        <div class="field"><label>Population Min (kcal)</label><input type="number" id="rmr-pop-min" placeholder="e.g. 1529"></div>
+        <div class="field"><label>Population Max (kcal)</label><input type="number" id="rmr-pop-max" placeholder="e.g. 1869"></div>
+      </div>
+    </div>
+    <button class="btn btn-blue" onclick="saveRMR()" id="rmr-btn">💾 Save RMR Test</button>
+  </div>
+
+</main>
+</div>
+
+<div class="toast" id="toast"></div>
+
+<script>
+// Anthropic key handled server-side via edge functions
+const SUPABASE_URL = 'https://shvpwgrjqskccsdzajkj.supabase.co';
+const SUPABASE_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InNodnB3Z3JqcXNrY2NzZHphamtqIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzM5MDUzNTIsImV4cCI6MjA4OTQ4MTM1Mn0.2dL3J9XbzU8q8ogPPqhwR4w7_vSB0FxVKMzsAOxCgk4';
+const sb = window.supabase.createClient(SUPABASE_URL, SUPABASE_KEY);
+
+let clients = [];
+let currentUserId = null;
+
+/* ══ INIT ══ */
+async function init() {
+  const { data: { session } } = await sb.auth.getSession();
+  if (!session) { window.location.href = 'index.html'; return; }
+  currentUserId = session.user.id;
+
+  const { data: profile } = await sb.from('profiles').select('*').eq('id', currentUserId).single();
+
+  document.getElementById('staff-name').textContent = profile?.full_name || 'Staff';
+  await Promise.all([loadClients(), loadTodayAppointments()]);
+
+  document.getElementById('loading').style.display = 'none';
+  document.getElementById('app').style.display = 'flex';
+}
+
+/* ══ TODAY'S APPOINTMENTS ══ */
+async function loadTodayAppointments() {
+  const grid = document.getElementById('today-grid');
+  const subtitle = document.getElementById('today-subtitle');
+  const dateEl = document.getElementById('today-date');
+
+  try {
+    const res = await fetch(`${SUPABASE_URL}/functions/v1/get-appointments`, {
+      headers: { 'Authorization': `Bearer ${SUPABASE_KEY}` }
+    });
+    const data = await res.json();
+
+    if (data.error) throw new Error(data.error);
+
+    const appts = data.appointments || [];
+    const dateStr = data.date || new Date().toISOString().slice(0,10);
+    const [y, m, d] = dateStr.split('-').map(Number);
+    const monthNames = ['January','February','March','April','May','June','July','August','September','October','November','December'];
+    const dayNames = ['Sunday','Monday','Tuesday','Wednesday','Thursday','Friday','Saturday'];
+    const dateObj = new Date(y, m - 1, d);
+    dateEl.textContent = `${dayNames[dateObj.getDay()]}, ${d} ${monthNames[m-1]}`;
+    subtitle.textContent = appts.length === 0 ? 'No appointments today' : `${appts.length} appointment${appts.length > 1 ? 's' : ''} booked`;
+
+    if (appts.length === 0) {
+      grid.innerHTML = `<div class="no-acuity"><div class="no-acuity-icon">📅</div><div>No appointments scheduled for today</div></div>`;
+      return;
+    }
+
+    grid.innerHTML = appts.map(a => renderApptCard(a)).join('');
+
+    // Wire up drag and drop for each card
+    appts.forEach(a => {
+      if (!a.clientId) return;
+      const zone = document.getElementById(`drop-${a.id}`);
+      if (!zone) return;
+      zone.addEventListener('dragover', e => { e.preventDefault(); zone.classList.add('drag-over'); });
+      zone.addEventListener('dragleave', () => zone.classList.remove('drag-over'));
+      zone.addEventListener('drop', e => { e.preventDefault(); zone.classList.remove('drag-over'); handleDrop(e, a); });
+      zone.addEventListener('click', () => { const inp = document.createElement('input'); inp.type='file'; inp.accept='application/pdf'; inp.onchange = ev => handleDrop({ dataTransfer: { files: ev.target.files } }, a); inp.click(); });
+    });
+
+  } catch (e) {
+    subtitle.textContent = 'Could not load appointments';
+    grid.innerHTML = `<div class="no-acuity"><div class="no-acuity-icon">⚠️</div><div>${e.message}</div></div>`;
+  }
+}
+
+function renderApptCard(a) {
+  const initials = `${a.firstName?.[0]||''}${a.lastName?.[0]||''}`.toUpperCase();
+  const time = new Date(a.datetime).toLocaleTimeString('en-AU', { hour:'numeric', minute:'2-digit', hour12:true });
+  const hasClient = !!a.clientId;
+
+  return `
+  <div class="appt-card ${hasClient ? 'has-client' : 'no-client'}">
+    <div class="appt-header">
+      <div class="appt-avatar">${initials}</div>
+      <div>
+        <div class="appt-name">${a.firstName} ${a.lastName}</div>
+        <div class="appt-meta">${time} · ${a.type || 'Appointment'}${!hasClient ? ' · <span style="color:var(--red)">No Life X account</span>' : ''}</div>
+      </div>
+    </div>
+    <div class="appt-body">
+      ${hasClient ? `
+        <div class="drop-zone" id="drop-${a.id}">
+          <div class="drop-icon">📄</div>
+          <div>Drop PDF here or click to browse</div>
+          <div style="font-size:11px;margin-top:4px;opacity:0.6">DEXA · Blood · RMR · Hormones — auto-detected</div>
+        </div>
+        <div class="scan-badges" id="badges-${a.id}"></div>
+      ` : `
+        <div style="text-align:center;padding:16px 0;">
+          <div style="font-size:12px;color:var(--muted2);margin-bottom:12px;">No Life X account yet</div>
+          <button class="btn btn-blue btn-sm" onclick="createAccountFromAppt('${a.id}','${a.email}','${a.firstName}','${a.lastName}')">➕ Create Life X Account</button>
+          <div id="create-status-${a.id}" style="font-size:12px;margin-top:8px;"></div>
+        </div>
+      `}
+    </div>
+  </div>`;
+}
+
+async function handleDrop(e, appt) {
+  const file = e.dataTransfer.files[0];
+  if (!file || file.type !== 'application/pdf') { toast('Please drop a PDF file', 'error'); return; }
+
+  const zone = document.getElementById(`drop-${appt.id}`);
+  zone.classList.add('uploading');
+  zone.innerHTML = `<div class="drop-icon">⏳</div><div>Reading PDF…</div>`;
+
+  try {
+    // Convert PDF to base64
+    const base64 = await new Promise((resolve, reject) => {
+      const reader = new FileReader();
+      reader.onload = () => resolve(reader.result.split(',')[1]);
+      reader.onerror = reject;
+      reader.readAsDataURL(file);
+    });
+
+    zone.innerHTML = `<div class="drop-icon">🤖</div><div>Detecting scan type…</div>`;
+
+    const res = await fetch(`${SUPABASE_URL}/functions/v1/parse-pdf`, {
+      method: 'POST',
+      headers: { 'Authorization': `Bearer ${SUPABASE_KEY}`, 'Content-Type': 'application/json' },
+      body: JSON.stringify({ pdfBase64: base64, clientId: appt.clientId })
+    });
+
+    const result = await res.json();
+    if (result.error) throw new Error(result.error);
+
+    // Update drop zone to done state
+    zone.classList.remove('uploading');
+    zone.classList.add('done');
+    zone.innerHTML = `<div class="drop-icon">✅</div><div>${result.type} uploaded successfully</div><div style="font-size:11px;margin-top:4px;opacity:0.6">Drop another PDF to add more</div>`;
+
+    // Add badge
+    const badges = document.getElementById(`badges-${appt.id}`);
+    const badge = document.createElement('span');
+    badge.className = 'scan-badge done';
+    badge.textContent = `✅ ${result.type}`;
+    badges.appendChild(badge);
+
+    setTimeout(() => { zone.classList.remove('done'); zone.innerHTML = `<div class="drop-icon">📄</div><div>Drop another PDF or click to browse</div>`; }, 3000);
+    toast(`${result.type} scan saved for ${appt.firstName}!`, 'success');
+
+  } catch (err) {
+    zone.classList.remove('uploading');
+    zone.innerHTML = `<div class="drop-icon">❌</div><div>${err.message}</div>`;
+    setTimeout(() => { zone.innerHTML = `<div class="drop-icon">📄</div><div>Drop PDF here or click to browse</div>`; }, 3000);
+    toast('Upload failed: ' + err.message, 'error');
+  }
+}
+
+async function createAccountFromAppt(apptId, email, firstName, lastName) {
+  const statusEl = document.getElementById(`create-status-${apptId}`);
+  const btn = event.target;
+  btn.disabled = true;
+  btn.textContent = 'Creating…';
+  statusEl.style.color = 'var(--muted2)';
+  statusEl.textContent = 'Setting up account…';
+
+  try {
+    const res = await fetch(`${SUPABASE_URL}/functions/v1/create-client`, {
+      method: 'POST',
+      headers: { 'Authorization': `Bearer ${SUPABASE_KEY}`, 'Content-Type': 'application/json' },
+      body: JSON.stringify({ email, firstName, lastName })
+    });
+    const result = await res.json();
+    if (result.error) throw new Error(result.error);
+
+    statusEl.style.color = 'var(--green)';
+    statusEl.textContent = `✅ Account created — invite sent to ${email}`;
+    btn.textContent = '✅ Done';
+
+    // Reload appointments to show drop zone
+    setTimeout(() => loadTodayAppointments(), 2000);
+    toast(`Account created for ${firstName} ${lastName}!`, 'success');
+  } catch (e) {
+    statusEl.style.color = 'var(--red)';
+    statusEl.textContent = `❌ ${e.message}`;
+    btn.disabled = false;
+    btn.textContent = '➕ Create Life X Account';
+  }
+}
+
+async function loadClients() {
+  const { data } = await sb.from('profiles').select('*').eq('is_staff', false).order('full_name');
+  clients = data || [];
+  renderClientList();
+  populateClientSelects();
+}
+
+function renderClientList() {
+  const el = document.getElementById('clients-list');
+  if (!clients.length) { el.innerHTML = '<div style="color:var(--muted2);font-size:13px;">No clients yet. Create one using the New Client panel.</div>'; return; }
+  el.innerHTML = clients.map(c => `
+    <div class="client-card" onclick="jumpToClient('${c.id}')">
+      <div class="client-avatar">${c.initials || '??'}</div>
+      <div class="client-info">
+        <div class="client-name">${c.full_name}</div>
+        <div class="client-meta">${c.member_level} Member &nbsp;·&nbsp; ${c.points} pts</div>
+      </div>
+      <div class="client-actions">
+        <button class="btn btn-outline btn-sm" onclick="event.stopPropagation();jumpToDexa('${c.id}')">DEXA</button>
+        <button class="btn btn-outline btn-sm" onclick="event.stopPropagation();jumpToBlood('${c.id}')">Blood</button>
+        <button class="btn btn-outline btn-sm" onclick="event.stopPropagation();jumpToRMR('${c.id}')">RMR</button>
+      </div>
+    </div>`).join('');
+}
+
+function populateClientSelects() {
+  const selects = ['dexa-client','blood-client','hormones-client','rmr-client'];
+  selects.forEach(id => {
+    const el = document.getElementById(id);
+    const cur = el.value;
+    el.innerHTML = '<option value="">— Select client —</option>' +
+      clients.map(c => `<option value="${c.id}">${c.full_name}</option>`).join('');
+    if (cur) el.value = cur;
+  });
+}
+
+function jumpToClient(id) { showPanel('dexa'); document.getElementById('dexa-client').value = id; }
+function jumpToDexa(id)   { showPanel('dexa'); document.getElementById('dexa-client').value = id; }
+function jumpToBlood(id)  { showPanel('blood'); document.getElementById('blood-client').value = id; }
+function jumpToRMR(id)    { showPanel('rmr'); document.getElementById('rmr-client').value = id; }
+
+/* ══ NAVIGATION ══ */
+function showPanel(id) {
+  document.querySelectorAll('.panel').forEach(p => p.classList.remove('active'));
+  document.querySelectorAll('.nav-item').forEach(n => n.classList.remove('active'));
+  document.getElementById('panel-' + id).classList.add('active');
+  document.querySelector(`[data-panel="${id}"]`)?.classList.add('active');
+}
+
+/* ══ TOAST ══ */
+function toast(msg, type='success') {
+  const el = document.getElementById('toast');
+  el.textContent = msg; el.className = `toast ${type} show`;
+  setTimeout(() => el.classList.remove('show'), 3000);
+}
+
+/* ══ NEW CLIENT ══ */
+async function createClientProfile() {
+  const uuid     = document.getElementById('nc-uuid').value.trim();
+  const name     = document.getElementById('nc-name').value.trim();
+  const initials = document.getElementById('nc-initials').value.trim().toUpperCase();
+  const level    = document.getElementById('nc-level').value;
+
+  if (!uuid || !name) { toast('UUID and name are required.', 'error'); return; }
+
+  const btn = document.getElementById('nc-btn');
+  btn.disabled = true; btn.textContent = 'Creating…';
+
+  const { error } = await sb.from('profiles').upsert({
+    id: uuid,
+    full_name: name,
+    initials: initials || name.split(' ').map(w=>w[0].toUpperCase()).slice(0,2).join(''),
+    member_level: level,
+    is_staff: false,
+    points: 0,
+  });
+
+  btn.disabled=false; btn.textContent='➕ Create Client Profile';
+  if (error) { toast('Error: ' + error.message, 'error'); return; }
+
+  toast(`✅ Profile created for ${name}!`);
+  document.getElementById('nc-uuid').value='';
+  document.getElementById('nc-name').value='';
+  document.getElementById('nc-initials').value='';
+  await loadClients();
+}
+
+/* ══ SAVE DEXA ══ */
+async function saveDEXA() {
+  const clientId = document.getElementById('dexa-client').value;
+  const date     = document.getElementById('dexa-date').value;
+  if (!clientId) { toast('Please select a client.', 'error'); return; }
+  if (!date)     { toast('Please enter a scan date.', 'error'); return; }
+
+  const btn = document.getElementById('dexa-btn');
+  btn.disabled=true; btn.textContent='Saving…';
+
+  const val = id => { const v=document.getElementById(id).value; return v===''?null:parseFloat(v); };
+
+  const { error } = await sb.from('dexa_scans').insert({
+    client_id: clientId,
+    scan_date: date,
+    scan_number: val('dexa-num'),
+    fat_pct: val('dexa-fat-pct'), fat_g: val('dexa-fat-g'),
+    lean_g:  val('dexa-lean-g'),  total_g: val('dexa-total-g'),
+    bmd:     val('dexa-bmd'),     t_score: val('dexa-tscore'),
+    z_score: val('dexa-zscore'),  pr_pct:  val('dexa-pr'),
+    vat_g:   val('dexa-vat'),
+    android_fat_pct: val('dexa-android'),
+    gynoid_fat_pct:  val('dexa-gynoid'),
+    ag_ratio: val('dexa-ag'),
+  });
+
+  btn.disabled=false; btn.textContent='💾 Save DEXA Scan';
+  if (error) { toast('Error: ' + error.message, 'error'); return; }
+  toast('✅ DEXA scan saved!');
+}
+
+/* ══ BLOOD PANEL ══ */
+let bloodMarkerCount = 0;
+
+function addBloodMarker(cat='', name='', value='', unit='', dmin='0', dmax='100', rmin='', rmax='', status='normal') {
+  bloodMarkerCount++;
+  const id = 'bm-' + bloodMarkerCount;
+  const row = document.createElement('div');
+  row.className = 'marker-row'; row.id = id;
+  row.style.gridTemplateColumns = '1fr 1fr 80px 80px 80px 80px 80px 90px 36px';
+  row.innerHTML = `
+    <input type="text"   class="bm-cat"    placeholder="Category" value="${cat}">
+    <input type="text"   class="bm-name"   placeholder="e.g. hsCRP" value="${name}">
+    <input type="number" class="bm-value"  placeholder="0.75" value="${value}">
+    <input type="text"   class="bm-unit"   placeholder="mg/L" value="${unit}">
+    <input type="number" class="bm-dmin"   placeholder="0" value="${dmin}">
+    <input type="number" class="bm-dmax"   placeholder="10" value="${dmax}">
+    <input type="number" class="bm-rmin"   placeholder="0" value="${rmin}">
+    <input type="number" class="bm-rmax"   placeholder="5" value="${rmax}">
+    <select class="bm-status">
+      <option value="optimal" ${status==='optimal'?'selected':''}>Optimal</option>
+      <option value="normal"  ${status==='normal'?'selected':''}>Normal</option>
+      <option value="high"    ${status==='high'?'selected':''}>High</option>
+      <option value="low"     ${status==='low'?'selected':''}>Low</option>
+    </select>
+    <button class="del-btn" onclick="document.getElementById('${id}').remove()">✕</button>`;
+  document.getElementById('blood-markers-list').appendChild(row);
+}
+
+function loadBloodTemplate() {
+  document.getElementById('blood-markers-list').innerHTML = '';
+  bloodMarkerCount = 0;
+  [
+    ['Inflammation','hsCRP','','mg/L','0','10','0','5','normal'],
+    ['Metabolic','HbA1c','','%','3','8','4.0','6.0','normal'],
+    ['Metabolic','Fasting Insulin','','mU/L','0','25','0','10','normal'],
+    ['Metabolic','Homocysteine','','umol/L','0','20','4.0','14.0','normal'],
+    ['Hormones','Cortisol AM','','nmol/L','0','800','145','619','normal'],
+    ['Hormones','FT4','','pmol/L','5','30','10','20','normal'],
+    ['Hormones','FT3','','pmol/L','2','10','3.5','6.5','normal'],
+    ['Other','Albumin','','g/L','30','60','38','50','normal'],
+  ].forEach(t => addBloodMarker(...t));
+}
+
+async function saveBloodPanel() {
+  const clientId = document.getElementById('blood-client').value;
+  const date     = document.getElementById('blood-date').value;
+  const lab      = document.getElementById('blood-lab').value;
+  if (!clientId) { toast('Please select a client.', 'error'); return; }
+  if (!date)     { toast('Please enter a panel date.', 'error'); return; }
+
+  const rows = document.querySelectorAll('#blood-markers-list .marker-row');
+  if (!rows.length) { toast('Please add at least one marker.', 'error'); return; }
+
+  const btn = document.getElementById('blood-btn');
+  btn.disabled=true; btn.textContent='Saving…';
+
+  const { data: panel, error: panelErr } = await sb.from('blood_panels').insert({ client_id:clientId, panel_date:date, lab_name:lab }).select().single();
+  if (panelErr) { toast('Error: '+panelErr.message,'error'); btn.disabled=false; btn.textContent='💾 Save Blood Panel'; return; }
+
+  const markers = Array.from(rows).map(row => ({
+    panel_id:    panel.id,
+    category:    row.querySelector('.bm-cat').value    || 'Other',
+    name:        row.querySelector('.bm-name').value,
+    value:       parseFloat(row.querySelector('.bm-value').value),
+    unit:        row.querySelector('.bm-unit').value,
+    display_min: parseFloat(row.querySelector('.bm-dmin').value) || 0,
+    display_max: parseFloat(row.querySelector('.bm-dmax').value) || 100,
+    ref_min:     parseFloat(row.querySelector('.bm-rmin').value),
+    ref_max:     parseFloat(row.querySelector('.bm-rmax').value),
+    status:      row.querySelector('.bm-status').value,
+  })).filter(m => m.name && !isNaN(m.value));
+
+  const { error: markerErr } = await sb.from('blood_markers').insert(markers);
+  btn.disabled=false; btn.textContent='💾 Save Blood Panel';
+  if (markerErr) { toast('Panel saved but marker error: '+markerErr.message,'error'); return; }
+  toast('✅ Blood panel saved with '+markers.length+' markers!');
+  document.getElementById('blood-markers-list').innerHTML = '';
+}
+
+/* ══ HORMONE PANEL ══ */
+let hormoneMarkerCount = 0;
+
+function addHormoneMarker(name='', value='', unit='', dmin='0', dmax='100', rmin='', rmax='', status='normal', note='') {
+  hormoneMarkerCount++;
+  const id = 'hm-' + hormoneMarkerCount;
+  const row = document.createElement('div');
+  row.className = 'marker-row'; row.id = id;
+  row.style.gridTemplateColumns = '1fr 80px 80px 80px 80px 80px 90px 1fr 36px';
+  row.innerHTML = `
+    <input type="text"   class="hm-name"   placeholder="e.g. Total Testosterone" value="${name}">
+    <input type="number" class="hm-value"  placeholder="21.8" value="${value}">
+    <input type="text"   class="hm-unit"   placeholder="nmol/L" value="${unit}">
+    <input type="number" class="hm-dmin"   placeholder="0" value="${dmin}">
+    <input type="number" class="hm-dmax"   placeholder="35" value="${dmax}">
+    <input type="number" class="hm-rmin"   placeholder="8.3" value="${rmin}">
+    <input type="number" class="hm-rmax"   placeholder="29" value="${rmax}">
+    <select class="hm-status">
+      <option value="optimal" ${status==='optimal'?'selected':''}>Optimal</option>
+      <option value="normal"  ${status==='normal'?'selected':''}>Normal</option>
+      <option value="high"    ${status==='high'?'selected':''}>High</option>
+      <option value="low"     ${status==='low'?'selected':''}>Low</option>
+    </select>
+    <input type="text"   class="hm-note"   placeholder="Optional note…" value="${note}">
+    <button class="del-btn" onclick="document.getElementById('${id}').remove()">✕</button>`;
+  document.getElementById('hormone-markers-list').appendChild(row);
+}
+
+function loadHormoneTemplate() {
+  document.getElementById('hormone-markers-list').innerHTML = '';
+  hormoneMarkerCount = 0;
+  [
+    ['Total Testosterone','','nmol/L','0','35','8.3','29','normal',''],
+    ['SHBG','','nmol/L','0','80','11','71','normal',''],
+    ['Free Testosterone','','pmol/L','0','800','255','725','normal',''],
+  ].forEach(t => addHormoneMarker(...t));
+}
+
+async function saveHormonePanel() {
+  const clientId = document.getElementById('hormones-client').value;
+  const date     = document.getElementById('hormones-date').value;
+  if (!clientId) { toast('Please select a client.', 'error'); return; }
+  if (!date)     { toast('Please enter a panel date.', 'error'); return; }
+
+  const rows = document.querySelectorAll('#hormone-markers-list .marker-row');
+  if (!rows.length) { toast('Please add at least one marker.', 'error'); return; }
+
+  const btn = document.getElementById('hormones-btn');
+  btn.disabled=true; btn.textContent='Saving…';
+
+  const { data: panel, error: panelErr } = await sb.from('hormone_panels').insert({ client_id:clientId, panel_date:date }).select().single();
+  if (panelErr) { toast('Error: '+panelErr.message,'error'); btn.disabled=false; btn.textContent='💾 Save Hormone Panel'; return; }
+
+  const markers = Array.from(rows).map(row => ({
+    panel_id:    panel.id,
+    name:        row.querySelector('.hm-name').value,
+    value:       parseFloat(row.querySelector('.hm-value').value),
+    unit:        row.querySelector('.hm-unit').value,
+    display_min: parseFloat(row.querySelector('.hm-dmin').value) || 0,
+    display_max: parseFloat(row.querySelector('.hm-dmax').value) || 100,
+    ref_min:     parseFloat(row.querySelector('.hm-rmin').value),
+    ref_max:     parseFloat(row.querySelector('.hm-rmax').value),
+    status:      row.querySelector('.hm-status').value,
+    note:        row.querySelector('.hm-note').value,
+  })).filter(m => m.name && !isNaN(m.value));
+
+  const { error: markerErr } = await sb.from('hormone_markers').insert(markers);
+  btn.disabled=false; btn.textContent='💾 Save Hormone Panel';
+  if (markerErr) { toast('Panel saved but marker error: '+markerErr.message,'error'); return; }
+  toast('✅ Hormone panel saved with '+markers.length+' markers!');
+  document.getElementById('hormone-markers-list').innerHTML = '';
+}
+
+/* ══ SAVE RMR ══ */
+async function saveRMR() {
+  const clientId = document.getElementById('rmr-client').value;
+  const date     = document.getElementById('rmr-date').value;
+  if (!clientId) { toast('Please select a client.', 'error'); return; }
+  if (!date)     { toast('Please enter a test date.', 'error'); return; }
+
+  const kcal = document.getElementById('rmr-kcal').value;
+  if (!kcal) { toast('RMR kcal is required.', 'error'); return; }
+
+  const btn = document.getElementById('rmr-btn');
+  btn.disabled=true; btn.textContent='Saving…';
+
+  const val = id => { const v=document.getElementById(id).value; return v===''?null:parseFloat(v); };
+
+  const { error } = await sb.from('rmr_tests').insert({
+    client_id:   clientId,
+    test_date:   date,
+    kcal:        parseInt(kcal),
+    kj:          val('rmr-kj'),
+    fat_pct:     val('rmr-fat'),
+    glucose_pct: val('rmr-glucose'),
+    feo2:        val('rmr-feo2'),
+    pop_min:     val('rmr-pop-min'),
+    pop_max:     val('rmr-pop-max'),
+  });
+
+  btn.disabled=false; btn.textContent='💾 Save RMR Test';
+  if (error) { toast('Error: '+error.message,'error'); return; }
+  toast('✅ RMR test saved!');
+}
+
+/* ══ PDF / IMAGE PARSER ══ */
+async function parseScanFile(file, type) {
+  const prompts = {
+    dexa: `Extract DEXA scan data from this report. Return ONLY valid JSON with these exact keys (use null for any missing values):
+{"scan_date":"YYYY-MM-DD","fat_pct":null,"fat_g":null,"lean_g":null,"total_g":null,"bmd":null,"t_score":null,"z_score":null,"pr_pct":null,"vat_g":null,"android_fat_pct":null,"gynoid_fat_pct":null,"ag_ratio":null}
+fat_g, lean_g, total_g, vat_g should be in grams as integers. fat_pct as a decimal like 22.4.`,
+
+    blood: `Extract all blood test markers from this pathology report. Return ONLY valid JSON:
+{"panel_date":"YYYY-MM-DD","lab_name":"","markers":[{"category":"Inflammation","name":"hsCRP","value":0.75,"unit":"mg/L","ref_min":0,"ref_max":5,"display_min":0,"display_max":10,"status":"optimal"}]}
+Status: "optimal" if in ideal range, "normal" if within reference range, "high" if above max, "low" if below min. Categorise markers as: Inflammation, Metabolic, Hormones, Thyroid, Liver, Kidney, or Other.`,
+
+    hormones: `Extract all hormone test results from this report. Return ONLY valid JSON:
+{"panel_date":"YYYY-MM-DD","markers":[{"name":"Total Testosterone","value":21.8,"unit":"nmol/L","ref_min":8.3,"ref_max":29,"display_min":0,"display_max":35,"status":"normal","note":"Upper range — excellent"}]}
+Status: "optimal" if in ideal range, "normal" if within reference range, "high" if above, "low" if below.`,
+
+    rmr: `Extract resting metabolic rate test data from this report. Return ONLY valid JSON:
+{"test_date":"YYYY-MM-DD","kcal":null,"kj":null,"fat_pct":null,"glucose_pct":null,"feo2":null,"pop_min":null,"pop_max":null}
+fat_pct and glucose_pct are percentages (e.g. 76.1). kcal and kj are integers.`
+  };
+
+  return new Promise((resolve, reject) => {
+    const reader = new FileReader();
+    reader.onload = async (e) => {
+      const base64 = e.target.result.split(',')[1];
+      const isImage = file.type.startsWith('image/');
+      const contentBlock = isImage
+        ? { type: 'image',    source: { type: 'base64', media_type: file.type, data: base64 } }
+        : { type: 'document', source: { type: 'base64', media_type: 'application/pdf', data: base64 } };
+
+      try {
+        const res = await fetch('/api/parse', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            model: 'claude-haiku-4-5-20251001',
+            max_tokens: 2048,
+            messages: [{ role: 'user', content: [contentBlock, { type: 'text', text: prompts[type] }] }]
+          })
+        });
+        const json = await res.json();
+        if (json.error) throw new Error(json.error.message);
+        const text = json.content[0].text;
+        const match = text.match(/\{[\s\S]*\}/);
+        if (!match) throw new Error('No JSON found in response');
+        resolve(JSON.parse(match[0]));
+      } catch (err) { reject(err); }
+    };
+    reader.readAsDataURL(file);
+  });
+}
+
+function setVal(id, val) {
+  const el = document.getElementById(id);
+  if (el && val != null) el.value = val;
+}
+
+async function autofillDEXA(input) {
+  const file = input.files[0]; if (!file) return;
+  toast('Reading DEXA report…');
+  try {
+    const d = await parseScanFile(file, 'dexa');
+    setVal('dexa-date', d.scan_date);
+    setVal('dexa-fat-pct', d.fat_pct); setVal('dexa-fat-g', d.fat_g);
+    setVal('dexa-lean-g', d.lean_g);   setVal('dexa-total-g', d.total_g);
+    setVal('dexa-vat', d.vat_g);       setVal('dexa-android', d.android_fat_pct);
+    setVal('dexa-gynoid', d.gynoid_fat_pct); setVal('dexa-ag', d.ag_ratio);
+    setVal('dexa-bmd', d.bmd);         setVal('dexa-tscore', d.t_score);
+    setVal('dexa-zscore', d.z_score);  setVal('dexa-pr', d.pr_pct);
+    toast('✅ DEXA form auto-filled!');
+  } catch(e) { toast('Could not read file: ' + e.message, 'error'); }
+}
+
+async function autofillBlood(input) {
+  const file = input.files[0]; if (!file) return;
+  toast('Reading blood panel…');
+  try {
+    const d = await parseScanFile(file, 'blood');
+    setVal('blood-date', d.panel_date);
+    setVal('blood-lab', d.lab_name);
+    document.getElementById('blood-markers-list').innerHTML = '';
+    bloodMarkerCount = 0;
+    (d.markers || []).forEach(m => addBloodMarker(m.category, m.name, m.value, m.unit, m.display_min??0, m.display_max??100, m.ref_min, m.ref_max, m.status||'normal'));
+    toast('✅ Blood panel auto-filled with ' + (d.markers||[]).length + ' markers!');
+  } catch(e) { toast('Could not read file: ' + e.message, 'error'); }
+}
+
+async function autofillHormones(input) {
+  const file = input.files[0]; if (!file) return;
+  toast('Reading hormone panel…');
+  try {
+    const d = await parseScanFile(file, 'hormones');
+    setVal('hormones-date', d.panel_date);
+    document.getElementById('hormone-markers-list').innerHTML = '';
+    hormoneMarkerCount = 0;
+    (d.markers || []).forEach(m => addHormoneMarker(m.name, m.value, m.unit, m.display_min??0, m.display_max??100, m.ref_min, m.ref_max, m.status||'normal', m.note||''));
+    toast('✅ Hormone panel auto-filled with ' + (d.markers||[]).length + ' markers!');
+  } catch(e) { toast('Could not read file: ' + e.message, 'error'); }
+}
+
+async function autofillRMR(input) {
+  const file = input.files[0]; if (!file) return;
+  toast('Reading RMR report…');
+  try {
+    const d = await parseScanFile(file, 'rmr');
+    setVal('rmr-date', d.test_date); setVal('rmr-kcal', d.kcal);
+    setVal('rmr-kj', d.kj);         setVal('rmr-fat', d.fat_pct);
+    setVal('rmr-glucose', d.glucose_pct); setVal('rmr-feo2', d.feo2);
+    setVal('rmr-pop-min', d.pop_min); setVal('rmr-pop-max', d.pop_max);
+    toast('✅ RMR form auto-filled!');
+  } catch(e) { toast('Could not read file: ' + e.message, 'error'); }
+}
+
+function signOut() {
+  sb.auth.signOut().then(() => { window.location.href = 'index.html'; });
+}
+
+init();
+</script>
+</body>
+</html>

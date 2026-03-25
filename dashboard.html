@@ -1,0 +1,1063 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Life X — Dashboard</title>
+<link href="https://fonts.googleapis.com/css2?family=Bebas+Neue&family=Outfit:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+<style>
+:root {
+  --bg: #08090b; --surface: #0f1114; --surface2: #161a1f; --surface3: #1c2128;
+  --border: rgba(255,255,255,0.06); --border2: rgba(255,255,255,0.1);
+  --gold: #f5c842; --gold2: #e8a020; --green: #39e07a; --red: #ff5555;
+  --blue: #4da6ff; --orange: #ff9f43; --purple: #a78bfa; --teal: #2dd4bf;
+  --text: #eef0f3; --muted: #5a6272; --muted2: #8a94a6;
+}
+*, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+html, body { height: 100%; overflow: hidden; }
+body { background: var(--bg); color: var(--text); font-family: 'Outfit', sans-serif; font-size: 14px; display: flex; }
+
+/* Loading */
+#loading {
+  position: fixed; inset: 0; background: var(--bg); display: flex;
+  flex-direction: column; align-items: center; justify-content: center; gap: 16px; z-index: 100;
+}
+.loading-mark {
+  width: 64px; height: 64px; background: var(--gold); border-radius: 16px;
+  display: flex; align-items: center; justify-content: center;
+  font-family: 'Bebas Neue', sans-serif; font-size: 30px; color: #000;
+  animation: pulse 1.2s ease-in-out infinite;
+}
+@keyframes pulse { 0%,100%{opacity:1} 50%{opacity:0.4} }
+.loading-text { font-size: 13px; color: var(--muted2); letter-spacing: 1px; }
+
+#app { display: none; width: 100%; }
+
+::-webkit-scrollbar { width: 4px; }
+::-webkit-scrollbar-track { background: transparent; }
+::-webkit-scrollbar-thumb { background: var(--surface3); border-radius: 2px; }
+
+/* SIDEBAR */
+.sidebar {
+  width: 220px; min-width: 220px; background: var(--surface);
+  border-right: 1px solid var(--border); display: flex;
+  flex-direction: column; height: 100vh; overflow-y: auto;
+}
+.sidebar-logo { display: flex; align-items: center; gap: 10px; padding: 20px 16px 16px; border-bottom: 1px solid var(--border); }
+.logo-mark { width: 32px; height: 32px; background: var(--gold); border-radius: 8px; display: flex; align-items: center; justify-content: center; font-size: 16px; font-weight: 700; color: #000; flex-shrink: 0; font-family: 'Bebas Neue', sans-serif; }
+.logo-text { font-family: 'Bebas Neue', sans-serif; font-size: 22px; letter-spacing: 3px; color: var(--text); line-height: 1; }
+.logo-sub { font-size: 9px; color: var(--muted2); letter-spacing: 1px; text-transform: uppercase; margin-top: 1px; }
+.sidebar-nav { flex: 1; padding: 8px 0; }
+.nav-group { margin-bottom: 4px; }
+.nav-group-label { font-size: 9px; font-weight: 600; letter-spacing: 1.5px; text-transform: uppercase; color: var(--muted); padding: 12px 16px 4px; }
+.nav-item { display: flex; align-items: center; gap: 10px; padding: 9px 16px; cursor: pointer; color: var(--muted2); font-size: 13px; transition: all 0.15s; border-left: 2px solid transparent; }
+.nav-item:hover { background: var(--surface2); color: var(--text); }
+.nav-item.active { background: rgba(245,200,66,0.08); color: var(--gold); border-left: 2px solid var(--gold); font-weight: 500; }
+.nav-icon { font-size: 15px; width: 18px; text-align: center; flex-shrink: 0; }
+.nav-badge { margin-left: auto; background: var(--gold); color: #000; font-size: 9px; font-weight: 700; padding: 1px 5px; border-radius: 10px; }
+.sidebar-footer { border-top: 1px solid var(--border); padding: 12px 16px; }
+.user-row { display: flex; align-items: center; gap: 10px; margin-bottom: 10px; }
+.user-avatar { width: 36px; height: 36px; border-radius: 50%; background: linear-gradient(135deg, var(--gold), var(--gold2)); display: flex; align-items: center; justify-content: center; font-family: 'Bebas Neue', sans-serif; font-size: 16px; color: #000; flex-shrink: 0; }
+.user-info { flex: 1; min-width: 0; }
+.user-name { font-size: 13px; font-weight: 600; color: var(--text); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.user-level { font-size: 11px; color: var(--gold); display: flex; align-items: center; gap: 4px; }
+.pts-pill { background: rgba(245,200,66,0.12); border: 1px solid rgba(245,200,66,0.25); color: var(--gold); font-size: 10px; font-weight: 600; padding: 2px 6px; border-radius: 10px; }
+.signout-btn { width: 100%; padding: 8px; background: transparent; border: 1px solid var(--border2); border-radius: 7px; color: var(--muted2); font-family: 'Outfit', sans-serif; font-size: 12px; cursor: pointer; transition: all 0.15s; }
+.signout-btn:hover { background: var(--surface2); color: var(--text); }
+
+/* MAIN */
+.main { flex: 1; overflow-y: auto; height: 100vh; }
+.screen { display: none; padding: 28px 32px; min-height: 100%; animation: fadeIn 0.2s ease; }
+.screen.active { display: block; }
+@keyframes fadeIn { from{opacity:0;transform:translateY(4px)} to{opacity:1;transform:translateY(0)} }
+
+/* PAGE HEADER */
+.page-header { margin-bottom: 24px; }
+.page-title { font-family: 'Bebas Neue', sans-serif; font-size: 32px; letter-spacing: 2px; color: var(--text); line-height: 1; margin-bottom: 4px; }
+.page-subtitle { color: var(--muted2); font-size: 13px; }
+
+/* CARDS */
+.card { background: var(--surface); border: 1px solid var(--border); border-radius: 12px; padding: 20px; }
+.card-title { font-size: 11px; font-weight: 600; letter-spacing: 1px; text-transform: uppercase; color: var(--muted2); margin-bottom: 14px; }
+
+/* STAT TILES */
+.stats-row { display: grid; grid-template-columns: repeat(4, 1fr); gap: 12px; margin-bottom: 20px; }
+.stat-tile { background: var(--surface); border: 1px solid var(--border); border-radius: 12px; padding: 16px; border-top: 3px solid var(--muted); }
+.stat-tile.gold{border-top-color:var(--gold)} .stat-tile.green{border-top-color:var(--green)} .stat-tile.blue{border-top-color:var(--blue)} .stat-tile.red{border-top-color:var(--red)} .stat-tile.orange{border-top-color:var(--orange)} .stat-tile.purple{border-top-color:var(--purple)} .stat-tile.teal{border-top-color:var(--teal)}
+.tile-label { font-size: 10px; font-weight: 600; letter-spacing: 0.8px; text-transform: uppercase; color: var(--muted2); margin-bottom: 6px; }
+.tile-value { font-family: 'Bebas Neue', sans-serif; font-size: 36px; line-height: 1; color: var(--text); letter-spacing: 1px; }
+.tile-unit { font-family: 'Outfit', sans-serif; font-size: 14px; color: var(--muted2); margin-left: 2px; }
+.tile-delta { font-size: 11px; margin-top: 4px; display: flex; align-items: center; gap: 3px; }
+.tile-delta.down{color:var(--green)} .tile-delta.up{color:var(--red)} .tile-delta.good{color:var(--green)} .tile-delta.neutral{color:var(--muted2)}
+
+/* ALERT */
+.alert { border-radius: 10px; padding: 14px 16px; margin-bottom: 16px; display: flex; gap: 12px; align-items: flex-start; border: 1px solid transparent; }
+.alert.warn  { background: rgba(255,159,67,0.08); border-color: rgba(255,159,67,0.25); }
+.alert.danger{ background: rgba(255,85,85,0.08);  border-color: rgba(255,85,85,0.25); }
+.alert.success{background: rgba(57,224,122,0.08); border-color: rgba(57,224,122,0.25); }
+.alert-icon { font-size: 18px; flex-shrink: 0; margin-top: 1px; }
+.alert-title { font-weight: 600; font-size: 13px; color: var(--text); margin-bottom: 3px; }
+.alert-body { font-size: 12px; color: var(--muted2); line-height: 1.5; }
+
+/* SCORE RING */
+.score-section { display: flex; gap: 20px; margin-bottom: 20px; }
+.score-ring-wrap { flex-shrink: 0; position: relative; width: 160px; height: 160px; }
+.score-ring-wrap svg { transform: rotate(-90deg); }
+.score-center { position: absolute; inset: 0; display: flex; flex-direction: column; align-items: center; justify-content: center; }
+.score-big { font-family: 'Bebas Neue', sans-serif; font-size: 52px; line-height: 1; color: var(--gold); letter-spacing: 2px; }
+.score-denom { font-size: 13px; color: var(--muted2); }
+.score-label { font-size: 10px; font-weight: 600; letter-spacing: 1px; text-transform: uppercase; color: var(--gold); margin-top: 2px; }
+.score-breakdown { flex: 1; display: flex; flex-direction: column; justify-content: center; gap: 10px; }
+.sub-score-row { display: flex; align-items: center; gap: 10px; }
+.sub-score-label { font-size: 12px; color: var(--muted2); width: 44px; flex-shrink: 0; }
+.sub-score-bar-wrap { flex: 1; height: 6px; background: var(--surface3); border-radius: 3px; overflow: hidden; }
+.sub-score-bar { height: 100%; border-radius: 3px; transition: width 0.6s ease; }
+.sub-score-val { font-family: 'Bebas Neue', sans-serif; font-size: 18px; color: var(--text); width: 36px; text-align: right; letter-spacing: 1px; }
+
+/* GRIDS */
+.grid-2 { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; }
+.grid-3 { display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 16px; }
+.mb16 { margin-bottom: 16px; }
+.mb20 { margin-bottom: 20px; }
+
+/* PLACEHOLDER */
+.placeholder-screen { display: flex; flex-direction: column; align-items: center; justify-content: center; min-height: 60vh; gap: 12px; text-align: center; }
+.placeholder-icon { font-size: 48px; opacity: 0.4; }
+.placeholder-title { font-family: 'Bebas Neue', sans-serif; font-size: 28px; letter-spacing: 3px; color: var(--muted); }
+.placeholder-sub { font-size: 13px; color: var(--muted); }
+
+/* BUTTONS */
+.btn { display: inline-flex; align-items: center; gap: 8px; padding: 10px 20px; border-radius: 8px; font-family: 'Outfit', sans-serif; font-size: 13px; font-weight: 600; cursor: pointer; border: none; transition: all 0.15s; }
+.btn-gold { background: var(--gold); color: #000; }
+.btn-gold:hover { background: var(--gold2); }
+.btn-outline { background: transparent; color: var(--text); border: 1px solid var(--border2); }
+.btn-outline:hover { background: var(--surface2); }
+
+/* SECONDARY STATS */
+.secondary-stats { display: grid; grid-template-columns: repeat(3, 1fr); gap: 12px; margin-bottom: 20px; }
+.mini-stat { background: var(--surface); border: 1px solid var(--border); border-radius: 10px; padding: 14px 16px; display: flex; align-items: center; gap: 12px; }
+.mini-stat-icon { font-size: 20px; flex-shrink: 0; }
+.mini-stat-label { font-size: 10px; font-weight: 600; text-transform: uppercase; letter-spacing: 0.8px; color: var(--muted2); margin-bottom: 2px; }
+.mini-stat-value { font-family: 'Bebas Neue', sans-serif; font-size: 20px; color: var(--text); letter-spacing: 1px; line-height: 1; }
+.mini-stat-value span { font-family: 'Outfit', sans-serif; font-size: 11px; color: var(--muted2); margin-left: 2px; }
+
+/* BADGE */
+.badge { display: inline-flex; align-items: center; padding: 2px 8px; border-radius: 20px; font-size: 10px; font-weight: 600; letter-spacing: 0.5px; }
+.badge.green{background:rgba(57,224,122,0.15);color:var(--green)} .badge.red{background:rgba(255,85,85,0.15);color:var(--red)} .badge.gold{background:rgba(245,200,66,0.15);color:var(--gold)} .badge.blue{background:rgba(77,166,255,0.15);color:var(--blue)}
+
+/* INSIGHT LIST */
+.insight-list { display: flex; flex-direction: column; gap: 10px; }
+.insight-item { display: flex; align-items: flex-start; gap: 10px; padding: 10px 14px; background: var(--surface2); border-radius: 8px; font-size: 12px; line-height: 1.5; color: var(--muted2); }
+.insight-item .icon { font-size: 14px; flex-shrink: 0; margin-top: 1px; }
+.insight-item strong { color: var(--text); }
+
+/* BOOK */
+.service-cards { display: grid; grid-template-columns: repeat(3, 1fr); gap: 16px; margin-bottom: 24px; }
+.service-card { background: var(--surface); border: 1px solid var(--border); border-radius: 12px; padding: 24px 20px; text-align: center; transition: border-color 0.15s; cursor: pointer; }
+.service-card:hover { border-color: var(--gold); }
+.service-icon { font-size: 32px; margin-bottom: 12px; }
+.service-name { font-family: 'Bebas Neue', sans-serif; font-size: 20px; letter-spacing: 2px; color: var(--text); margin-bottom: 4px; }
+.service-price { font-size: 22px; font-weight: 700; color: var(--gold); margin-bottom: 10px; }
+.service-desc { font-size: 12px; color: var(--muted2); line-height: 1.5; }
+
+@media (max-width: 1100px) { .stats-row { grid-template-columns: repeat(2, 1fr); } }
+
+/* HAMBURGER */
+.hamburger {
+  display: none; position: fixed; top: 12px; left: 12px; z-index: 200;
+  width: 38px; height: 38px; background: var(--surface); border: 1px solid var(--border2);
+  border-radius: 8px; align-items: center; justify-content: center;
+  cursor: pointer; flex-direction: column; gap: 5px;
+}
+.hamburger span { display: block; width: 18px; height: 2px; background: var(--text); border-radius: 1px; }
+.sidebar-overlay {
+  display: none; position: fixed; inset: 0; background: rgba(0,0,0,0.6); z-index: 150;
+}
+
+@media (max-width: 640px) {
+  .hamburger { display: flex; }
+  .sidebar {
+    position: fixed; left: -240px; top: 0; z-index: 160; width: 220px;
+    transition: left 0.25s ease; box-shadow: 4px 0 24px rgba(0,0,0,0.4);
+  }
+  .sidebar.open { left: 0; }
+  .sidebar-overlay.open { display: block; }
+  .main { width: 100%; }
+  .screen { padding: 20px 16px 20px; padding-top: 60px; }
+  .stats-row { grid-template-columns: repeat(2, 1fr); }
+  .secondary-stats { grid-template-columns: repeat(2, 1fr); }
+  .score-section { flex-direction: column; align-items: center; }
+  .score-breakdown { width: 100%; }
+  .grid-2 { grid-template-columns: 1fr; }
+  .grid-3 { grid-template-columns: 1fr; }
+  .service-cards { grid-template-columns: 1fr; }
+  .page-title { font-size: 26px; }
+}
+</style>
+</head>
+<body>
+
+<!-- Loading overlay -->
+<div id="loading">
+  <div class="loading-mark">LX</div>
+  <div class="loading-text">Loading your results…</div>
+</div>
+
+<!-- App (hidden until data loads) -->
+<div id="app">
+
+<div class="hamburger" id="hamburger" onclick="toggleSidebar()">
+  <span></span><span></span><span></span>
+</div>
+<div class="sidebar-overlay" id="overlay" onclick="toggleSidebar()"></div>
+
+<nav class="sidebar" id="sidebar">
+  <div class="sidebar-logo">
+    <div class="logo-mark">LX</div>
+    <div>
+      <div class="logo-text">Life X</div>
+      <div class="logo-sub">Body Intelligence</div>
+    </div>
+  </div>
+
+  <div class="sidebar-nav">
+    <div class="nav-group">
+      <div class="nav-group-label">Health Overview</div>
+      <div class="nav-item active" data-screen="dashboard"><span class="nav-icon">📊</span> Dashboard</div>
+      <div class="nav-item" data-screen="score"><span class="nav-icon">⭐</span> Life X Score <span class="nav-badge js-score-badge">—</span></div>
+    </div>
+    <div class="nav-group">
+      <div class="nav-group-label">DEXA Body Scan</div>
+      <div class="nav-item" data-screen="body-comp"><span class="nav-icon">🫀</span> Body Composition</div>
+      <div class="nav-item" data-screen="bone"><span class="nav-icon">🦴</span> Bone Density</div>
+      <div class="nav-item" data-screen="before-after"><span class="nav-icon">📈</span> Before vs After</div>
+    </div>
+    <div class="nav-group">
+      <div class="nav-group-label">Blood &amp; Hormones</div>
+      <div class="nav-item" data-screen="blood"><span class="nav-icon">🩸</span> Blood Panel</div>
+      <div class="nav-item" data-screen="hormones"><span class="nav-icon">⚗️</span> Hormones</div>
+    </div>
+    <div class="nav-group">
+      <div class="nav-group-label">Metabolism</div>
+      <div class="nav-item" data-screen="rmr"><span class="nav-icon">🔥</span> RMR — Metabolism</div>
+    </div>
+    <div class="nav-group">
+      <div class="nav-group-label">Earn &amp; Play</div>
+      <div class="nav-item" data-screen="spin"><span class="nav-icon">🎰</span> Spin &amp; Win</div>
+      <div class="nav-item" data-screen="book"><span class="nav-icon">📅</span> Book Next Test</div>
+    </div>
+  </div>
+
+  <div class="sidebar-footer">
+    <div class="user-row">
+      <div class="user-avatar js-avatar">LX</div>
+      <div class="user-info">
+        <div class="user-name js-name">Loading…</div>
+        <div class="user-level">
+          <span class="js-level">Member</span>
+          <span class="pts-pill js-pts">0 pts</span>
+        </div>
+      </div>
+    </div>
+    <button class="signout-btn" onclick="signOut()">↩ Sign Out</button>
+  </div>
+</nav>
+
+<main class="main">
+
+  <!-- DASHBOARD -->
+  <div id="screen-dashboard" class="screen active">
+    <div id="dashboard-content"></div>
+  </div>
+
+  <!-- LIFE X SCORE -->
+  <div id="screen-score" class="screen">
+    <div id="score-content"></div>
+  </div>
+
+  <!-- BODY COMPOSITION -->
+  <div id="screen-body-comp" class="screen">
+    <div class="page-header">
+      <div class="page-title">Body Composition</div>
+      <div class="page-subtitle">DEXA scan — regional breakdown</div>
+    </div>
+    <div id="body-comp-content"></div>
+  </div>
+
+  <!-- BONE DENSITY -->
+  <div id="screen-bone" class="screen">
+    <div class="page-header">
+      <div class="page-title">Bone Density</div>
+      <div class="page-subtitle">DEXA bone mineral density analysis</div>
+    </div>
+    <div id="bone-content"></div>
+  </div>
+
+  <!-- BEFORE VS AFTER -->
+  <div id="screen-before-after" class="screen">
+    <div class="page-header">
+      <div class="page-title">Before vs After</div>
+      <div id="ba-subtitle" class="page-subtitle"></div>
+    </div>
+    <div id="before-after-content"></div>
+  </div>
+
+  <!-- BLOOD PANEL -->
+  <div id="screen-blood" class="screen">
+    <div class="page-header">
+      <div class="page-title">Blood Panel</div>
+      <div id="blood-subtitle" class="page-subtitle"></div>
+    </div>
+    <div id="blood-panel-content"></div>
+  </div>
+
+  <!-- HORMONES -->
+  <div id="screen-hormones" class="screen">
+    <div class="page-header">
+      <div class="page-title">Hormones</div>
+      <div id="hormones-subtitle" class="page-subtitle"></div>
+    </div>
+    <div id="hormones-content"></div>
+  </div>
+
+  <!-- RMR -->
+  <div id="screen-rmr" class="screen">
+    <div class="page-header">
+      <div class="page-title">RMR — Metabolism</div>
+      <div id="rmr-subtitle" class="page-subtitle"></div>
+    </div>
+    <div id="rmr-content"></div>
+  </div>
+
+  <!-- SPIN & WIN -->
+  <div id="screen-spin" class="screen">
+    <div class="page-header">
+      <div class="page-title">Spin &amp; Win</div>
+      <div class="page-subtitle">Answer a question to earn your spin</div>
+    </div>
+    <div id="spin-content"></div>
+  </div>
+
+  <!-- BOOK -->
+  <div id="screen-book" class="screen">
+    <div class="page-header">
+      <div class="page-title">Book Next Test</div>
+      <div class="page-subtitle">Castle Hill NSW &nbsp;·&nbsp; Life X Clinic</div>
+    </div>
+    <div class="service-cards">
+      <div class="service-card">
+        <div class="service-icon">🫀</div>
+        <div class="service-name">DEXA Scan</div>
+        <div class="service-price">$149</div>
+        <div class="service-desc">Full body composition analysis. Fat mass, lean mass, bone density &amp; regional breakdown.</div>
+        <div style="margin-top:16px;"><a href="https://lifexclinic.square.site" target="_blank" class="btn btn-gold" style="width:100%;justify-content:center;">Book Now →</a></div>
+      </div>
+      <div class="service-card">
+        <div class="service-icon">🔥</div>
+        <div class="service-name">RMR Test</div>
+        <div class="service-price">$160</div>
+        <div class="service-desc">Resting metabolic rate via indirect calorimetry. Discover your true calorie burn &amp; fuel mix.</div>
+        <div style="margin-top:16px;"><a href="https://lifexclinic.square.site" target="_blank" class="btn btn-gold" style="width:100%;justify-content:center;">Book Now →</a></div>
+      </div>
+      <div class="service-card">
+        <div class="service-icon">🩸</div>
+        <div class="service-name">Blood Panel</div>
+        <div class="service-price">Varies</div>
+        <div class="service-desc">Comprehensive blood markers including hormones, metabolic, inflammation &amp; thyroid.</div>
+        <div style="margin-top:16px;"><a href="https://lifexclinic.square.site" target="_blank" class="btn btn-gold" style="width:100%;justify-content:center;">View Panels →</a></div>
+      </div>
+    </div>
+    <div class="card">
+      <div class="card-title">Refer a Friend — Earn 25 pts each</div>
+      <div style="display:flex;align-items:center;gap:12px;margin-bottom:12px;">
+        <div id="referral-code" style="flex:1;background:var(--surface2);border:1px solid var(--border2);border-radius:8px;padding:10px 14px;font-size:13px;color:var(--muted2);font-family:monospace;">lifex.app/ref/…</div>
+        <button class="btn btn-outline" onclick="copyReferral()">📋 Copy Link</button>
+      </div>
+      <div style="font-size:12px;color:var(--muted2);">Share your link — earn <strong style="color:var(--gold)">25 pts</strong> for every friend who books a test.</div>
+    </div>
+  </div>
+
+</main>
+</div><!-- end #app -->
+
+<script>
+function toggleSidebar() {
+  document.getElementById('sidebar').classList.toggle('open');
+  document.getElementById('overlay').classList.toggle('open');
+}
+
+const SUPABASE_URL = 'https://shvpwgrjqskccsdzajkj.supabase.co';
+const SUPABASE_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InNodnB3Z3JqcXNrY2NzZHphamtqIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzM5MDUzNTIsImV4cCI6MjA4OTQ4MTM1Mn0.2dL3J9XbzU8q8ogPPqhwR4w7_vSB0FxVKMzsAOxCgk4';
+const sb = window.supabase.createClient(SUPABASE_URL, SUPABASE_KEY);
+
+// Module-level data
+let profile = null;
+let scan1 = null, scan2 = null;
+let blood = [], hormones = [], rmr = null;
+let bloodPanelDate = '', hormonePanelDate = '', rmrDate = '';
+let lifexScore = null;
+
+/* ══════════════════════════
+   INIT
+══════════════════════════ */
+async function init() {
+  const { data: { session } } = await sb.auth.getSession();
+  if (!session) { window.location.href = 'index.html'; return; }
+
+  const uid = session.user.id;
+
+  const [profileRes, scansRes, bloodRes, hormoneRes, rmrRes] = await Promise.all([
+    sb.from('profiles').select('*').eq('id', uid).single(),
+    sb.from('dexa_scans').select('*').eq('client_id', uid).order('scan_date', { ascending: true }),
+    sb.from('blood_panels').select('*, blood_markers(*)').eq('client_id', uid).order('panel_date', { ascending: false }).limit(1),
+    sb.from('hormone_panels').select('*, hormone_markers(*)').eq('client_id', uid).order('panel_date', { ascending: false }).limit(1),
+    sb.from('rmr_tests').select('*').eq('client_id', uid).order('test_date', { ascending: false }).limit(1),
+  ]);
+
+  profile = profileRes.data;
+
+  // Sidebar user info
+  if (profile) {
+    document.querySelector('.js-avatar').textContent = profile.initials || '??';
+    document.querySelector('.js-name').textContent   = profile.full_name;
+    document.querySelector('.js-level').textContent  = (profile.member_level || 'Standard') + ' Member';
+    document.querySelector('.js-pts').textContent    = (profile.points || 0) + ' pts';
+    document.getElementById('referral-code').textContent =
+      'lifex.app/ref/' + profile.full_name.replace(/\s+/g,'').toUpperCase().slice(0,6) + (profile.points || 0);
+  }
+
+  // Map DEXA scans
+  const scans = scansRes.data || [];
+  if (scans.length >= 2) {
+    scan1 = mapScan(scans[scans.length - 2]);
+    scan2 = mapScan(scans[scans.length - 1]);
+  } else if (scans.length === 1) {
+    scan2 = mapScan(scans[0]);
+  }
+
+  // Map blood
+  const bp = (bloodRes.data || [])[0];
+  if (bp) {
+    bloodPanelDate = bp.panel_date;
+    blood = (bp.blood_markers || []).map(m => ({ ...m, min: m.display_min, max: m.display_max }));
+  }
+
+  // Map hormones
+  const hp = (hormoneRes.data || [])[0];
+  if (hp) {
+    hormonePanelDate = hp.panel_date;
+    hormones = (hp.hormone_markers || []).map(h => ({ ...h, min: h.display_min, max: h.display_max }));
+  }
+
+  // Map RMR
+  rmr = (rmrRes.data || [])[0] || null;
+  if (rmr) rmrDate = rmr.test_date;
+
+  // Calc score
+  lifexScore = calcLifexScore();
+  if (lifexScore !== null) {
+    document.querySelector('.js-score-badge').textContent = lifexScore;
+  }
+
+  // Show app
+  document.getElementById('loading').style.display = 'none';
+  document.getElementById('app').style.display = 'flex';
+
+  // Render all screens
+  renderDashboard();
+  renderScore();
+  renderBodyComp();
+  renderBone();
+  renderBeforeAfter();
+  renderBlood();
+  renderHormones();
+  renderRMR();
+  renderSpin();
+}
+
+function mapScan(s) {
+  return {
+    date: s.scan_date, scan_number: s.scan_number,
+    fat_pct: s.fat_pct, fat_g: s.fat_g, lean_g: s.lean_g, total_g: s.total_g,
+    bmd: s.bmd, t_score: s.t_score, z_score: s.z_score, pr_pct: s.pr_pct,
+    vat_g: s.vat_g, android: s.android_fat_pct, gynoid: s.gynoid_fat_pct, ag_ratio: s.ag_ratio,
+  };
+}
+
+function calcLifexScore() {
+  const scores = [];
+  if (scan2) {
+    // DEXA score based on body fat %
+    const fp = scan2.fat_pct;
+    if      (fp <= 12) scores.push(95);
+    else if (fp <= 17) scores.push(85);
+    else if (fp <= 22) scores.push(74);
+    else if (fp <= 27) scores.push(58);
+    else               scores.push(42);
+  }
+  if (blood.length) {
+    const optimal = blood.filter(m => m.status === 'optimal').length;
+    const normal  = blood.filter(m => m.status === 'normal').length;
+    scores.push(Math.round(((optimal + normal * 0.75) / blood.length) * 100));
+  }
+  if (rmr) {
+    const fp = rmr.fat_pct || 0;
+    if      (fp >= 80) scores.push(90);
+    else if (fp >= 75) scores.push(76);
+    else if (fp >= 65) scores.push(60);
+    else               scores.push(45);
+  }
+  if (!scores.length) return null;
+  return Math.round(scores.reduce((a, b) => a + b, 0) / scores.length);
+}
+
+function signOut() {
+  sb.auth.signOut().then(() => { window.location.href = 'index.html'; });
+}
+
+/* ══════════════════════════
+   ROUTER
+══════════════════════════ */
+function navigate(id) {
+  document.querySelectorAll('.screen').forEach(s => s.classList.remove('active'));
+  document.querySelectorAll('.nav-item').forEach(n => n.classList.remove('active'));
+  const screen = document.getElementById('screen-' + id);
+  if (screen) screen.classList.add('active');
+  const nav = document.querySelector(`[data-screen="${id}"]`);
+  if (nav) nav.classList.add('active');
+}
+document.querySelectorAll('.nav-item').forEach(item => {
+  item.addEventListener('click', () => {
+    navigate(item.dataset.screen);
+    // Close sidebar on mobile after navigation
+    document.getElementById('sidebar').classList.remove('open');
+    document.getElementById('overlay').classList.remove('open');
+  });
+});
+
+/* ══════════════════════════
+   HELPERS
+══════════════════════════ */
+function fmt(n) { return Number(n).toLocaleString(); }
+function fmtDate(d) { if (!d) return '—'; return new Date(d).toLocaleDateString('en-AU', { day:'numeric', month:'short', year:'numeric' }); }
+function noData(icon, title, sub) {
+  return `<div class="placeholder-screen"><div class="placeholder-icon">${icon}</div><div class="placeholder-title">${title}</div><div class="placeholder-sub">${sub}</div></div>`;
+}
+
+/* ══════════════════════════
+   DASHBOARD
+══════════════════════════ */
+function renderDashboard() {
+  const el = document.getElementById('dashboard-content');
+
+  // Subtitles
+  const parts = [];
+  if (scan2) parts.push('Last scan: ' + fmtDate(scan2.date));
+  if (blood.length) parts.push('Blood panel: ' + fmtDate(bloodPanelDate));
+  if (rmr) parts.push('RMR: ' + fmtDate(rmrDate));
+
+  if (!scan2 && !blood.length && !rmr) {
+    el.innerHTML = `
+      <div class="page-header"><div class="page-title">Dashboard</div><div class="page-subtitle">Welcome to Life X</div></div>
+      ${noData('🏥', 'Results Coming Soon', 'Your scan data will appear here once uploaded by the Life X team.')}`;
+    return;
+  }
+
+  const score = lifexScore;
+  const scorePct = score ? Math.min(score, 100) : 0;
+  const circumference = 2 * Math.PI * 65;
+  const offset = circumference - (scorePct / 100) * circumference;
+
+  // Calculate DEXA score + blood score + rmr score for breakdown
+  let dexaScore = null, bloodScore = null, rmrScore = null;
+  if (scan2) {
+    const fp = scan2.fat_pct;
+    if(fp<=12)dexaScore=95; else if(fp<=17)dexaScore=85; else if(fp<=22)dexaScore=74; else if(fp<=27)dexaScore=58; else dexaScore=42;
+  }
+  if (blood.length) {
+    const optimal = blood.filter(m => m.status==='optimal').length;
+    const normal  = blood.filter(m => m.status==='normal').length;
+    bloodScore = Math.round(((optimal + normal*0.75)/blood.length)*100);
+  }
+  if (rmr) {
+    const fp = rmr.fat_pct||0;
+    if(fp>=80)rmrScore=90; else if(fp>=75)rmrScore=76; else if(fp>=65)rmrScore=60; else rmrScore=45;
+  }
+
+  // Alerts
+  let alerts = '';
+  if (scan1 && scan2) {
+    const leanDiff = (scan2.lean_g || 0) - (scan1.lean_g || 0);
+    const fatDiff  = (scan2.fat_g  || 0) - (scan1.fat_g  || 0);
+    if (leanDiff < -500) {
+      alerts += `<div class="alert warn mb16"><div class="alert-icon">⚠️</div><div><div class="alert-title">Lean Mass Loss Detected</div><div class="alert-body">Between scans you lost <strong style="color:var(--orange)">${fmt(Math.abs(leanDiff))}g of lean mass</strong>${fatDiff < 0 ? ` alongside ${fmt(Math.abs(fatDiff))}g of fat. ` : '. '}Increase protein intake and resistance training volume.</div></div></div>`;
+    }
+    if (fatDiff < -500 && leanDiff >= 0) {
+      alerts += `<div class="alert success mb16"><div class="alert-icon">✅</div><div><div class="alert-title">Great Progress!</div><div class="alert-body">You lost <strong>${fmt(Math.abs(fatDiff))}g of fat</strong> while maintaining lean mass. Excellent work.</div></div></div>`;
+    }
+  }
+
+  // Stat tiles
+  let tiles = '';
+  if (scan2?.fat_pct != null) {
+    const delta = scan1 ? ((scan2.fat_pct - scan1.fat_pct).toFixed(1)) : null;
+    tiles += `<div class="stat-tile blue"><div class="tile-label">Body Fat</div><div class="tile-value">${scan2.fat_pct}<span class="tile-unit">%</span></div>${delta !== null ? `<div class="tile-delta ${parseFloat(delta)<0?'down':'up'}">${parseFloat(delta)<0?'▼':'▲'} ${delta>0?'+':''}${delta}% from last scan</div>` : ''}</div>`;
+  }
+  if (scan2?.lean_g != null) {
+    const delta = scan1 ? (scan2.lean_g - scan1.lean_g) : null;
+    tiles += `<div class="stat-tile green"><div class="tile-label">Lean Mass</div><div class="tile-value">${(scan2.lean_g/1000).toFixed(1)}<span class="tile-unit">kg</span></div>${delta !== null ? `<div class="tile-delta ${delta>=0?'down':'up'}">${delta>=0?'▲ +':'▼ '}${fmt(Math.abs(delta))}g ${delta<-500?'⚠️':''}</div>` : ''}</div>`;
+  }
+  if (hormones.length) {
+    const testo = hormones.find(h => h.name.toLowerCase().includes('testosterone') && h.name.toLowerCase().includes('total'));
+    if (testo) tiles += `<div class="stat-tile purple"><div class="tile-label">Total Testosterone</div><div class="tile-value">${testo.value}<span class="tile-unit">${testo.unit}</span></div><div class="tile-delta good">✓ Ref ${testo.ref_min}–${testo.ref_max}</div></div>`;
+  }
+  if (rmr?.kcal) {
+    tiles += `<div class="stat-tile orange"><div class="tile-label">RMR</div><div class="tile-value">${fmt(rmr.kcal)}<span class="tile-unit">kcal</span></div><div class="tile-delta good">✓ Measured</div></div>`;
+  }
+
+  // Blood mini stats
+  let miniStats = '';
+  const crp = blood.find(m => m.name.toLowerCase().includes('crp'));
+  const hba1c = blood.find(m => m.name.toLowerCase().includes('hba1c'));
+  if (crp)   miniStats += `<div class="mini-stat"><div class="mini-stat-icon">🔬</div><div><div class="mini-stat-label">hsCRP Inflammation</div><div class="mini-stat-value">${crp.value} <span>${crp.unit} ${crp.status==='optimal'?'✓':''}</span></div></div></div>`;
+  if (hba1c) miniStats += `<div class="mini-stat"><div class="mini-stat-icon">🩺</div><div><div class="mini-stat-label">HbA1c (Blood Sugar)</div><div class="mini-stat-value">${hba1c.value} <span>% ${hba1c.status==='optimal'?'optimal':''}</span></div></div></div>`;
+  if (rmr?.fat_pct) miniStats += `<div class="mini-stat"><div class="mini-stat-icon">🔥</div><div><div class="mini-stat-label">Fat Burning</div><div class="mini-stat-value">${rmr.fat_pct} <span>% (goal 80%)</span></div></div></div>`;
+
+  el.innerHTML = `
+    <div class="page-header">
+      <div class="page-title">Dashboard</div>
+      <div class="page-subtitle">${parts.join(' &nbsp;·&nbsp; ')}</div>
+    </div>
+
+    ${score !== null ? `
+    <div class="card mb20">
+      <div class="score-section">
+        <div class="score-ring-wrap">
+          <svg width="160" height="160" viewBox="0 0 160 160">
+            <circle cx="80" cy="80" r="65" fill="none" stroke="var(--surface3)" stroke-width="10"/>
+            <circle cx="80" cy="80" r="65" fill="none" stroke="var(--gold)" stroke-width="10"
+              stroke-dasharray="${circumference.toFixed(1)}" stroke-dashoffset="${offset.toFixed(1)}" stroke-linecap="round"/>
+          </svg>
+          <div class="score-center">
+            <div class="score-big">${score}</div>
+            <div class="score-denom">/100</div>
+            <div class="score-label">Life X Score</div>
+          </div>
+        </div>
+        <div class="score-breakdown">
+          ${dexaScore !== null ? `<div class="sub-score-row"><div class="sub-score-label">DEXA</div><div class="sub-score-bar-wrap"><div class="sub-score-bar" style="width:${dexaScore}%;background:var(--blue)"></div></div><div class="sub-score-val">${dexaScore}</div></div>` : ''}
+          ${bloodScore !== null ? `<div class="sub-score-row"><div class="sub-score-label">Blood</div><div class="sub-score-bar-wrap"><div class="sub-score-bar" style="width:${bloodScore}%;background:var(--green)"></div></div><div class="sub-score-val">${bloodScore}</div></div>` : ''}
+          ${rmrScore !== null ? `<div class="sub-score-row"><div class="sub-score-label">RMR</div><div class="sub-score-bar-wrap"><div class="sub-score-bar" style="width:${rmrScore}%;background:var(--orange)"></div></div><div class="sub-score-val">${rmrScore}</div></div>` : ''}
+        </div>
+      </div>
+    </div>` : ''}
+
+    ${alerts}
+
+    ${tiles ? `<div class="stats-row mb20">${tiles}</div>` : ''}
+    ${miniStats ? `<div class="secondary-stats mb20">${miniStats}</div>` : ''}
+
+    <div class="grid-2">
+      <div class="card">
+        <div class="card-title">Recommended Actions</div>
+        <div class="insight-list">
+          ${scan2?.lean_g && scan1?.lean_g && scan2.lean_g < scan1.lean_g ? '<div class="insight-item"><span class="icon">🥩</span><span>Increase protein to <strong>2.2g/kg</strong> to preserve lean mass during deficit.</span></div>' : ''}
+          ${scan2?.bmd ? '<div class="insight-item"><span class="icon">🏋️</span><span>Maintain <strong>heavy compound lifts</strong> 3x/week to support bone density.</span></div>' : ''}
+          ${rmr?.fat_pct && rmr.fat_pct < 80 ? '<div class="insight-item"><span class="icon">😴</span><span>Fat burning at ${rmr.fat_pct}% (goal 80%). <strong>Prioritise sleep &amp; fasted cardio.</strong></span></div>' : ''}
+          <div class="insight-item" style="border-top:1px solid var(--border);padding-top:14px;margin-top:4px;"><span class="icon">📅</span><span><strong>Book your next DEXA</strong> in 3 months to track progress.</span></div>
+        </div>
+        <div style="margin-top:14px;"><button class="btn btn-gold" onclick="navigate('book')">📅 Book Next Test</button></div>
+      </div>
+      <div class="card">
+        <div class="card-title">Your Scans</div>
+        ${scansRes_global.length ? scansRes_global.map((s,i) => `
+          <div style="display:flex;align-items:center;justify-content:space-between;padding:10px 0;border-bottom:1px solid var(--border);">
+            <div><div style="font-weight:500;font-size:13px;">Scan #${s.scan_number || (i+1)}</div><div style="font-size:11px;color:var(--muted2)">${fmtDate(s.scan_date)}</div></div>
+            <div style="font-family:'Bebas Neue',sans-serif;font-size:20px;color:var(--blue)">${s.fat_pct}%</div>
+          </div>`).join('') : '<div style="color:var(--muted2);font-size:13px;">No scans uploaded yet.</div>'}
+      </div>
+    </div>`;
+}
+
+// We need to keep the raw scans list for the dashboard
+let scansRes_global = [];
+
+/* ══════════════════════════
+   LIFE X SCORE SCREEN
+══════════════════════════ */
+function renderScore() {
+  const el = document.getElementById('score-content');
+  if (lifexScore === null) {
+    el.innerHTML = `<div class="page-header"><div class="page-title">Life X Score</div></div>${noData('⭐','No Score Yet','Your score will be calculated once your scan data is uploaded.')}`;
+    return;
+  }
+  const score = lifexScore;
+  const dexaScore  = scan2 ? (() => { const fp=scan2.fat_pct; if(fp<=12)return 95; if(fp<=17)return 85; if(fp<=22)return 74; if(fp<=27)return 58; return 42; })() : null;
+  const bloodScore = blood.length ? Math.round(((blood.filter(m=>m.status==='optimal').length + blood.filter(m=>m.status==='normal').length*0.75)/blood.length)*100) : null;
+  const rmrScore   = rmr ? (rmr.fat_pct>=80?90:rmr.fat_pct>=75?76:rmr.fat_pct>=65?60:45) : null;
+
+  el.innerHTML = `
+    <div class="page-header"><div class="page-title">Life X Score</div><div class="page-subtitle">Composite health score across DEXA, Blood &amp; Metabolism</div></div>
+    <div class="card mb20" style="text-align:center;padding:32px;">
+      <div style="font-family:'Bebas Neue',sans-serif;font-size:96px;color:var(--gold);line-height:1;letter-spacing:4px;">${score}</div>
+      <div style="font-size:14px;color:var(--muted2);margin-bottom:8px;">/100 — <strong style="color:var(--text)">${score>=90?'Exceptional':score>=76?'Good':score>=60?'Fair':'Needs Attention'}</strong></div>
+      <div style="display:flex;justify-content:center;gap:12px;flex-wrap:wrap;">
+        ${dexaScore  !== null ? `<span class="badge blue">DEXA ${dexaScore}/100</span>` : ''}
+        ${bloodScore !== null ? `<span class="badge green">Blood ${bloodScore}/100</span>` : ''}
+        ${rmrScore   !== null ? `<span class="badge gold">RMR ${rmrScore}/100</span>` : ''}
+      </div>
+    </div>
+    <div class="card">
+      <div class="card-title">Score Scale</div>
+      <div style="display:flex;gap:0;border-radius:8px;overflow:hidden;">
+        <div style="flex:1;background:var(--red);opacity:0.7;padding:8px 12px;font-size:11px;font-weight:600;color:#fff;">&lt;60<br><span style="font-weight:400;opacity:0.8">Needs Attention</span></div>
+        <div style="flex:1;background:var(--orange);opacity:0.7;padding:8px 12px;font-size:11px;font-weight:600;color:#fff;">60–75<br><span style="font-weight:400;opacity:0.8">Fair</span></div>
+        <div style="flex:${score>=76&&score<=89?3:1};background:var(--gold);opacity:0.9;padding:8px 12px;font-size:11px;font-weight:700;color:#000;">76–89${score>=76&&score<=89?' ← YOU':''}<br><span style="font-weight:400;opacity:0.7">Good</span></div>
+        <div style="flex:${score>=90?3:1};background:var(--green);opacity:0.7;padding:8px 12px;font-size:11px;font-weight:600;color:#000;">90–100${score>=90?' ← YOU':''}<br><span style="font-weight:400;opacity:0.6">Exceptional</span></div>
+      </div>
+    </div>`;
+}
+
+/* ══════════════════════════
+   BODY COMPOSITION
+══════════════════════════ */
+function renderBodyComp() {
+  const el = document.getElementById('body-comp-content');
+  if (!scan2) { el.innerHTML = noData('🫀','No Scan Data','Body composition data will appear here after your DEXA scan.'); return; }
+  const fatDiff  = scan1 ? (scan2.fat_g  - scan1.fat_g)  : null;
+  const leanDiff = scan1 ? (scan2.lean_g - scan1.lean_g) : null;
+  const vatDiff  = scan1 ? (scan2.vat_g  - scan1.vat_g)  : null;
+  el.innerHTML = `
+    <div class="stats-row mb20">
+      <div class="stat-tile blue"><div class="tile-label">Total Body Fat</div><div class="tile-value">${scan2.fat_pct}<span class="tile-unit">%</span></div>${fatDiff!==null?`<div class="tile-delta ${fatDiff<0?'down':'up'}">${fatDiff<0?'▼':'▲'} ${fatDiff<0?'-':'+'}${fmt(Math.abs(fatDiff))}g vs last scan</div>`:''}</div>
+      <div class="stat-tile green"><div class="tile-label">Lean Mass</div><div class="tile-value">${(scan2.lean_g/1000).toFixed(1)}<span class="tile-unit">kg</span></div>${leanDiff!==null?`<div class="tile-delta ${leanDiff>=0?'down':'up'}">${leanDiff>=0?'▲ +':'▼ '}${fmt(Math.abs(leanDiff))}g ${leanDiff<-500?'⚠️':''}</div>`:''}</div>
+      <div class="stat-tile red"><div class="tile-label">Fat Mass</div><div class="tile-value">${(scan2.fat_g/1000).toFixed(2)}<span class="tile-unit">kg</span></div></div>
+      ${scan2.vat_g!=null?`<div class="stat-tile orange"><div class="tile-label">Est. VAT</div><div class="tile-value">${fmt(scan2.vat_g)}<span class="tile-unit">g</span></div>${vatDiff!==null?`<div class="tile-delta ${vatDiff<0?'down':'up'}">${vatDiff<0?'▼ '+fmt(Math.abs(vatDiff))+'g excellent':'▲ +'+fmt(vatDiff)+'g'}</div>`:''}</div>`:''}
+    </div>
+    ${scan2.android!=null?`<div class="card"><div class="card-title">Regional Fat Distribution</div><div style="display:flex;gap:20px;flex-wrap:wrap;">
+      <div style="flex:1;min-width:140px;text-align:center;padding:16px;background:var(--surface2);border-radius:8px;"><div style="font-size:11px;color:var(--muted2);text-transform:uppercase;letter-spacing:0.8px;margin-bottom:6px;">Android (Belly)</div><div style="font-family:'Bebas Neue',sans-serif;font-size:36px;color:var(--orange)">${scan2.android}%</div></div>
+      <div style="flex:1;min-width:140px;text-align:center;padding:16px;background:var(--surface2);border-radius:8px;"><div style="font-size:11px;color:var(--muted2);text-transform:uppercase;letter-spacing:0.8px;margin-bottom:6px;">Gynoid (Hip)</div><div style="font-family:'Bebas Neue',sans-serif;font-size:36px;color:var(--blue)">${scan2.gynoid}%</div></div>
+      <div style="flex:1;min-width:140px;text-align:center;padding:16px;background:var(--surface2);border-radius:8px;"><div style="font-size:11px;color:var(--muted2);text-transform:uppercase;letter-spacing:0.8px;margin-bottom:6px;">A:G Ratio</div><div style="font-family:'Bebas Neue',sans-serif;font-size:36px;color:${(scan2.ag_ratio||0)<1?'var(--green)':'var(--red)'}">${scan2.ag_ratio}</div><div style="font-size:11px;color:var(--muted2);margin-top:2px;">${(scan2.ag_ratio||0)<1?'✓ Healthy':'⚠️ Elevated'}</div></div>
+    </div></div>`:''}`;
+}
+
+/* ══════════════════════════
+   BONE DENSITY
+══════════════════════════ */
+function renderBone() {
+  const el = document.getElementById('bone-content');
+  if (!scan2?.bmd) { el.innerHTML = noData('🦴','No Bone Data','Bone density data will appear here after your DEXA scan.'); return; }
+  const bmdDiff = scan1?.bmd ? ((scan2.bmd - scan1.bmd) * 100 / scan1.bmd).toFixed(1) : null;
+  el.innerHTML = `
+    <div class="stats-row mb20">
+      <div class="stat-tile green"><div class="tile-label">BMD Total</div><div class="tile-value">${scan2.bmd}<span class="tile-unit">g/cm²</span></div>${bmdDiff!==null?`<div class="tile-delta ${parseFloat(bmdDiff)>0?'good':'up'}">${parseFloat(bmdDiff)>0?'▲ +':''  }${bmdDiff}% vs last scan</div>`:''}</div>
+      ${scan2.t_score!=null?`<div class="stat-tile ${scan2.t_score>=-1?'blue':'red'}"><div class="tile-label">T-Score</div><div class="tile-value">${scan2.t_score}</div><div class="tile-delta ${scan2.t_score>=-1?'good':'up'}">${scan2.t_score>=-1?'✓ Normal range':'⚠️ Below normal'}</div></div>`:''}
+      ${scan2.z_score!=null?`<div class="stat-tile teal"><div class="tile-label">Z-Score</div><div class="tile-value">${scan2.z_score>=0?'+':''}${scan2.z_score}</div><div class="tile-delta ${scan2.z_score>=0?'good':'neutral'}">${scan2.z_score>=0?'Above':'Below'} age-matched mean</div></div>`:''}
+      ${scan2.pr_pct!=null?`<div class="stat-tile gold"><div class="tile-label">PR %</div><div class="tile-value">${scan2.pr_pct}<span class="tile-unit">%</span></div><div class="tile-delta good">% of young adult ref</div></div>`:''}
+    </div>
+    <div class="card"><div class="card-title">Bone Health</div><div class="insight-list">
+      ${bmdDiff !== null && parseFloat(bmdDiff) > 0 ? `<div class="insight-item"><span class="icon">✅</span><span><strong>BMD improved +${bmdDiff}%</strong> between scans.</span></div>` : ''}
+      ${scan2.t_score!=null?`<div class="insight-item"><span class="icon">${scan2.t_score>=-1?'✅':'⚠️'}</span><span>T-score of ${scan2.t_score} — ${scan2.t_score>=-1?'within normal range':'approaching osteopenia threshold (-1.0)'}. <strong>Maintain heavy compound lifts.</strong></span></div>`:''}
+      <div class="insight-item"><span class="icon">💊</span><span>Ensure adequate <strong>Vitamin D3 + K2</strong> and calcium intake to support bone density.</span></div>
+    </div></div>`;
+}
+
+/* ══════════════════════════
+   BEFORE VS AFTER
+══════════════════════════ */
+function renderBeforeAfter() {
+  const el = document.getElementById('before-after-content');
+  if (!scan1 || !scan2) {
+    el.innerHTML = noData('📈', 'Need 2 Scans', 'Before vs After comparison will appear once you have completed a second scan.');
+    return;
+  }
+  document.getElementById('ba-subtitle').textContent = `Scan #${scan1.scan_number||1} (${fmtDate(scan1.date)}) vs Scan #${scan2.scan_number||2} (${fmtDate(scan2.date)})`;
+  const rows = [
+    ['Body Fat %',   scan1.fat_pct+'%',      scan2.fat_pct+'%',      ((scan2.fat_pct-scan1.fat_pct)>0?'+':'')+( scan2.fat_pct-scan1.fat_pct).toFixed(1)+'%', scan2.fat_pct<scan1.fat_pct?'good':'bad'],
+    ['Fat Mass',     fmt(scan1.fat_g)+'g',   fmt(scan2.fat_g)+'g',   (scan2.fat_g-scan1.fat_g<0?'−':'+')+''+fmt(Math.abs(scan2.fat_g-scan1.fat_g))+'g', scan2.fat_g<scan1.fat_g?'good':'bad'],
+    ['Lean Mass',    fmt(scan1.lean_g)+'g',  fmt(scan2.lean_g)+'g',  (scan2.lean_g-scan1.lean_g<0?'−':'+')+''+fmt(Math.abs(scan2.lean_g-scan1.lean_g))+'g '+(scan2.lean_g<scan1.lean_g-500?'⚠️':''), scan2.lean_g>=scan1.lean_g?'good':'bad'],
+    ['Total Mass',   fmt(scan1.total_g)+'g', fmt(scan2.total_g)+'g', (scan2.total_g-scan1.total_g<0?'−':'+')+''+fmt(Math.abs(scan2.total_g-scan1.total_g))+'g', 'neutral'],
+    ...(scan1.bmd&&scan2.bmd ? [['BMD (g/cm²)', scan1.bmd, scan2.bmd, (scan2.bmd-scan1.bmd>0?'+':'')+((scan2.bmd-scan1.bmd)).toFixed(3), scan2.bmd>scan1.bmd?'good':'bad']] : []),
+    ...(scan1.t_score!=null&&scan2.t_score!=null ? [['T-Score', scan1.t_score, scan2.t_score, (scan2.t_score-scan1.t_score>0?'+':'')+((scan2.t_score-scan1.t_score)).toFixed(1), scan2.t_score>scan1.t_score?'good':'neutral']] : []),
+    ...(scan1.vat_g&&scan2.vat_g ? [['VAT (g)', fmt(scan1.vat_g)+'g', fmt(scan2.vat_g)+'g', (scan2.vat_g-scan1.vat_g<0?'−':'+')+''+fmt(Math.abs(scan2.vat_g-scan1.vat_g))+'g', scan2.vat_g<scan1.vat_g?'good':'bad']] : []),
+    ...(scan1.ag_ratio&&scan2.ag_ratio ? [['A:G Ratio', scan1.ag_ratio, scan2.ag_ratio, (scan2.ag_ratio-scan1.ag_ratio>0?'+':'')+((scan2.ag_ratio-scan1.ag_ratio)).toFixed(2), scan2.ag_ratio<scan1.ag_ratio?'good':'neutral']] : []),
+  ];
+  const colorMap = { good:'var(--green)', bad:'var(--red)', neutral:'var(--muted2)' };
+  el.innerHTML = `
+    <div class="card mb20">
+      <div class="card-title">Full Comparison</div>
+      <table style="width:100%;border-collapse:collapse;font-size:13px;">
+        <thead><tr style="border-bottom:1px solid var(--border);">
+          <th style="text-align:left;padding:8px 0;color:var(--muted2);font-size:11px;text-transform:uppercase;letter-spacing:0.8px;">Metric</th>
+          <th style="text-align:right;padding:8px 12px;color:var(--muted2);font-size:11px;text-transform:uppercase;letter-spacing:0.8px;">Scan #${scan1.scan_number||1}</th>
+          <th style="text-align:right;padding:8px 12px;color:var(--muted2);font-size:11px;text-transform:uppercase;letter-spacing:0.8px;">Scan #${scan2.scan_number||2}</th>
+          <th style="text-align:right;padding:8px 0;color:var(--muted2);font-size:11px;text-transform:uppercase;letter-spacing:0.8px;">Change</th>
+        </tr></thead>
+        <tbody>${rows.map(([label,v1,v2,delta,type]) => `
+          <tr style="border-bottom:1px solid var(--border);">
+            <td style="padding:10px 0;color:var(--text);font-weight:500;">${label}</td>
+            <td style="padding:10px 12px;text-align:right;color:var(--muted2);">${v1}</td>
+            <td style="padding:10px 12px;text-align:right;color:var(--text);font-weight:500;">${v2}</td>
+            <td style="padding:10px 0;text-align:right;color:${colorMap[type]};font-weight:600;">${delta}</td>
+          </tr>`).join('')}</tbody>
+      </table>
+    </div>`;
+}
+
+/* ══════════════════════════
+   BLOOD PANEL
+══════════════════════════ */
+function renderBlood() {
+  const el = document.getElementById('blood-panel-content');
+  document.getElementById('blood-subtitle').textContent = bloodPanelDate ? fmtDate(bloodPanelDate) : '';
+  if (!blood.length) { el.innerHTML = noData('🩸','No Blood Panel','Blood panel data will appear here once uploaded.'); return; }
+  const cats = [...new Set(blood.map(m => m.category))];
+  el.innerHTML = cats.map(cat => `
+    <div class="card mb16">
+      <div class="card-title">${cat}</div>
+      <div style="display:flex;flex-direction:column;gap:18px;">
+        ${blood.filter(m => m.category === cat).map(m => markerBar(m)).join('')}
+      </div>
+    </div>`).join('');
+}
+
+/* ══════════════════════════
+   HORMONES
+══════════════════════════ */
+function renderHormones() {
+  const el = document.getElementById('hormones-content');
+  document.getElementById('hormones-subtitle').textContent = hormonePanelDate ? fmtDate(hormonePanelDate) : '';
+  if (!hormones.length) { el.innerHTML = noData('⚗️','No Hormone Panel','Hormone data will appear here once uploaded.'); return; }
+  el.innerHTML = `
+    <div class="card mb16">
+      <div class="card-title">Hormone Markers</div>
+      <div style="display:flex;flex-direction:column;gap:20px;">
+        ${hormones.map(h => `<div>${markerBar(h)}${h.note?`<div style="font-size:11px;color:var(--teal);margin-top:4px;padding-left:4px;">💡 ${h.note}</div>`:''}</div>`).join('')}
+      </div>
+    </div>`;
+}
+
+/* ══════════════════════════
+   MARKER BAR (shared)
+══════════════════════════ */
+function markerBar(m) {
+  const pct       = Math.min(100, Math.max(0, ((m.value - m.min) / (m.max - m.min)) * 100));
+  const refMinPct = ((m.ref_min - m.min) / (m.max - m.min)) * 100;
+  const refMaxPct = ((m.ref_max - m.min) / (m.max - m.min)) * 100;
+  const color     = m.status === 'optimal' ? 'var(--green)' : m.status === 'normal' ? 'var(--blue)' : 'var(--red)';
+  const label     = m.status === 'optimal' ? 'Optimal' : m.status === 'normal' ? 'Normal' : 'Outside Range';
+  return `
+    <div>
+      <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:6px;">
+        <div style="font-weight:500;font-size:13px;">${m.name}</div>
+        <div style="display:flex;align-items:center;gap:10px;">
+          <span style="font-family:'Bebas Neue',sans-serif;font-size:20px;color:var(--text);letter-spacing:1px;">${m.value}</span>
+          <span style="color:var(--muted2);font-size:12px;">${m.unit}</span>
+          <span class="badge ${m.status==='optimal'?'green':'blue'}">${label}</span>
+        </div>
+      </div>
+      <div style="position:relative;height:8px;background:var(--surface3);border-radius:4px;margin-bottom:4px;">
+        <div style="position:absolute;left:${refMinPct}%;width:${refMaxPct-refMinPct}%;height:100%;background:rgba(57,224,122,0.2);border-radius:4px;"></div>
+        <div style="position:absolute;left:${pct}%;transform:translateX(-50%);width:12px;height:12px;background:${color};border-radius:50%;top:-2px;box-shadow:0 0 6px ${color};"></div>
+      </div>
+      <div style="display:flex;justify-content:space-between;font-size:10px;color:var(--muted);">
+        <span>${m.min} ${m.unit}</span>
+        <span style="color:var(--muted2);">Ref: ${m.ref_min}–${m.ref_max} ${m.unit}</span>
+        <span>${m.max} ${m.unit}</span>
+      </div>
+    </div>`;
+}
+
+/* ══════════════════════════
+   RMR
+══════════════════════════ */
+function renderRMR() {
+  const el = document.getElementById('rmr-content');
+  document.getElementById('rmr-subtitle').textContent = rmrDate ? 'ECAL Indirect Calorimetry — ' + fmtDate(rmrDate) : '';
+  if (!rmr) { el.innerHTML = noData('🔥','No RMR Data','Metabolism data will appear here after your RMR test.'); return; }
+
+  const abovePop = rmr.pop_max ? ((rmr.kcal - rmr.pop_max) / rmr.pop_max * 100).toFixed(0) : null;
+  el.innerHTML = `
+    <div class="stats-row mb20">
+      <div class="stat-tile orange"><div class="tile-label">Resting Metabolism</div><div class="tile-value">${fmt(rmr.kcal)}<span class="tile-unit">kcal/day</span></div>${abovePop!==null?`<div class="tile-delta ${abovePop>0?'good':'up'}">▲ ${abovePop>0?'+':''}${abovePop}% vs population estimate</div>`:''}</div>
+      ${rmr.fat_pct!=null?`<div class="stat-tile green"><div class="tile-label">Fat Burning</div><div class="tile-value">${rmr.fat_pct}<span class="tile-unit">%</span></div><div class="tile-delta ${rmr.fat_pct>=80?'good':'up'}">Goal: 80%${rmr.fat_pct>=80?' ✓':` — ${(80-rmr.fat_pct).toFixed(1)}% below`}</div></div>`:''}
+      ${rmr.glucose_pct!=null?`<div class="stat-tile blue"><div class="tile-label">Glucose Avail.</div><div class="tile-value">${rmr.glucose_pct}<span class="tile-unit">%</span></div><div class="tile-delta neutral">Near optimal 20%</div></div>`:''}
+      ${rmr.feo2!=null?`<div class="stat-tile gold"><div class="tile-label">Efficiency (FEO2)</div><div class="tile-value">${rmr.feo2}<span class="tile-unit">%</span></div><div class="tile-delta ${rmr.feo2<15?'good':'up'}">Optimal &lt;15%</div></div>`:''}
+    </div>
+    <div class="grid-2 mb20">
+      <div class="card">
+        <div class="card-title">Fuel Utilisation</div>
+        ${rmr.fat_pct!=null?`<div style="margin-bottom:12px;"><div style="display:flex;justify-content:space-between;margin-bottom:6px;"><span style="color:var(--green);font-size:13px;font-weight:600;">🔥 Fat</span><span style="font-family:'Bebas Neue',sans-serif;font-size:22px;color:var(--green);">${rmr.fat_pct}%</span></div><div style="height:10px;background:var(--surface3);border-radius:5px;overflow:hidden;"><div style="width:${rmr.fat_pct}%;height:100%;background:linear-gradient(90deg,var(--green),var(--teal));border-radius:5px;"></div></div></div>`:''}
+        ${rmr.glucose_pct!=null?`<div><div style="display:flex;justify-content:space-between;margin-bottom:6px;"><span style="color:var(--blue);font-size:13px;font-weight:600;">⚡ Glucose</span><span style="font-family:'Bebas Neue',sans-serif;font-size:22px;color:var(--blue);">${rmr.glucose_pct}%</span></div><div style="height:10px;background:var(--surface3);border-radius:5px;overflow:hidden;"><div style="width:${rmr.glucose_pct}%;height:100%;background:var(--blue);border-radius:5px;"></div></div></div>`:''}
+      </div>
+      <div class="card">
+        <div class="card-title">Personalised Calorie Targets</div>
+        <div style="display:flex;flex-direction:column;gap:10px;">
+          ${[['🔻 Fat Loss', Math.round(rmr.kcal*0.85),'var(--red)','15% deficit from RMR'],['⚖️ Maintenance',Math.round(rmr.kcal*1.4),'var(--blue)','1.4× RMR activity multiplier'],['📈 Lean Bulk',Math.round(rmr.kcal*1.55),'var(--green)','1.55× RMR + 10% surplus']].map(([label,kcal,color,note]) => `
+            <div style="display:flex;justify-content:space-between;align-items:center;padding:10px 14px;background:var(--surface2);border-radius:8px;">
+              <div><div style="font-size:13px;font-weight:600;color:var(--text);">${label}</div><div style="font-size:11px;color:var(--muted2);">${note}</div></div>
+              <div style="font-family:'Bebas Neue',sans-serif;font-size:24px;color:${color};letter-spacing:1px;">${fmt(kcal)} <span style="font-size:14px;font-family:'Outfit',sans-serif;color:var(--muted2);">kcal</span></div>
+            </div>`).join('')}
+        </div>
+      </div>
+    </div>`;
+}
+
+/* ══════════════════════════
+   SPIN & WIN
+══════════════════════════ */
+const quizBank = [
+  { q:'What does DEXA stand for?', a:'Dual-Energy X-ray Absorptiometry', wrong:['Direct Energy X-ray Analysis','Dual Emission X-ray Assessment','Dense Energy X-ray Anatomy'] },
+  { q:'During a calorie deficit, which is the BEST way to preserve muscle mass?', a:'High protein intake + resistance training', wrong:['Low-intensity cardio only','Eating at maintenance','Fasting for 24 hours weekly'] },
+  { q:'What does VAT stand for and why does it matter?', a:'Visceral Adipose Tissue — fat around organs, highest metabolic risk', wrong:['Vascular Adipose Tissue — fat in blood vessels','Volumetric Adipose Tracking — total fat volume','Variable Abdominal Tissue — abdominal wall fat'] },
+  { q:'What RMR fat burning % is considered optimal?', a:'80% fat burning at rest', wrong:['50% fat burning at rest','95% fat burning at rest','60% fat burning at rest'] },
+  { q:'A T-score of −1.0 to −2.5 on a bone density scan indicates:', a:'Osteopenia — low bone density, not yet osteoporosis', wrong:['Osteoporosis — severe bone loss','Normal bone density','Hyperdensity — too much bone mineral'] },
+  { q:'Which training type is MOST effective for maintaining bone density?', a:'Heavy compound resistance training (squats, deadlifts)', wrong:['Swimming and cycling','High-rep light weight training','Stretching and yoga'] },
+  { q:'SHBG affects testosterone availability. Low SHBG means:', a:'More free (bioavailable) testosterone', wrong:['Less testosterone produced','Higher total testosterone','Lower metabolic rate'] },
+];
+let spinState = { phase:'quiz', quizIdx:0, quizAnswered:false, spinning:false };
+let wheelAngle=0, wheelVelocity=0, wheelAnim=null;
+const WHEEL_SEGMENTS=[{pts:5,color:'#1c2128'},{pts:20,color:'#1a3a2a'},{pts:10,color:'#1c2128'},{pts:30,color:'#2a2010'},{pts:5,color:'#1c2128'},{pts:15,color:'#1a3050'},{pts:10,color:'#1c2128'},{pts:20,color:'#1a3a2a'}];
+
+function renderSpin() {
+  const el = document.getElementById('spin-content');
+  if (spinState.phase === 'quiz') {
+    const q = quizBank[spinState.quizIdx % quizBank.length];
+    const opts = shuffleArr([q.a, ...q.wrong]);
+    el.innerHTML = `<div style="max-width:640px;margin:0 auto;"><div class="card mb20">
+      <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:16px;">
+        <div class="card-title" style="margin:0;">Answer to earn your spin</div>
+        <div style="font-family:'Bebas Neue',sans-serif;font-size:22px;color:var(--gold);">🏆 ${profile?.points||0} pts</div>
+      </div>
+      <div style="font-size:15px;font-weight:500;color:var(--text);margin-bottom:20px;line-height:1.5;">${q.q}</div>
+      <div style="display:flex;flex-direction:column;gap:10px;" id="quiz-options">
+        ${opts.map(opt => `<button onclick="answerQuiz(this,'${opt.replace(/'/g,"\\'")}','${q.a.replace(/'/g,"\\'")}')"
+          style="text-align:left;padding:12px 16px;background:var(--surface2);border:1px solid var(--border2);border-radius:8px;color:var(--text);font-size:13px;cursor:pointer;font-family:'Outfit',sans-serif;transition:all 0.15s;"
+          onmouseover="this.style.borderColor='var(--gold)'" onmouseout="if(!this.dataset.answered)this.style.borderColor='var(--border2)'">${opt}</button>`).join('')}
+      </div>
+      <div id="quiz-result" style="margin-top:14px;display:none;"></div>
+    </div></div>`;
+  } else {
+    el.innerHTML = `<div style="max-width:640px;margin:0 auto;text-align:center;"><div class="card">
+      <div class="card-title">Spin the Wheel!</div>
+      <canvas id="spin-canvas" width="320" height="320" style="display:block;margin:0 auto 20px;cursor:pointer;" onclick="spinWheel()"></canvas>
+      <div id="spin-result" style="min-height:40px;margin-bottom:12px;"></div>
+      <button class="btn btn-gold" onclick="spinWheel()" id="spin-btn" style="width:100%;">🎰 SPIN NOW</button>
+    </div></div>`;
+    setTimeout(drawWheel, 50);
+  }
+}
+
+function answerQuiz(btn, selected, correct) {
+  if (spinState.quizAnswered) return;
+  spinState.quizAnswered = true;
+  const isCorrect = selected === correct;
+  document.querySelectorAll('#quiz-options button').forEach(b => {
+    b.dataset.answered = '1'; b.style.cursor='default'; b.onmouseover=null; b.onmouseout=null;
+    if (b.textContent.trim() === correct) { b.style.background='rgba(57,224,122,0.15)'; b.style.borderColor='var(--green)'; b.style.color='var(--green)'; }
+  });
+  if (!isCorrect) { btn.style.background='rgba(255,85,85,0.15)'; btn.style.borderColor='var(--red)'; btn.style.color='var(--red)'; }
+  const res = document.getElementById('quiz-result');
+  res.style.display = 'block';
+  res.innerHTML = `<div style="padding:12px 16px;background:${isCorrect?'rgba(57,224,122,0.08)':'rgba(255,159,67,0.08)'};border:1px solid ${isCorrect?'rgba(57,224,122,0.3)':'rgba(255,159,67,0.3)'};border-radius:8px;">
+    <div style="font-weight:600;color:${isCorrect?'var(--green)':'var(--orange)'};margin-bottom:4px;">${isCorrect?'✅ Correct!':'❌ Not quite.'}</div>
+    ${!isCorrect?`<div style="font-size:12px;color:var(--muted2);">Answer: <strong style="color:var(--text)">${correct}</strong></div>`:''}
+  </div>
+  <div style="margin-top:12px;text-align:center;"><button class="btn btn-gold" onclick="spinState.phase='wheel';renderSpin();">🎰 Spin the Wheel!</button></div>`;
+}
+
+function drawWheel(highlight=-1) {
+  const canvas = document.getElementById('spin-canvas'); if(!canvas) return;
+  const ctx=canvas.getContext('2d'), cx=160,cy=160,r=148,n=WHEEL_SEGMENTS.length, arc=(2*Math.PI)/n;
+  ctx.clearRect(0,0,320,320);
+  WHEEL_SEGMENTS.forEach((seg,i) => {
+    const start=wheelAngle+i*arc-Math.PI/2, end=start+arc;
+    ctx.beginPath(); ctx.moveTo(cx,cy); ctx.arc(cx,cy,r,start,end); ctx.closePath();
+    ctx.fillStyle=i===highlight?'#f5c842':seg.color; ctx.fill();
+    ctx.strokeStyle='rgba(255,255,255,0.08)'; ctx.lineWidth=1; ctx.stroke();
+    ctx.save(); ctx.translate(cx,cy); ctx.rotate(start+arc/2);
+    ctx.textAlign='right'; ctx.fillStyle=i===highlight?'#000':'#f5c842';
+    ctx.font="bold 18px 'Bebas Neue',sans-serif"; ctx.fillText(seg.pts+' pts',r-12,6); ctx.restore();
+  });
+  ctx.beginPath(); ctx.arc(cx,cy,24,0,Math.PI*2); ctx.fillStyle='#08090b'; ctx.fill();
+  ctx.strokeStyle='rgba(245,200,66,0.4)'; ctx.lineWidth=2; ctx.stroke();
+  ctx.fillStyle='#f5c842'; ctx.font="bold 13px 'Bebas Neue',sans-serif"; ctx.textAlign='center'; ctx.fillText('SPIN',cx,cy+5);
+  ctx.beginPath(); ctx.moveTo(cx,cy-r-4); ctx.lineTo(cx-8,cy-r+14); ctx.lineTo(cx+8,cy-r+14); ctx.closePath(); ctx.fillStyle='#f5c842'; ctx.fill();
+}
+
+function spinWheel() {
+  if (spinState.spinning) return;
+  const btn=document.getElementById('spin-btn'); if(btn)btn.disabled=true;
+  spinState.spinning=true; wheelVelocity=0.25+Math.random()*0.2;
+  const decel=0.004+Math.random()*0.002; if(wheelAnim)cancelAnimationFrame(wheelAnim);
+  function step() {
+    wheelAngle+=wheelVelocity; wheelVelocity-=decel;
+    if (wheelVelocity<=0) {
+      wheelVelocity=0; spinState.spinning=false;
+      const n=WHEEL_SEGMENTS.length, arc=(2*Math.PI)/n;
+      const norm=((-wheelAngle%(2*Math.PI))+(2*Math.PI))%(2*Math.PI);
+      const idx=Math.floor(norm/arc)%n, won=WHEEL_SEGMENTS[idx].pts;
+      drawWheel(idx);
+      const res=document.getElementById('spin-result');
+      if(res) res.innerHTML=`<div style="font-family:'Bebas Neue',sans-serif;font-size:32px;color:var(--gold);letter-spacing:2px;">🎉 +${won} POINTS!</div><div style="color:var(--muted2);font-size:12px;">Next spin available in 48 hours</div>`;
+      if(btn){btn.disabled=true;btn.textContent='⏳ Come back in 48 hrs';}
+      // Update points in Supabase
+      if (profile) sb.from('profiles').update({ points: (profile.points||0)+won }).eq('id', profile.id);
+      return;
+    }
+    drawWheel(); wheelAnim=requestAnimationFrame(step);
+  }
+  wheelAnim=requestAnimationFrame(step);
+}
+
+function shuffleArr(arr) { return arr.sort(() => Math.random()-0.5); }
+
+function copyReferral() {
+  const code = document.getElementById('referral-code').textContent;
+  navigator.clipboard.writeText(code).catch(()=>{});
+  event.target.textContent='✅ Copied!';
+  setTimeout(()=>event.target.textContent='📋 Copy Link',2000);
+}
+
+// Patch init to keep scans list globally
+const _origInit = init;
+window.init = async function() {
+  const { data: { session } } = await sb.auth.getSession();
+  if (!session) { window.location.href = 'index.html'; return; }
+  const uid = session.user.id;
+  const [profileRes, scansRes, bloodRes, hormoneRes, rmrRes] = await Promise.all([
+    sb.from('profiles').select('*').eq('id', uid).single(),
+    sb.from('dexa_scans').select('*').eq('client_id', uid).order('scan_date', { ascending: true }),
+    sb.from('blood_panels').select('*, blood_markers(*)').eq('client_id', uid).order('panel_date', { ascending: false }).limit(1),
+    sb.from('hormone_panels').select('*, hormone_markers(*)').eq('client_id', uid).order('panel_date', { ascending: false }).limit(1),
+    sb.from('rmr_tests').select('*').eq('client_id', uid).order('test_date', { ascending: false }).limit(1),
+  ]);
+  profile = profileRes.data;
+  if (profile) {
+    document.querySelector('.js-avatar').textContent = profile.initials || '??';
+    document.querySelector('.js-name').textContent   = profile.full_name;
+    document.querySelector('.js-level').textContent  = (profile.member_level||'Standard')+' Member';
+    document.querySelector('.js-pts').textContent    = (profile.points||0)+' pts';
+    document.getElementById('referral-code').textContent = 'lifex.app/ref/'+profile.full_name.replace(/\s+/g,'').toUpperCase().slice(0,6)+(profile.points||0);
+  }
+  scansRes_global = scansRes.data || [];
+  const scans = scansRes_global;
+  if (scans.length>=2) { scan1=mapScan(scans[scans.length-2]); scan2=mapScan(scans[scans.length-1]); }
+  else if (scans.length===1) { scan2=mapScan(scans[0]); }
+  const bp=(bloodRes.data||[])[0];
+  if(bp){bloodPanelDate=bp.panel_date;blood=(bp.blood_markers||[]).map(m=>({...m,min:m.display_min,max:m.display_max}));}
+  const hp=(hormoneRes.data||[])[0];
+  if(hp){hormonePanelDate=hp.panel_date;hormones=(hp.hormone_markers||[]).map(h=>({...h,min:h.display_min,max:h.display_max}));}
+  rmr=(rmrRes.data||[])[0]||null; if(rmr)rmrDate=rmr.test_date;
+  lifexScore=calcLifexScore();
+  if(lifexScore!==null)document.querySelector('.js-score-badge').textContent=lifexScore;
+  document.getElementById('loading').style.display='none';
+  document.getElementById('app').style.display='flex';
+  renderDashboard(); renderScore(); renderBodyComp(); renderBone(); renderBeforeAfter(); renderBlood(); renderHormones(); renderRMR(); renderSpin();
+}
+
+init();
+</script>
+</body>
+</html>
