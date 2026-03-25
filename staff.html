@@ -195,6 +195,20 @@ html, body { height: 100%; background: var(--bg); color: var(--text); font-famil
 .appt-collapsed-bar { display:flex;align-items:center;justify-content:space-between;gap:8px; }
 .expand-btn { background:transparent;border:1px solid var(--border2);border-radius:6px;padding:3px 10px;color:var(--muted2);font-size:11px;cursor:pointer;white-space:nowrap; }
 .expand-btn:hover { background:var(--surface2);color:var(--text); }
+
+/* WEEK APPOINTMENT GRID */
+.week-col { min-width:0; }
+.week-col-header { text-align:center;padding:8px 4px;border-radius:8px;background:var(--surface);border:1px solid var(--border);margin-bottom:6px; }
+.week-col-header.today { border-color:var(--gold); }
+.week-col-day-name { font-size:9px;font-weight:600;text-transform:uppercase;letter-spacing:0.8px;color:var(--muted2); }
+.week-col-day-num { font-family:'Bebas Neue',sans-serif;font-size:22px;line-height:1.2; }
+.week-appt-chip { padding:6px 8px;background:var(--surface2);border:1px solid var(--border);border-radius:7px;margin-bottom:4px;cursor:pointer;transition:border-color 0.15s; }
+.week-appt-chip:hover { border-color:var(--blue); }
+.week-appt-chip.has-account { border-left:3px solid var(--green); }
+.week-appt-chip.no-account { border-left:3px solid var(--muted); opacity:0.6; }
+.week-chip-time { font-size:10px;color:var(--muted2);margin-bottom:2px; }
+.week-chip-name { font-size:11px;font-weight:600;overflow:hidden;text-overflow:ellipsis;white-space:nowrap; }
+.week-col-empty { font-size:11px;color:var(--muted);text-align:center;padding:8px 0;opacity:0.5; }
 .no-acuity-icon { font-size:48px;opacity:0.3;margin-bottom:12px; }
 .date-header { display:flex;align-items:center;justify-content:space-between;margin-bottom:24px; }
 .date-pill { background:var(--surface);border:1px solid var(--border2);border-radius:8px;padding:6px 14px;font-size:13px;color:var(--muted2); }
@@ -258,17 +272,18 @@ html, body { height: 100%; background: var(--bg); color: var(--text); font-famil
     <div class="page-title">Previous Appointments</div>
     <div class="page-subtitle" id="prev-subtitle" style="margin-bottom:16px;">Select a day to view appointments</div>
     <div class="view-toggle">
-      <button class="view-toggle-btn active" id="btn-week-view" onclick="setPrevView('week')">Week</button>
-      <button class="view-toggle-btn" id="btn-month-view" onclick="setPrevView('month')">Month</button>
+      <button class="view-toggle-btn" id="btn-week-view" onclick="setPrevView('week')">Week</button>
+      <button class="view-toggle-btn active" id="btn-month-view" onclick="setPrevView('month')">Month</button>
     </div>
-    <div id="prev-week-view">
+    <div id="prev-week-view" style="display:none;">
       <div class="week-nav">
         <button class="week-nav-btn" onclick="shiftWeek(-1)">◀ Prev</button>
-        <div class="week-days" id="week-days"></div>
+        <div class="week-title" id="week-title" style="font-size:15px;font-weight:600;"></div>
         <button class="week-nav-btn" onclick="shiftWeek(1)">Next ▶</button>
       </div>
+      <div id="week-appt-grid" style="display:grid;grid-template-columns:repeat(7,1fr);gap:8px;overflow-x:auto;"></div>
     </div>
-    <div id="prev-month-view" style="display:none;">
+    <div id="prev-month-view">
       <div class="month-nav">
         <button class="week-nav-btn" onclick="shiftMonth(-1)">◀ Prev</button>
         <div class="month-title" id="month-title"></div>
@@ -563,7 +578,7 @@ function renderWeek() {
 
 function shiftWeek(dir) {
   weekOffset += dir;
-  renderWeek();
+  loadWeekView();
 }
 
 let monthYear = new Date().getFullYear();
@@ -573,9 +588,55 @@ const MONTH_NAMES_FULL = ['January','February','March','April','May','June','Jul
 function setPrevView(view) {
   document.getElementById('prev-week-view').style.display = view === 'week' ? '' : 'none';
   document.getElementById('prev-month-view').style.display = view === 'month' ? '' : 'none';
+  document.getElementById('prev-grid').style.display = view === 'month' ? '' : 'none';
   document.getElementById('btn-week-view').classList.toggle('active', view === 'week');
   document.getElementById('btn-month-view').classList.toggle('active', view === 'month');
   if (view === 'month') renderMonth();
+  if (view === 'week') loadWeekView();
+}
+
+async function loadWeekView() {
+  const days = getWeekDates(weekOffset);
+  const todayStr = dateToStr(new Date());
+  const grid = document.getElementById('week-appt-grid');
+  const title = document.getElementById('week-title');
+
+  const monthShort = ['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];
+  const first = days[0], last = days[6];
+  title.textContent = `${first.getDate()} ${monthShort[first.getMonth()]} – ${last.getDate()} ${monthShort[last.getMonth()]} ${last.getFullYear()}`;
+
+  grid.innerHTML = days.map(d => `
+    <div class="week-col">
+      <div class="week-col-header ${dateToStr(d)===todayStr?'today':''}">
+        <div class="week-col-day-name">${DAY_NAMES[d.getDay()]}</div>
+        <div class="week-col-day-num">${d.getDate()}</div>
+      </div>
+      <div id="week-col-${dateToStr(d)}" style="min-height:40px;"><div class="week-col-empty">…</div></div>
+    </div>`).join('');
+
+  // Fetch all 7 days in parallel
+  const results = await Promise.all(days.map(d =>
+    fetch(`${SUPABASE_URL}/functions/v1/get-appointments?date=${dateToStr(d)}`, {
+      headers: { 'Authorization': `Bearer ${SUPABASE_KEY}` }
+    }).then(r => r.json()).catch(() => ({ appointments: [] }))
+  ));
+
+  days.forEach((d, i) => {
+    const col = document.getElementById(`week-col-${dateToStr(d)}`);
+    if (!col) return;
+    const appts = results[i]?.appointments || [];
+    if (!appts.length) { col.innerHTML = `<div class="week-col-empty">—</div>`; return; }
+    col.innerHTML = appts.map(a => {
+      const time = new Date(a.datetime).toLocaleTimeString('en-AU', { hour:'numeric', minute:'2-digit', hour12:true });
+      const name = `${a.firstName||''} ${a.lastName||''}`.trim();
+      const hasClient = !!a.clientId;
+      return `<div class="week-appt-chip ${hasClient?'has-account':'no-account'}"
+        onclick="${hasClient ? `viewClientProfile('${a.clientId}','${a.firstName}','${a.lastName}')` : `toast('No Life X account yet','error')`}">
+        <div class="week-chip-time">${time}</div>
+        <div class="week-chip-name">${name}</div>
+      </div>`;
+    }).join('');
+  });
 }
 
 function shiftMonth(dir) {
@@ -606,8 +667,7 @@ function renderMonth() {
 
 function selectWeekDay(date) {
   selectedDate = date;
-  renderWeek();
-  if (document.getElementById('prev-month-view').style.display !== 'none') renderMonth();
+  renderMonth();
   loadPreviousAppointments(date);
 }
 
@@ -913,7 +973,7 @@ function showPanel(id) {
   document.querySelectorAll('.nav-item').forEach(n => n.classList.remove('active'));
   document.getElementById('panel-' + id).classList.add('active');
   document.querySelector(`[data-panel="${id}"]`)?.classList.add('active');
-  if (id === 'previous') renderWeek();
+  if (id === 'previous') setPrevView('month');
 }
 
 /* ══ TOAST ══ */
