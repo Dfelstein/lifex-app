@@ -296,10 +296,18 @@ html, body { height: 100%; background: var(--bg); color: var(--text); font-famil
   <!-- ── CLIENTS LIST ── -->
   <div id="panel-clients" class="panel">
     <div class="page-title">All Clients</div>
-    <div class="page-subtitle">Click a client to jump to their data entry</div>
-    <div id="clients-list" class="client-list">
-      <div style="color:var(--muted2);font-size:13px;">Loading clients…</div>
+    <div style="display:flex;gap:10px;align-items:center;margin-bottom:16px;flex-wrap:wrap;">
+      <input type="text" id="client-search" placeholder="Search by name…" oninput="clientSearch=this.value;clientPage=0;renderClientList()"
+        style="flex:1;min-width:180px;background:var(--surface2);border:1px solid var(--border2);border-radius:8px;padding:9px 14px;color:var(--text);font-family:'Outfit',sans-serif;font-size:13px;outline:none;">
+      <select id="client-sort" onchange="clientSort=this.value;clientPage=0;renderClientList()"
+        style="background:var(--surface2);border:1px solid var(--border2);border-radius:8px;padding:9px 12px;color:var(--text);font-family:'Outfit',sans-serif;font-size:13px;outline:none;">
+        <option value="date">Latest Scan</option>
+        <option value="name">Name A–Z</option>
+        <option value="level">Member Level</option>
+      </select>
     </div>
+    <div id="clients-list" class="client-list"></div>
+    <div id="clients-pagination" style="display:flex;align-items:center;justify-content:space-between;margin-top:16px;"></div>
   </div>
 
   <!-- ── NEW CLIENT ── -->
@@ -800,27 +808,94 @@ async function createAccountFromAppt(apptId, email, firstName, lastName) {
   }
 }
 
+let clientSearch = '';
+let clientSort = 'date';
+let clientPage = 0;
+const CLIENT_PAGE_SIZE = 10;
+
 async function loadClients() {
-  const { data } = await sb.from('profiles').select('*').eq('is_staff', false).order('full_name');
-  clients = data || [];
+  const [profilesRes, dexaRes, rmrRes, bloodRes] = await Promise.all([
+    sb.from('profiles').select('*').eq('is_staff', false),
+    sb.from('dexa_scans').select('client_id, scan_date').order('scan_date', { ascending: false }),
+    sb.from('rmr_tests').select('client_id, test_date').order('test_date', { ascending: false }),
+    sb.from('blood_panels').select('client_id, panel_date').order('panel_date', { ascending: false }),
+  ]);
+
+  // Build latest scan date map per client
+  const latestMap = {};
+  const updateLatest = (clientId, dateStr) => {
+    if (!dateStr) return;
+    if (!latestMap[clientId] || dateStr > latestMap[clientId]) latestMap[clientId] = dateStr;
+  };
+  (dexaRes.data || []).forEach(r => updateLatest(r.client_id, r.scan_date));
+  (rmrRes.data  || []).forEach(r => updateLatest(r.client_id, r.test_date));
+  (bloodRes.data|| []).forEach(r => updateLatest(r.client_id, r.panel_date));
+
+  clients = (profilesRes.data || []).map(c => ({ ...c, lastScan: latestMap[c.id] || null }));
   renderClientList();
   populateClientSelects();
 }
 
 function renderClientList() {
   const el = document.getElementById('clients-list');
-  if (!clients.length) { el.innerHTML = '<div style="color:var(--muted2);font-size:13px;">No clients yet. Create one using the New Client panel.</div>'; return; }
-  el.innerHTML = clients.map(c => `
-    <div class="client-card" onclick="jumpToClient('${c.id}')">
+  const pagEl = document.getElementById('clients-pagination');
+  if (!clients.length) {
+    el.innerHTML = '<div style="color:var(--muted2);font-size:13px;">No clients yet.</div>';
+    pagEl.innerHTML = '';
+    return;
+  }
+
+  const q = clientSearch.toLowerCase();
+  let filtered = q ? clients.filter(c => c.full_name?.toLowerCase().includes(q)) : [...clients];
+
+  if (clientSort === 'date') {
+    filtered.sort((a, b) => {
+      if (!a.lastScan && !b.lastScan) return 0;
+      if (!a.lastScan) return 1;
+      if (!b.lastScan) return -1;
+      return b.lastScan.localeCompare(a.lastScan);
+    });
+  } else if (clientSort === 'name') {
+    filtered.sort((a, b) => (a.full_name || '').localeCompare(b.full_name || ''));
+  } else if (clientSort === 'level') {
+    const order = { Platinum: 0, Gold: 1, Standard: 2 };
+    filtered.sort((a, b) => (order[a.member_level] ?? 3) - (order[b.member_level] ?? 3));
+  }
+
+  const totalPages = Math.ceil(filtered.length / CLIENT_PAGE_SIZE);
+  if (clientPage >= totalPages) clientPage = Math.max(0, totalPages - 1);
+  const page = filtered.slice(clientPage * CLIENT_PAGE_SIZE, (clientPage + 1) * CLIENT_PAGE_SIZE);
+
+  const fmtDate = d => d ? new Date(d + 'T00:00:00').toLocaleDateString('en-AU', { day:'numeric', month:'short', year:'numeric' }) : null;
+  const levelColour = { Platinum: 'var(--teal)', Gold: 'var(--gold)', Standard: 'var(--muted2)' };
+
+  el.innerHTML = page.map(c => {
+    const fn = c.full_name?.split(' ')[0] || '';
+    const ln = c.full_name?.split(' ').slice(1).join(' ') || '';
+    const lastScanText = c.lastScan ? `Last scan: ${fmtDate(c.lastScan)}` : 'No scans yet';
+    return `
+    <div class="client-card" onclick="viewClientProfile('${c.id}','${fn}','${ln}')">
       <div class="client-avatar">${c.initials || '??'}</div>
       <div class="client-info">
         <div class="client-name">${c.full_name}</div>
-        <div class="client-meta">${c.member_level} Member &nbsp;·&nbsp; ${c.points} pts</div>
+        <div class="client-meta" style="color:${levelColour[c.member_level]||'var(--muted2)'};">${c.member_level} Member</div>
+        <div class="client-meta">${lastScanText}</div>
       </div>
       <div class="client-actions">
-        <button class="btn btn-outline btn-sm" onclick="event.stopPropagation();viewClientProfile('${c.id}','${c.full_name?.split(' ')[0]||''}','${c.full_name?.split(' ').slice(1).join(' ')||''}')">View Profile</button>
+        <button class="btn btn-outline btn-sm" onclick="event.stopPropagation();viewClientProfile('${c.id}','${fn}','${ln}')">View Profile</button>
       </div>
-    </div>`).join('');
+    </div>`;
+  }).join('');
+
+  // Pagination
+  if (totalPages <= 1) {
+    pagEl.innerHTML = `<div style="font-size:12px;color:var(--muted2);">${filtered.length} client${filtered.length!==1?'s':''}</div>`;
+  } else {
+    pagEl.innerHTML = `
+      <button class="week-nav-btn" onclick="clientPage--;renderClientList()" ${clientPage===0?'disabled style="opacity:0.4"':''}>◀ Prev</button>
+      <div style="font-size:12px;color:var(--muted2);">Page ${clientPage+1} of ${totalPages} &nbsp;·&nbsp; ${filtered.length} clients</div>
+      <button class="week-nav-btn" onclick="clientPage++;renderClientList()" ${clientPage>=totalPages-1?'disabled style="opacity:0.4"':''}>Next ▶</button>`;
+  }
 }
 
 function populateClientSelects() {
