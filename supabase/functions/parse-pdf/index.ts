@@ -16,6 +16,15 @@ function cors(body: string, status = 200) {
   });
 }
 
+// Strip comparison operators and convert to number (handles "<0.1", ">200", etc.)
+function toNum(v: any): number | null {
+  if (v === null || v === undefined || v === '') return null;
+  if (typeof v === 'number') return v;
+  const cleaned = String(v).replace(/[<>≤≥\s]/g, '');
+  const n = parseFloat(cleaned);
+  return isNaN(n) ? null : n;
+}
+
 Deno.serve(async (req) => {
   if (req.method === 'OPTIONS') return new Response(null, { status: 204, headers: { 'Access-Control-Allow-Origin': '*', 'Access-Control-Allow-Headers': 'authorization, content-type' } });
 
@@ -33,10 +42,11 @@ Deno.serve(async (req) => {
         'Content-Type': 'application/json',
         'x-api-key': ANTHROPIC_KEY,
         'anthropic-version': '2023-06-01',
+        'anthropic-beta': 'pdfs-2024-09-25',
       },
       body: JSON.stringify({
         model: 'claude-opus-4-6',
-        max_tokens: 2000,
+        max_tokens: 4096,
         messages: [{
           role: 'user',
           content: [
@@ -77,20 +87,30 @@ Return ONLY the JSON, no other text.`,
     });
 
     const claudeData = await claudeRes.json();
+    if (claudeData.type === 'error') {
+      return cors(JSON.stringify({ error: `Claude API error: ${claudeData.error?.message || JSON.stringify(claudeData.error)}` }), 500);
+    }
     const rawText = claudeData.content?.[0]?.text || '';
 
     let parsed: any;
     try {
-      parsed = JSON.parse(rawText.trim());
+      // Strip markdown code fences if present
+      const clean = rawText.replace(/^```(?:json)?\s*/i, '').replace(/\s*```$/,'').trim();
+      parsed = JSON.parse(clean);
     } catch {
-      // Try to extract JSON from the response
       const match = rawText.match(/\{[\s\S]*\}/);
-      if (!match) return cors(JSON.stringify({ error: 'Could not parse Claude response', raw: rawText }), 500);
-      parsed = JSON.parse(match[0]);
+      if (!match) return cors(JSON.stringify({ error: 'Could not parse Claude response', raw: rawText.slice(0, 500) }), 500);
+      try {
+        parsed = JSON.parse(match[0]);
+      } catch (e2) {
+        return cors(JSON.stringify({ error: `JSON parse failed: ${String(e2)}`, raw: rawText.slice(0, 500) }), 500);
+      }
     }
 
     // Save to Supabase using service role (bypasses RLS)
-    const sb = createClient(SUPABASE_URL, SUPABASE_SERVICE_KEY);
+    const sb = createClient(SUPABASE_URL, SUPABASE_SERVICE_KEY, {
+      auth: { autoRefreshToken: false, persistSession: false }
+    });
     const scanType = parsed.type;
 
     if (scanType === 'DEXA') {
@@ -135,7 +155,18 @@ Return ONLY the JSON, no other text.`,
       }).select().single();
       if (panelErr) return cors(JSON.stringify({ error: panelErr.message }), 500);
 
-      const markers = parsed.markers.map((m: any) => ({ ...m, panel_id: panel.id }));
+      const markers = parsed.markers.map((m: any) => ({
+        panel_id: panel.id,
+        category: m.category || 'Other',
+        name: m.name,
+        value: toNum(m.value) ?? 0,
+        unit: m.unit || '',
+        display_min: toNum(m.display_min) ?? 0,
+        display_max: toNum(m.display_max) ?? 100,
+        ref_min: toNum(m.ref_min) ?? 0,
+        ref_max: toNum(m.ref_max) ?? 0,
+        status: m.status || 'normal',
+      }));
       const { error: markersErr } = await sb.from('blood_markers').insert(markers);
       if (markersErr) return cors(JSON.stringify({ error: markersErr.message }), 500);
 
@@ -146,7 +177,18 @@ Return ONLY the JSON, no other text.`,
       }).select().single();
       if (panelErr) return cors(JSON.stringify({ error: panelErr.message }), 500);
 
-      const markers = parsed.markers.map((m: any) => ({ ...m, panel_id: panel.id }));
+      const markers = parsed.markers.map((m: any) => ({
+        panel_id: panel.id,
+        name: m.name,
+        value: toNum(m.value) ?? 0,
+        unit: m.unit || '',
+        display_min: toNum(m.display_min) ?? 0,
+        display_max: toNum(m.display_max) ?? 100,
+        ref_min: toNum(m.ref_min) ?? 0,
+        ref_max: toNum(m.ref_max) ?? 0,
+        status: m.status || 'normal',
+        note: m.note || '',
+      }));
       const { error: markersErr } = await sb.from('hormone_markers').insert(markers);
       if (markersErr) return cors(JSON.stringify({ error: markersErr.message }), 500);
     }

@@ -893,15 +893,58 @@ function renderRMR() {
       </div>
       <div class="card">
         <div class="card-title">Personalised Calorie Targets</div>
-        <div style="display:flex;flex-direction:column;gap:10px;">
-          ${[['🔻 Fat Loss', Math.round(rmr.kcal*0.85),'var(--red)','15% deficit from RMR'],['⚖️ Maintenance',Math.round(rmr.kcal*1.4),'var(--blue)','1.4× RMR activity multiplier'],['📈 Lean Bulk',Math.round(rmr.kcal*1.55),'var(--green)','1.55× RMR + 10% surplus']].map(([label,kcal,color,note]) => `
-            <div style="display:flex;justify-content:space-between;align-items:center;padding:10px 14px;background:var(--surface2);border-radius:8px;">
-              <div><div style="font-size:13px;font-weight:600;color:var(--text);">${label}</div><div style="font-size:11px;color:var(--muted2);">${note}</div></div>
-              <div style="font-family:'Bebas Neue',sans-serif;font-size:24px;color:${color};letter-spacing:1px;">${fmt(kcal)} <span style="font-size:14px;font-family:'Outfit',sans-serif;color:var(--muted2);">kcal</span></div>
-            </div>`).join('')}
+        <div style="margin-bottom:16px;">
+          <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:8px;">
+            <span style="font-size:12px;color:var(--muted2);">Daily Steps</span>
+            <span style="font-family:'Bebas Neue',sans-serif;font-size:20px;color:var(--orange);" id="steps-display">8,000</span>
+          </div>
+          <input type="range" id="steps-slider" min="0" max="20000" step="500" value="8000"
+            style="width:100%;accent-color:var(--orange);cursor:pointer;"
+            oninput="updateStepsTDEE(${rmr.kcal})">
+          <div style="display:flex;justify-content:space-between;margin-top:4px;">
+            <span style="font-size:10px;color:var(--muted);">0</span>
+            <span id="steps-level" style="font-size:11px;font-weight:600;color:var(--orange);">Moderately Active</span>
+            <span style="font-size:10px;color:var(--muted);">20k</span>
+          </div>
+        </div>
+        <div style="display:flex;flex-direction:column;gap:10px;" id="calorie-targets">
         </div>
       </div>
     </div>`;
+  updateStepsTDEE(rmr.kcal);
+}
+
+function updateStepsTDEE(rmrKcal) {
+  const slider = document.getElementById('steps-slider');
+  const display = document.getElementById('steps-display');
+  const levelEl = document.getElementById('steps-level');
+  const targetsEl = document.getElementById('calorie-targets');
+  if (!slider || !targetsEl) return;
+
+  const steps = parseInt(slider.value);
+  display.textContent = steps.toLocaleString();
+
+  let multiplier, level;
+  if (steps < 3000)       { multiplier = 1.2;   level = 'Sedentary'; }
+  else if (steps < 6000)  { multiplier = 1.375; level = 'Lightly Active'; }
+  else if (steps < 10000) { multiplier = 1.55;  level = 'Moderately Active'; }
+  else if (steps < 13000) { multiplier = 1.725; level = 'Active'; }
+  else                    { multiplier = 1.9;   level = 'Very Active'; }
+
+  levelEl.textContent = level;
+  const tdee = Math.round(rmrKcal * multiplier);
+
+  const targets = [
+    ['🔻 Fat Loss',    Math.round(tdee * 0.8),  'var(--red)',   '20% deficit from TDEE'],
+    ['⚖️ Maintenance', tdee,                     'var(--blue)',  `${multiplier}× RMR (${steps.toLocaleString()} steps/day)`],
+    ['📈 Lean Bulk',   Math.round(tdee * 1.1),  'var(--green)', '10% surplus above TDEE'],
+  ];
+
+  targetsEl.innerHTML = targets.map(([label, kcal, color, note]) => `
+    <div style="display:flex;justify-content:space-between;align-items:center;padding:10px 14px;background:var(--surface2);border-radius:8px;">
+      <div><div style="font-size:13px;font-weight:600;color:var(--text);">${label}</div><div style="font-size:11px;color:var(--muted2);">${note}</div></div>
+      <div style="font-family:'Bebas Neue',sans-serif;font-size:24px;color:${color};letter-spacing:1px;">${fmt(kcal)} <span style="font-size:14px;font-family:'Outfit',sans-serif;color:var(--muted2);">kcal</span></div>
+    </div>`).join('');
 }
 
 /* ══════════════════════════
