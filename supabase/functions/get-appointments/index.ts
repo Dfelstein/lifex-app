@@ -21,19 +21,23 @@ Deno.serve(async (req) => {
   if (req.method === 'OPTIONS') return new Response(null, { status: 204, headers: { 'Access-Control-Allow-Origin': '*', 'Access-Control-Allow-Headers': 'authorization, content-type' } });
 
   try {
-    // Get today's date in Sydney timezone
-    const now = new Date();
-    const sydney = new Date(now.toLocaleString('en-AU', { timeZone: 'Australia/Sydney' }));
     const pad = (n: number) => String(n).padStart(2, '0');
-    const today = `${sydney.getFullYear()}-${pad(sydney.getMonth() + 1)}-${pad(sydney.getDate())}`;
+
+    // Allow ?date=YYYY-MM-DD param, otherwise use today in Sydney time
+    const urlParams = new URL(req.url).searchParams;
+    let targetDate = urlParams.get('date') || '';
+
+    if (!targetDate) {
+      const now = new Date();
+      const sydney = new Date(now.toLocaleString('en-AU', { timeZone: 'Australia/Sydney' }));
+      targetDate = `${sydney.getFullYear()}-${pad(sydney.getMonth() + 1)}-${pad(sydney.getDate())}`;
+    }
 
     // Fetch from Acuity
     const auth = btoa(`${ACUITY_USER_ID}:${ACUITY_API_KEY}`);
-    const url = `https://acuityscheduling.com/api/v1/appointments?minDate=${today}&maxDate=${today}&max=200`;
+    const url = `https://acuityscheduling.com/api/v1/appointments?minDate=${targetDate}&maxDate=${targetDate}&max=200`;
 
-    const res = await fetch(url, {
-      headers: { 'Authorization': `Basic ${auth}` },
-    });
+    const res = await fetch(url, { headers: { 'Authorization': `Basic ${auth}` } });
 
     if (!res.ok) {
       const err = await res.text();
@@ -42,28 +46,30 @@ Deno.serve(async (req) => {
 
     const appointments = await res.json();
 
-    // Filter to only today's appointments and sort by time
-    const todayFiltered = appointments.filter((a: any) => {
+    // Filter strictly to the target date in AEST
+    const filtered = appointments.filter((a: any) => {
       if (!a.datetime) return false;
-      const apptDate = new Date(a.datetime).toLocaleDateString('en-CA', { timeZone: 'Australia/Sydney' });
-      return apptDate === today;
+      const apptSydney = new Date(new Date(a.datetime).toLocaleString('en-AU', { timeZone: 'Australia/Sydney' }));
+      const apptDateStr = `${apptSydney.getFullYear()}-${pad(apptSydney.getMonth()+1)}-${pad(apptSydney.getDate())}`;
+      return apptDateStr === targetDate;
     });
-    todayFiltered.sort((a: any, b: any) => new Date(a.datetime).getTime() - new Date(b.datetime).getTime());
 
-    // Look up Supabase UUID for each client email
+    filtered.sort((a: any, b: any) => new Date(a.datetime).getTime() - new Date(b.datetime).getTime());
+
+    // Look up Supabase UUID for each client — fetch all users once
     const sb = createClient(SUPABASE_URL, SUPABASE_SERVICE_KEY, {
       auth: { autoRefreshToken: false, persistSession: false }
     });
 
-    const mapped = await Promise.all(todayFiltered.map(async (a: any) => {
-      let clientId = null;
+    const { data: usersData } = await sb.auth.admin.listUsers({ perPage: 1000 });
+    const users = usersData?.users || [];
 
+    const mapped = filtered.map((a: any) => {
+      let clientId = null;
       if (a.email) {
-        const { data } = await sb.auth.admin.listUsers();
-        const user = data?.users?.find((u: any) => u.email?.toLowerCase() === a.email?.toLowerCase());
+        const user = users.find((u: any) => u.email?.toLowerCase() === a.email?.toLowerCase());
         if (user) clientId = user.id;
       }
-
       return {
         id: a.id,
         firstName: a.firstName,
@@ -75,9 +81,9 @@ Deno.serve(async (req) => {
         duration: a.duration,
         clientId,
       };
-    }));
+    });
 
-    return cors(JSON.stringify({ date: today, appointments: mapped }));
+    return cors(JSON.stringify({ date: targetDate, appointments: mapped }));
   } catch (e) {
     return cors(JSON.stringify({ error: String(e) }), 500);
   }

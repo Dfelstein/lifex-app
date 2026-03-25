@@ -161,6 +161,8 @@ html, body { height: 100%; background: var(--bg); color: var(--text); font-famil
     <div class="nav-group-label">Today</div>
     <div class="nav-item active" data-panel="today" onclick="showPanel('today')"><span class="nav-icon">📅</span> Today's Appointments</div>
 
+    <div class="nav-item" data-panel="previous" onclick="showPanel('previous')"><span class="nav-icon">🗓️</span> Previous Appointments</div>
+
     <div class="nav-group-label" style="margin-top:8px;">Clients</div>
     <div class="nav-item" data-panel="clients" onclick="showPanel('clients')"><span class="nav-icon">👥</span> All Clients</div>
     <div class="nav-item" data-panel="new-client" onclick="showPanel('new-client')"><span class="nav-icon">➕</span> New Client</div>
@@ -190,6 +192,20 @@ html, body { height: 100%; background: var(--bg); color: var(--text); font-famil
       <div class="date-pill" id="today-date">—</div>
     </div>
     <div id="today-grid" class="today-grid"></div>
+  </div>
+
+  <!-- ── PREVIOUS APPOINTMENTS ── -->
+  <div id="panel-previous" class="panel">
+    <div class="date-header">
+      <div>
+        <div class="page-title">Previous Appointments</div>
+        <div class="page-subtitle" id="prev-subtitle">Select a date to load appointments</div>
+      </div>
+      <input type="date" id="prev-date-picker" style="background:var(--surface2);border:1px solid var(--border2);border-radius:8px;padding:8px 12px;color:var(--text);font-family:'Outfit',sans-serif;font-size:13px;outline:none;cursor:pointer;" onchange="loadPreviousAppointments(this.value)">
+    </div>
+    <div id="prev-grid" class="today-grid">
+      <div class="no-acuity"><div class="no-acuity-icon">🗓️</div><div>Pick a date above to view appointments</div></div>
+    </div>
   </div>
 
   <!-- ── CLIENTS LIST ── -->
@@ -518,6 +534,44 @@ async function handleDrop(e, appt) {
     zone.innerHTML = `<div class="drop-icon">❌</div><div>${err.message}</div>`;
     setTimeout(() => { zone.innerHTML = `<div class="drop-icon">📄</div><div>Drop PDF here or click to browse</div>`; }, 3000);
     toast('Upload failed: ' + err.message, 'error');
+  }
+}
+
+async function loadPreviousAppointments(date) {
+  const grid = document.getElementById('prev-grid');
+  const subtitle = document.getElementById('prev-subtitle');
+  grid.innerHTML = `<div class="no-acuity"><div class="no-acuity-icon">⏳</div><div>Loading…</div></div>`;
+
+  try {
+    const res = await fetch(`${SUPABASE_URL}/functions/v1/get-appointments?date=${date}`, {
+      headers: { 'Authorization': `Bearer ${SUPABASE_KEY}` }
+    });
+    const data = await res.json();
+    if (data.error) throw new Error(data.error);
+
+    const appts = data.appointments || [];
+    const [y, m, d] = date.split('-').map(Number);
+    const monthNames = ['January','February','March','April','May','June','July','August','September','October','November','December'];
+    subtitle.textContent = `${d} ${monthNames[m-1]} ${y} — ${appts.length} appointment${appts.length !== 1 ? 's' : ''}`;
+
+    if (appts.length === 0) {
+      grid.innerHTML = `<div class="no-acuity"><div class="no-acuity-icon">📅</div><div>No appointments on this date</div></div>`;
+      return;
+    }
+
+    grid.innerHTML = appts.map(a => renderApptCard(a)).join('');
+
+    appts.forEach(a => {
+      if (!a.clientId) return;
+      const zone = document.getElementById(`drop-${a.id}`);
+      if (!zone) return;
+      zone.addEventListener('dragover', e => { e.preventDefault(); zone.classList.add('drag-over'); });
+      zone.addEventListener('dragleave', () => zone.classList.remove('drag-over'));
+      zone.addEventListener('drop', e => { e.preventDefault(); zone.classList.remove('drag-over'); handleDrop(e, a); });
+      zone.addEventListener('click', () => { const inp = document.createElement('input'); inp.type='file'; inp.accept='application/pdf'; inp.onchange = ev => handleDrop({ dataTransfer: { files: ev.target.files } }, a); inp.click(); });
+    });
+  } catch (e) {
+    grid.innerHTML = `<div class="no-acuity"><div class="no-acuity-icon">⚠️</div><div>${e.message}</div></div>`;
   }
 }
 
