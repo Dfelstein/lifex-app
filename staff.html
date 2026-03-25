@@ -227,11 +227,6 @@ html, body { height: 100%; background: var(--bg); color: var(--text); font-famil
     <div class="nav-item" data-panel="clients" onclick="showPanel('clients')"><span class="nav-icon">👥</span> All Clients</div>
     <div class="nav-item" data-panel="new-client" onclick="showPanel('new-client')"><span class="nav-icon">➕</span> New Client</div>
 
-    <div class="nav-group-label" style="margin-top:8px;">Upload Data</div>
-    <div class="nav-item" data-panel="dexa" onclick="showPanel('dexa')"><span class="nav-icon">🫀</span> DEXA Scan</div>
-    <div class="nav-item" data-panel="blood" onclick="showPanel('blood')"><span class="nav-icon">🩸</span> Blood Panel</div>
-    <div class="nav-item" data-panel="hormones" onclick="showPanel('hormones')"><span class="nav-icon">⚗️</span> Hormones</div>
-    <div class="nav-item" data-panel="rmr" onclick="showPanel('rmr')"><span class="nav-icon">🔥</span> RMR Test</div>
   </div>
 
   <div class="sidebar-footer">
@@ -306,164 +301,24 @@ html, body { height: 100%; background: var(--bg); color: var(--text); font-famil
   <!-- ── NEW CLIENT ── -->
   <div id="panel-new-client" class="panel">
     <div class="page-title">New Client</div>
-    <div class="page-subtitle">Two steps to set up a new client account</div>
-
-    <div class="card" style="max-width:560px;margin-bottom:16px;">
-      <div class="card-title">Step 1 — Create Login Account in Supabase</div>
-      <div style="display:flex;flex-direction:column;gap:10px;font-size:13px;color:var(--muted2);line-height:1.7;">
-        <div>1. Open <strong style="color:var(--text)">supabase.com</strong> → your project → <strong style="color:var(--text)">Authentication → Users</strong></div>
-        <div>2. Click <strong style="color:var(--text)">Add user → Create new user</strong></div>
-        <div>3. Enter the client's email + a temporary password (e.g. <code style="background:var(--surface3);padding:1px 6px;border-radius:4px;">LifeX2025!</code>)</div>
-        <div>4. Tick <strong style="color:var(--text)">"Auto Confirm User"</strong> so they can log in immediately</div>
-        <div>5. Copy their <strong style="color:var(--gold)">UUID</strong> (shown after creating) and paste it below</div>
-      </div>
-    </div>
-
-    <div class="card" style="max-width:560px;">
-      <div class="card-title">Step 2 — Set Up Their Profile</div>
+    <div class="page-subtitle">Enter their details to create an account and send an invite email</div>
+    <div class="card" style="max-width:480px;">
       <div style="display:flex;flex-direction:column;gap:16px;">
-        <div class="field"><label>Client UUID (from Supabase)</label><input type="text" id="nc-uuid" placeholder="xxxxxxxx-xxxx-xxxx-xxxx-xxxxxxxxxxxx"></div>
-        <div class="field"><label>Full Name</label><input type="text" id="nc-name" placeholder="e.g. Sarah Johnson"></div>
-        <div class="field"><label>Initials</label><input type="text" id="nc-initials" placeholder="e.g. SJ" maxlength="2" style="width:80px;"></div>
+        <div class="form-grid">
+          <div class="field"><label>First Name</label><input type="text" id="nc-first" placeholder="e.g. Sarah"></div>
+          <div class="field"><label>Last Name</label><input type="text" id="nc-last" placeholder="e.g. Johnson"></div>
+        </div>
+        <div class="field"><label>Email Address</label><input type="email" id="nc-email" placeholder="e.g. sarah@email.com"></div>
         <div class="field">
           <label>Member Level</label>
           <select id="nc-level"><option>Standard</option><option>Gold</option><option>Platinum</option></select>
         </div>
-        <button class="btn btn-blue" onclick="createClientProfile()" id="nc-btn">➕ Create Client Profile</button>
+        <button class="btn btn-blue" onclick="createNewClient()" id="nc-btn">➕ Create Account &amp; Send Invite</button>
+        <div id="nc-status" style="font-size:13px;text-align:center;"></div>
       </div>
     </div>
   </div>
 
-  <!-- ── DEXA SCAN ── -->
-  <div id="panel-dexa" class="panel">
-    <div class="page-title">Upload DEXA Scan</div>
-    <div class="page-subtitle">Enter body composition data from the DEXA scan report</div>
-    <div class="client-bar">
-      <label>Client</label>
-      <select id="dexa-client"><option value="">— Select client —</option></select>
-    </div>
-    <div style="margin-bottom:16px;">
-      <input type="file" id="dexa-pdf" accept=".pdf,image/*" style="display:none" onchange="autofillDEXA(this)">
-      <button class="btn btn-gold" onclick="document.getElementById('dexa-pdf').click()">📄 Upload PDF / Image to Auto-Fill</button>
-    </div>
-    <div class="card">
-      <div class="card-title">Scan Info</div>
-      <div class="form-grid">
-        <div class="field"><label>Scan Date</label><input type="date" id="dexa-date"></div>
-        <div class="field"><label>Scan Number</label><input type="number" id="dexa-num" placeholder="e.g. 1, 2, 3…" min="1"></div>
-      </div>
-    </div>
-    <div class="card">
-      <div class="card-title">Body Composition</div>
-      <div class="form-grid">
-        <div class="field"><label>Body Fat %</label><input type="number" id="dexa-fat-pct" step="0.1" placeholder="e.g. 22.4"></div>
-        <div class="field"><label>Fat Mass (g)</label><input type="number" id="dexa-fat-g" placeholder="e.g. 17952"></div>
-        <div class="field"><label>Lean Mass (g)</label><input type="number" id="dexa-lean-g" placeholder="e.g. 59705"></div>
-        <div class="field"><label>Total Mass (g)</label><input type="number" id="dexa-total-g" placeholder="e.g. 80147"></div>
-        <div class="field"><label>Est. VAT (g)</label><input type="number" id="dexa-vat" placeholder="e.g. 381"></div>
-        <div class="field"><label>Android Fat %</label><input type="number" id="dexa-android" step="0.1" placeholder="e.g. 23.7"></div>
-        <div class="field"><label>Gynoid Fat %</label><input type="number" id="dexa-gynoid" step="0.1" placeholder="e.g. 27.2"></div>
-        <div class="field"><label>A:G Ratio</label><input type="number" id="dexa-ag" step="0.01" placeholder="e.g. 0.87"></div>
-      </div>
-    </div>
-    <div class="card">
-      <div class="card-title">Bone Density</div>
-      <div class="form-grid">
-        <div class="field"><label>BMD (g/cm²)</label><input type="number" id="dexa-bmd" step="0.001" placeholder="e.g. 1.143"></div>
-        <div class="field"><label>T-Score</label><input type="number" id="dexa-tscore" step="0.1" placeholder="e.g. -0.5"></div>
-        <div class="field"><label>Z-Score</label><input type="number" id="dexa-zscore" step="0.1" placeholder="e.g. 0.2"></div>
-        <div class="field"><label>PR %</label><input type="number" id="dexa-pr" step="0.1" placeholder="e.g. 93"></div>
-      </div>
-    </div>
-    <button class="btn btn-blue" onclick="saveDEXA()" id="dexa-btn">💾 Save DEXA Scan</button>
-  </div>
-
-  <!-- ── BLOOD PANEL ── -->
-  <div id="panel-blood" class="panel">
-    <div class="page-title">Upload Blood Panel</div>
-    <div class="page-subtitle">Enter blood marker results from the lab report</div>
-    <div class="client-bar">
-      <label>Client</label>
-      <select id="blood-client"><option value="">— Select client —</option></select>
-    </div>
-    <div style="margin-bottom:16px;">
-      <input type="file" id="blood-pdf" accept=".pdf,image/*" style="display:none" onchange="autofillBlood(this)">
-      <button class="btn btn-gold" onclick="document.getElementById('blood-pdf').click()">📄 Upload PDF / Image to Auto-Fill</button>
-    </div>
-    <div class="card">
-      <div class="card-title">Panel Info</div>
-      <div class="form-grid">
-        <div class="field"><label>Panel Date</label><input type="date" id="blood-date"></div>
-        <div class="field"><label>Lab Name</label><input type="text" id="blood-lab" placeholder="e.g. Laverty Pathology"></div>
-      </div>
-    </div>
-    <div class="card">
-      <div class="card-title">Blood Markers &nbsp;<button class="btn btn-outline btn-sm" onclick="addBloodMarker()">+ Add Marker</button> &nbsp;<button class="btn btn-outline btn-sm" onclick="loadBloodTemplate()">📋 Load Template</button></div>
-      <div class="marker-header">
-        <span>Category</span><span>Marker Name</span><span>Value</span><span>Unit</span>
-        <span>Disp Min</span><span>Disp Max</span><span>Ref Min</span><span>Ref Max</span><span>Status</span><span></span>
-      </div>
-      <div id="blood-markers-list"></div>
-    </div>
-    <button class="btn btn-blue" onclick="saveBloodPanel()" id="blood-btn">💾 Save Blood Panel</button>
-  </div>
-
-  <!-- ── HORMONES ── -->
-  <div id="panel-hormones" class="panel">
-    <div class="page-title">Upload Hormone Panel</div>
-    <div class="page-subtitle">Enter hormone results from the lab report</div>
-    <div class="client-bar">
-      <label>Client</label>
-      <select id="hormones-client"><option value="">— Select client —</option></select>
-    </div>
-    <div style="margin-bottom:16px;">
-      <input type="file" id="hormones-pdf" accept=".pdf,image/*" style="display:none" onchange="autofillHormones(this)">
-      <button class="btn btn-gold" onclick="document.getElementById('hormones-pdf').click()">📄 Upload PDF / Image to Auto-Fill</button>
-    </div>
-    <div class="card">
-      <div class="card-title">Panel Info</div>
-      <div class="form-grid">
-        <div class="field"><label>Panel Date</label><input type="date" id="hormones-date"></div>
-      </div>
-    </div>
-    <div class="card">
-      <div class="card-title">Hormone Markers &nbsp;<button class="btn btn-outline btn-sm" onclick="addHormoneMarker()">+ Add Marker</button> &nbsp;<button class="btn btn-outline btn-sm" onclick="loadHormoneTemplate()">📋 Load Template</button></div>
-      <div class="marker-header" style="grid-template-columns:1fr 80px 80px 80px 80px 80px 90px 1fr 36px;">
-        <span>Hormone Name</span><span>Value</span><span>Unit</span>
-        <span>Disp Min</span><span>Disp Max</span><span>Ref Min</span><span>Ref Max</span><span>Status / Note</span><span></span>
-      </div>
-      <div id="hormone-markers-list"></div>
-    </div>
-    <button class="btn btn-blue" onclick="saveHormonePanel()" id="hormones-btn">💾 Save Hormone Panel</button>
-  </div>
-
-  <!-- ── RMR ── -->
-  <div id="panel-rmr" class="panel">
-    <div class="page-title">Upload RMR Test</div>
-    <div class="page-subtitle">Enter resting metabolic rate results from ECAL calorimetry</div>
-    <div class="client-bar">
-      <label>Client</label>
-      <select id="rmr-client"><option value="">— Select client —</option></select>
-    </div>
-    <div style="margin-bottom:16px;">
-      <input type="file" id="rmr-pdf" accept=".pdf,image/*" style="display:none" onchange="autofillRMR(this)">
-      <button class="btn btn-gold" onclick="document.getElementById('rmr-pdf').click()">📄 Upload PDF / Image to Auto-Fill</button>
-    </div>
-    <div class="card">
-      <div class="card-title">Test Results</div>
-      <div class="form-grid">
-        <div class="field"><label>Test Date</label><input type="date" id="rmr-date"></div>
-        <div class="field"><label>RMR (kcal/day)</label><input type="number" id="rmr-kcal" placeholder="e.g. 2219"></div>
-        <div class="field"><label>RMR (kJ/day)</label><input type="number" id="rmr-kj" placeholder="e.g. 9283"></div>
-        <div class="field"><label>Fat Burning %</label><input type="number" id="rmr-fat" step="0.1" placeholder="e.g. 76.1"></div>
-        <div class="field"><label>Glucose %</label><input type="number" id="rmr-glucose" step="0.1" placeholder="e.g. 23.9"></div>
-        <div class="field"><label>FEO2 %</label><input type="number" id="rmr-feo2" step="0.01" placeholder="e.g. 16.55"></div>
-        <div class="field"><label>Population Min (kcal)</label><input type="number" id="rmr-pop-min" placeholder="e.g. 1529"></div>
-        <div class="field"><label>Population Max (kcal)</label><input type="number" id="rmr-pop-max" placeholder="e.g. 1869"></div>
-      </div>
-    </div>
-    <button class="btn btn-blue" onclick="saveRMR()" id="rmr-btn">💾 Save RMR Test</button>
-  </div>
 
 </main>
 </div>
@@ -927,28 +782,16 @@ function renderClientList() {
         <div class="client-meta">${c.member_level} Member &nbsp;·&nbsp; ${c.points} pts</div>
       </div>
       <div class="client-actions">
-        <button class="btn btn-outline btn-sm" onclick="event.stopPropagation();jumpToDexa('${c.id}')">DEXA</button>
-        <button class="btn btn-outline btn-sm" onclick="event.stopPropagation();jumpToBlood('${c.id}')">Blood</button>
-        <button class="btn btn-outline btn-sm" onclick="event.stopPropagation();jumpToRMR('${c.id}')">RMR</button>
+        <button class="btn btn-outline btn-sm" onclick="event.stopPropagation();viewClientProfile('${c.id}','${c.full_name?.split(' ')[0]||''}','${c.full_name?.split(' ').slice(1).join(' ')||''}')">View Profile</button>
       </div>
     </div>`).join('');
 }
 
 function populateClientSelects() {
-  const selects = ['dexa-client','blood-client','hormones-client','rmr-client'];
-  selects.forEach(id => {
-    const el = document.getElementById(id);
-    const cur = el.value;
-    el.innerHTML = '<option value="">— Select client —</option>' +
-      clients.map(c => `<option value="${c.id}">${c.full_name}</option>`).join('');
-    if (cur) el.value = cur;
-  });
+  // Manual upload panels removed — drag-and-drop on appointment cards handles all uploads
 }
 
-function jumpToClient(id) { showPanel('dexa'); document.getElementById('dexa-client').value = id; }
-function jumpToDexa(id)   { showPanel('dexa'); document.getElementById('dexa-client').value = id; }
-function jumpToBlood(id)  { showPanel('blood'); document.getElementById('blood-client').value = id; }
-function jumpToRMR(id)    { showPanel('rmr'); document.getElementById('rmr-client').value = id; }
+function jumpToClient(id) { viewClientProfile(id, '', ''); }
 
 /* ══ NAVIGATION ══ */
 function showPanel(id) {
@@ -967,34 +810,43 @@ function toast(msg, type='success') {
 }
 
 /* ══ NEW CLIENT ══ */
-async function createClientProfile() {
-  const uuid     = document.getElementById('nc-uuid').value.trim();
-  const name     = document.getElementById('nc-name').value.trim();
-  const initials = document.getElementById('nc-initials').value.trim().toUpperCase();
-  const level    = document.getElementById('nc-level').value;
+async function createNewClient() {
+  const firstName = document.getElementById('nc-first').value.trim();
+  const lastName  = document.getElementById('nc-last').value.trim();
+  const email     = document.getElementById('nc-email').value.trim();
+  const level     = document.getElementById('nc-level').value;
 
-  if (!uuid || !name) { toast('UUID and name are required.', 'error'); return; }
+  if (!firstName || !email) { toast('First name and email are required.', 'error'); return; }
 
   const btn = document.getElementById('nc-btn');
+  const statusEl = document.getElementById('nc-status');
   btn.disabled = true; btn.textContent = 'Creating…';
+  statusEl.style.color = 'var(--muted2)';
+  statusEl.textContent = 'Setting up account…';
 
-  const { error } = await sb.from('profiles').upsert({
-    id: uuid,
-    full_name: name,
-    initials: initials || name.split(' ').map(w=>w[0].toUpperCase()).slice(0,2).join(''),
-    member_level: level,
-    is_staff: false,
-    points: 0,
-  });
+  try {
+    const res = await fetch(`${SUPABASE_URL}/functions/v1/create-client`, {
+      method: 'POST',
+      headers: { 'Authorization': `Bearer ${SUPABASE_KEY}`, 'Content-Type': 'application/json' },
+      body: JSON.stringify({ email, firstName, lastName })
+    });
+    const result = await res.json();
+    if (result.error) throw new Error(result.error);
 
-  btn.disabled=false; btn.textContent='➕ Create Client Profile';
-  if (error) { toast('Error: ' + error.message, 'error'); return; }
+    statusEl.style.color = 'var(--green)';
+    statusEl.textContent = `✅ Account created — invite sent to ${email}`;
+    document.getElementById('nc-first').value = '';
+    document.getElementById('nc-last').value = '';
+    document.getElementById('nc-email').value = '';
+    toast(`Account created for ${firstName} ${lastName}!`, 'success');
+    await loadClients();
+  } catch(e) {
+    statusEl.style.color = 'var(--red)';
+    statusEl.textContent = `❌ ${e.message}`;
+    toast('Error: ' + e.message, 'error');
+  }
 
-  toast(`✅ Profile created for ${name}!`);
-  document.getElementById('nc-uuid').value='';
-  document.getElementById('nc-name').value='';
-  document.getElementById('nc-initials').value='';
-  await loadClients();
+  btn.disabled = false; btn.textContent = '➕ Create Account & Send Invite';
 }
 
 /* ══ SAVE DEXA ══ */
