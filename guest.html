@@ -409,6 +409,7 @@ body { background: var(--bg); color: var(--text); font-family: 'Outfit', sans-se
 let sex = null;
 let gAge, gWeight, gHeight, gWaist;
 let gBF, gLeanKg, gFatKg, gBMI, gRMR, gFMI, gScore;
+let gScanStats = null; // real stats from get-scan-stats edge function
 
 function selectSex(s) {
   sex = s;
@@ -425,15 +426,19 @@ function normalCDF(x) {
 }
 
 function bfPercentile(bf, age, sex) {
+  // Use real Life X scan data if available
+  if (gScanStats && !gScanStats.insufficient) {
+    return { leaner: gScanStats.leaner, mean: gScanStats.mean, sd: gScanStats.sd, count: gScanStats.count, real: true };
+  }
+  // Fallback: published reference ranges
   const table = sex === 'male'
     ? [{a:29,m:18,s:4},{a:39,m:22,s:4},{a:49,m:25,s:4},{a:59,m:27,s:4},{a:999,m:28,s:4}]
     : [{a:29,m:28,s:5},{a:39,m:30,s:5},{a:49,m:33,s:5},{a:59,m:35,s:5},{a:999,m:37,s:5}];
   const row = table.find(r => age <= r.a) || table[table.length - 1];
   const z = (bf - row.m) / row.s;
-  // percentile of people with LOWER body fat (i.e. leaner than you)
-  const pctHigher = Math.round(normalCDF(z) * 100); // % of people with same or higher BF
+  const pctHigher = Math.round(normalCDF(z) * 100);
   const leaner = Math.max(5, Math.min(95, pctHigher));
-  return { leaner, mean: row.m, sd: row.s };
+  return { leaner, mean: row.m, sd: row.s, count: null, real: false };
 }
 
 function bfCategory(bf, sex) {
@@ -497,6 +502,19 @@ function calculateEstimate() {
 
   document.getElementById('onboarding').style.display = 'none';
   document.getElementById('app').style.display = 'block';
+
+  // Fetch real scan stats, fall back to hardcoded if insufficient data
+  const statsUrl = `https://shvpwgrjqskccsdzajkj.supabase.co/functions/v1/get-scan-stats?sex=${sex}&age=${gAge}&value=${gBF}`;
+  fetch(statsUrl, { headers: { 'Authorization': 'Bearer eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InNodnB3Z3JqcXNrY2NzZHphamtqIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzM5MDUzNTIsImV4cCI6MjA4OTQ4MTM1Mn0.2dL3J9XbzU8q8ogPPqhwR4w7_vSB0FxVKMzsAOxCgk4' } })
+    .then(r => r.json())
+    .then(stats => {
+      if (!stats.insufficient && stats.mean && stats.sd) {
+        gScanStats = stats; // real data — override fallback
+        renderDashboard();
+        renderCompare();
+      }
+    })
+    .catch(() => {}); // silently fall back if unavailable
 
   renderDashboard();
   renderCompare();
@@ -898,7 +916,8 @@ function lockedTile(icon, label, fakeVal, unit) {
 
 /* ── Render: How I Compare ── */
 function renderCompare() {
-  const { leaner, mean, sd } = bfPercentile(gBF, gAge, sex);
+  const leaner_data = bfPercentile(gBF, gAge, sex);
+  const { leaner, mean, sd } = leaner_data;
 
   // Reference values for comparison bars (age/sex adjusted)
   const isMale = sex === 'male';
@@ -924,7 +943,9 @@ function renderCompare() {
       <div style="display:flex;align-items:flex-start;justify-content:space-between;flex-wrap:wrap;gap:8px;margin-bottom:14px;">
         <div>
           <div class="card-title" style="margin-bottom:2px;">Body Fat % Distribution — Life X Scan Data</div>
-          <div style="font-size:12px;color:var(--muted2);">${isMale ? 'Males' : 'Females'} aged ${gAge < 30 ? '20–29' : gAge < 40 ? '30–39' : gAge < 50 ? '40–49' : '50+'}</div>
+          <div style="font-size:12px;color:var(--muted2);">${isMale ? 'Males' : 'Females'} aged ${gAge < 30 ? '20–29' : gAge < 40 ? '30–39' : gAge < 50 ? '40–49' : '50+'}
+            ${leaner_data.count ? `&nbsp;&middot;&nbsp; <span style="color:var(--teal)">${leaner_data.count} real scans</span>` : '&nbsp;&middot;&nbsp; <span style="color:var(--muted)">reference ranges</span>'}
+          </div>
         </div>
         <div style="text-align:right;">
           <div style="font-family:'Bebas Neue',sans-serif;font-size:28px;color:var(--gold);letter-spacing:1px;">Top ${leaner}%</div>

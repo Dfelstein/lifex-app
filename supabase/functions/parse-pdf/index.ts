@@ -67,7 +67,9 @@ First, identify the scan type: DEXA, BLOOD, HORMONES, or RMR.
 Then extract all relevant data and return ONLY a valid JSON object with this structure:
 
 For DEXA:
-{"type":"DEXA","scan_date":"YYYY-MM-DD","scan_number":1,"fat_pct":0.0,"fat_g":0,"lean_g":0,"total_g":0,"bmd":0.0,"t_score":0.0,"z_score":0.0,"pr_pct":0.0,"vat_g":0,"android_fat_pct":0.0,"gynoid_fat_pct":0.0,"ag_ratio":0.0}
+{"type":"DEXA","scan_date":"YYYY-MM-DD","scan_number":1,"patient_age":0,"sex":"male","height_cm":0.0,"weight_kg":0.0,"fat_pct":0.0,"fat_g":0,"lean_g":0,"total_g":0,"bmd":0.0,"t_score":0.0,"z_score":0.0,"pr_pct":0.0,"vat_g":0,"android_fat_pct":0.0,"gynoid_fat_pct":0.0,"ag_ratio":0.0}
+
+Extract patient_age (integer years), sex ("male" or "female"), height_cm (numeric), weight_kg (numeric) from the patient info header at the top of the DEXA report.
 
 For RMR:
 {"type":"RMR","test_date":"YYYY-MM-DD","kcal":0,"kj":0,"fat_pct":0.0,"glucose_pct":0.0,"feo2":0.0,"pop_min":0,"pop_max":0}
@@ -118,6 +120,10 @@ Return ONLY the JSON, no other text.`,
         client_id: clientId,
         scan_date: parsed.scan_date,
         scan_number: parsed.scan_number,
+        patient_age: parsed.patient_age || null,
+        sex: parsed.sex || null,
+        height_cm: toNum(parsed.height_cm),
+        weight_kg: toNum(parsed.weight_kg),
         fat_pct: parsed.fat_pct,
         fat_g: parsed.fat_g,
         lean_g: parsed.lean_g,
