@@ -36,10 +36,11 @@ Deno.serve(async (req) => {
     const placeholderEmail = `import.${slug}.${Date.now()}@lifex.import`;
 
     // Create auth user with placeholder email — no invite sent, auto-confirmed
+    const initials = ((firstName.trim()[0] || '') + (lastName.trim()[0] || '')).toUpperCase();
     const { data: userData, error: userError } = await sb.auth.admin.createUser({
       email: placeholderEmail,
       email_confirm: true,
-      user_metadata: { full_name: fullName },
+      user_metadata: { full_name: fullName, initials },
     });
 
     if (userError) {
@@ -47,23 +48,7 @@ Deno.serve(async (req) => {
     }
 
     const uid = userData.user.id;
-    const initials = ((firstName.trim()[0] || '') + (lastName.trim()[0] || '')).toUpperCase();
-
-    const { error: profileError } = await sb.from('profiles').insert({
-      id: uid,
-      full_name: fullName,
-      initials,
-      member_level: 'Standard',
-      points: 0,
-      is_staff: false,
-    });
-
-    if (profileError) {
-      // Clean up auth user if profile insert fails
-      await sb.auth.admin.deleteUser(uid);
-      return cors(JSON.stringify({ error: profileError.message }), 500);
-    }
-
+    // Profile is auto-created by the handle_new_user trigger using user_metadata
     return cors(JSON.stringify({ id: uid, name: fullName, isGhost: true }));
   } catch (e) {
     return cors(JSON.stringify({ error: String(e) }), 500);
