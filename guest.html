@@ -1,0 +1,786 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Life X — Free Health Estimate</title>
+<link rel="manifest" href="manifest.json">
+<meta name="theme-color" content="#08090b">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<meta name="apple-mobile-web-app-title" content="Life X">
+<link rel="apple-touch-icon" href="icons/icon-192.png">
+<link href="https://fonts.googleapis.com/css2?family=Bebas+Neue&family=Outfit:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+<style>
+:root {
+  --bg: #08090b; --surface: #0f1114; --surface2: #161a1f; --surface3: #1c2128;
+  --border: rgba(255,255,255,0.06); --border2: rgba(255,255,255,0.1);
+  --gold: #f5c842; --gold2: #e8a020; --green: #39e07a; --red: #ff5555;
+  --blue: #4da6ff; --orange: #ff9f43; --purple: #a78bfa; --teal: #2dd4bf;
+  --text: #eef0f3; --muted: #5a6272; --muted2: #8a94a6;
+}
+*, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+html, body { height: 100%; }
+body { background: var(--bg); color: var(--text); font-family: 'Outfit', sans-serif; font-size: 14px; }
+
+/* ── ONBOARDING ── */
+#onboarding {
+  min-height: 100vh; display: flex; align-items: center; justify-content: center;
+  padding: 24px 16px; background: var(--bg);
+}
+.ob-wrap { width: 100%; max-width: 440px; }
+.ob-logo { text-align: center; margin-bottom: 32px; }
+.ob-logo-mark {
+  width: 60px; height: 60px; background: var(--gold); border-radius: 14px;
+  display: inline-flex; align-items: center; justify-content: center;
+  font-family: 'Bebas Neue', sans-serif; font-size: 28px; color: #000; margin-bottom: 12px;
+}
+.ob-logo-name { font-family: 'Bebas Neue', sans-serif; font-size: 38px; letter-spacing: 5px; line-height: 1; }
+.ob-logo-sub { font-size: 11px; color: var(--muted2); letter-spacing: 2px; text-transform: uppercase; margin-top: 4px; }
+.ob-card { background: var(--surface); border: 1px solid var(--border); border-radius: 16px; padding: 32px; }
+.ob-headline { font-family: 'Bebas Neue', sans-serif; font-size: 26px; letter-spacing: 2px; margin-bottom: 6px; }
+.ob-sub { font-size: 13px; color: var(--muted2); line-height: 1.5; margin-bottom: 28px; }
+.ob-sub strong { color: var(--gold); }
+
+.sex-toggle { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; margin-bottom: 20px; }
+.sex-btn {
+  padding: 14px; border: 2px solid var(--border2); border-radius: 10px;
+  background: var(--surface2); color: var(--muted2); font-family: 'Outfit', sans-serif;
+  font-size: 15px; font-weight: 600; cursor: pointer; transition: all 0.15s; text-align: center;
+}
+.sex-btn:hover { border-color: var(--gold); color: var(--text); }
+.sex-btn.selected { border-color: var(--gold); background: rgba(245,200,66,0.1); color: var(--gold); }
+
+.ob-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 14px; margin-bottom: 20px; }
+.ob-field label {
+  display: block; font-size: 11px; font-weight: 600; text-transform: uppercase;
+  letter-spacing: 1px; color: var(--muted2); margin-bottom: 6px;
+}
+.ob-field input {
+  width: 100%; background: var(--surface2); border: 1px solid var(--border2);
+  border-radius: 8px; padding: 13px 14px; color: var(--text);
+  font-family: 'Outfit', sans-serif; font-size: 15px; outline: none; transition: border-color 0.15s;
+}
+.ob-field input:focus { border-color: var(--gold); }
+.ob-error { color: var(--red); font-size: 12px; margin-bottom: 12px; display: none; }
+
+.ob-btn {
+  width: 100%; padding: 15px; background: var(--gold); color: #000; border: none;
+  border-radius: 8px; font-family: 'Bebas Neue', sans-serif; font-size: 20px;
+  letter-spacing: 2px; cursor: pointer; transition: background 0.15s;
+}
+.ob-btn:hover { background: var(--gold2); }
+.ob-signin { text-align: center; margin-top: 16px; font-size: 12px; color: var(--muted2); }
+.ob-signin a { color: var(--gold); text-decoration: none; font-weight: 600; }
+
+/* ── APP ── */
+#app { display: none; overflow: hidden; height: 100vh; }
+.app-inner { display: flex; height: 100%; }
+
+/* Book banner */
+.book-banner {
+  position: fixed; top: 0; left: 0; right: 0; z-index: 300;
+  background: linear-gradient(90deg, #1a1500, #2a1f00, #1a1500);
+  border-bottom: 1px solid rgba(245,200,66,0.3);
+  display: flex; align-items: center; justify-content: center; gap: 16px;
+  padding: 9px 16px; font-size: 12px; color: var(--muted2);
+}
+.book-banner strong { color: var(--text); }
+.book-banner-cta {
+  background: var(--gold); color: #000; padding: 5px 14px; border-radius: 6px;
+  font-weight: 700; font-size: 12px; text-decoration: none; white-space: nowrap;
+  transition: background 0.15s;
+}
+.book-banner-cta:hover { background: var(--gold2); }
+.est-badge {
+  display: inline-block; font-size: 9px; background: rgba(245,200,66,0.12);
+  border: 1px solid rgba(245,200,66,0.3); color: var(--gold);
+  border-radius: 4px; padding: 1px 5px; letter-spacing: 0.5px; vertical-align: middle; margin-left: 5px;
+}
+
+::-webkit-scrollbar { width: 4px; }
+::-webkit-scrollbar-track { background: transparent; }
+::-webkit-scrollbar-thumb { background: var(--surface3); border-radius: 2px; }
+
+/* SIDEBAR */
+.sidebar {
+  width: 220px; min-width: 220px; background: var(--surface);
+  border-right: 1px solid var(--border); display: flex;
+  flex-direction: column; height: 100vh; overflow-y: auto; padding-top: 40px;
+}
+.sidebar-logo { display: flex; align-items: center; gap: 10px; padding: 20px 16px 16px; border-bottom: 1px solid var(--border); }
+.logo-mark { width: 32px; height: 32px; background: var(--gold); border-radius: 8px; display: flex; align-items: center; justify-content: center; font-size: 16px; font-weight: 700; color: #000; flex-shrink: 0; font-family: 'Bebas Neue', sans-serif; }
+.logo-text { font-family: 'Bebas Neue', sans-serif; font-size: 22px; letter-spacing: 3px; color: var(--text); line-height: 1; }
+.logo-sub { font-size: 9px; color: var(--muted2); letter-spacing: 1px; text-transform: uppercase; margin-top: 1px; }
+.sidebar-nav { flex: 1; padding: 8px 0; }
+.nav-group-label { font-size: 9px; font-weight: 600; letter-spacing: 1.5px; text-transform: uppercase; color: var(--muted); padding: 12px 16px 4px; }
+.nav-item { display: flex; align-items: center; gap: 10px; padding: 9px 16px; cursor: pointer; color: var(--muted2); font-size: 13px; transition: all 0.15s; border-left: 2px solid transparent; }
+.nav-item:hover { background: var(--surface2); color: var(--text); }
+.nav-item.active { background: rgba(245,200,66,0.08); color: var(--gold); border-left: 2px solid var(--gold); font-weight: 500; }
+.nav-icon { font-size: 15px; width: 18px; text-align: center; flex-shrink: 0; }
+.sidebar-footer { border-top: 1px solid var(--border); padding: 16px; display: flex; flex-direction: column; gap: 8px; }
+.guest-label { font-size: 11px; color: var(--muted2); text-align: center; margin-bottom: 2px; }
+.btn-book { display: block; width: 100%; padding: 10px; background: var(--gold); color: #000; border: none; border-radius: 7px; font-family: 'Bebas Neue', sans-serif; font-size: 16px; letter-spacing: 1px; cursor: pointer; text-align: center; text-decoration: none; transition: background 0.15s; }
+.btn-book:hover { background: var(--gold2); }
+.btn-signin { display: block; width: 100%; padding: 8px; background: transparent; border: 1px solid var(--border2); border-radius: 7px; color: var(--muted2); font-family: 'Outfit', sans-serif; font-size: 12px; cursor: pointer; text-align: center; text-decoration: none; transition: all 0.15s; }
+.btn-signin:hover { background: var(--surface2); color: var(--text); }
+
+/* MAIN */
+.main { flex: 1; overflow-y: auto; height: 100vh; padding-top: 40px; }
+.screen { display: none; padding: 28px 32px; min-height: 100%; animation: fadeIn 0.2s ease; }
+.screen.active { display: block; }
+@keyframes fadeIn { from{opacity:0;transform:translateY(4px)} to{opacity:1;transform:translateY(0)} }
+
+/* PAGE HEADER */
+.page-header { margin-bottom: 24px; }
+.page-title { font-family: 'Bebas Neue', sans-serif; font-size: 32px; letter-spacing: 2px; color: var(--text); line-height: 1; margin-bottom: 4px; }
+.page-subtitle { color: var(--muted2); font-size: 13px; }
+
+/* CARDS */
+.card { background: var(--surface); border: 1px solid var(--border); border-radius: 12px; padding: 20px; }
+.card-title { font-size: 11px; font-weight: 600; letter-spacing: 1px; text-transform: uppercase; color: var(--muted2); margin-bottom: 14px; }
+.mb16 { margin-bottom: 16px; }
+.mb20 { margin-bottom: 20px; }
+
+/* STAT TILES */
+.stats-row { display: grid; grid-template-columns: repeat(3, 1fr); gap: 12px; margin-bottom: 20px; }
+.stat-tile { background: var(--surface); border: 1px solid var(--border); border-radius: 12px; padding: 16px; border-top: 3px solid var(--muted); }
+.stat-tile.gold{border-top-color:var(--gold)} .stat-tile.green{border-top-color:var(--green)} .stat-tile.blue{border-top-color:var(--blue)} .stat-tile.orange{border-top-color:var(--orange)} .stat-tile.red{border-top-color:var(--red)}
+.tile-label { font-size: 10px; font-weight: 600; letter-spacing: 0.8px; text-transform: uppercase; color: var(--muted2); margin-bottom: 6px; }
+.tile-value { font-family: 'Bebas Neue', sans-serif; font-size: 36px; line-height: 1; color: var(--text); letter-spacing: 1px; }
+.tile-unit { font-family: 'Outfit', sans-serif; font-size: 14px; color: var(--muted2); margin-left: 2px; }
+.tile-sub { font-size: 11px; color: var(--muted2); margin-top: 4px; }
+
+/* SCORE RING */
+.score-section { display: flex; gap: 20px; margin-bottom: 20px; }
+.score-ring-wrap { flex-shrink: 0; position: relative; width: 160px; height: 160px; }
+.score-ring-wrap svg { transform: rotate(-90deg); }
+.score-center { position: absolute; inset: 0; display: flex; flex-direction: column; align-items: center; justify-content: center; }
+.score-big { font-family: 'Bebas Neue', sans-serif; font-size: 52px; line-height: 1; color: var(--gold); letter-spacing: 2px; }
+.score-denom { font-size: 13px; color: var(--muted2); }
+.score-label { font-size: 10px; font-weight: 600; letter-spacing: 1px; text-transform: uppercase; color: var(--gold); margin-top: 2px; }
+.score-breakdown { flex: 1; display: flex; flex-direction: column; justify-content: center; gap: 10px; }
+.sub-score-row { display: flex; align-items: center; gap: 10px; }
+.sub-score-label { font-size: 12px; color: var(--muted2); width: 60px; flex-shrink: 0; }
+.sub-score-bar-wrap { flex: 1; height: 6px; background: var(--surface3); border-radius: 3px; overflow: hidden; }
+.sub-score-bar { height: 100%; border-radius: 3px; transition: width 0.6s ease; }
+.sub-score-val { font-family: 'Bebas Neue', sans-serif; font-size: 18px; color: var(--text); width: 36px; text-align: right; letter-spacing: 1px; }
+
+/* WHERE YOU SIT */
+.sit-bar-wrap { position: relative; height: 14px; border-radius: 7px; background: linear-gradient(to right, #39e07a 0%, #f5c842 50%, #ff5555 100%); margin: 12px 0 6px; }
+.sit-marker { position: absolute; top: 50%; transform: translate(-50%, -50%); width: 22px; height: 22px; background: #fff; border: 3px solid var(--gold); border-radius: 50%; box-shadow: 0 2px 8px rgba(0,0,0,0.4); transition: left 0.6s ease; }
+.sit-labels { display: flex; justify-content: space-between; font-size: 10px; color: var(--muted2); }
+
+/* GRID */
+.grid-2 { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; }
+
+/* INSIGHT LIST */
+.insight-list { display: flex; flex-direction: column; gap: 10px; }
+.insight-item { display: flex; align-items: flex-start; gap: 10px; padding: 10px 14px; background: var(--surface2); border-radius: 8px; font-size: 12px; line-height: 1.5; color: var(--muted2); }
+.insight-item .icon { font-size: 14px; flex-shrink: 0; margin-top: 1px; }
+.insight-item strong { color: var(--text); }
+
+/* BUTTONS */
+.btn { display: inline-flex; align-items: center; gap: 8px; padding: 10px 20px; border-radius: 8px; font-family: 'Outfit', sans-serif; font-size: 13px; font-weight: 600; cursor: pointer; border: none; transition: all 0.15s; text-decoration: none; }
+.btn-gold { background: var(--gold); color: #000; }
+.btn-gold:hover { background: var(--gold2); }
+
+/* RMR SLIDER */
+.slider-wrap { display: flex; align-items: center; gap: 14px; margin: 14px 0 6px; }
+.slider-wrap input[type=range] { flex: 1; accent-color: var(--gold); height: 4px; }
+.slider-val { font-family: 'Bebas Neue', sans-serif; font-size: 22px; color: var(--gold); min-width: 60px; text-align: right; letter-spacing: 1px; }
+.tdee-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 10px; margin-top: 14px; }
+.tdee-card { background: var(--surface2); border: 1px solid var(--border); border-radius: 8px; padding: 12px; text-align: center; }
+.tdee-label { font-size: 10px; font-weight: 600; text-transform: uppercase; letter-spacing: 0.8px; color: var(--muted2); margin-bottom: 6px; }
+.tdee-val { font-family: 'Bebas Neue', sans-serif; font-size: 24px; color: var(--text); letter-spacing: 1px; }
+.tdee-unit { font-size: 11px; color: var(--muted2); }
+
+/* BOOK SCREEN */
+.scan-cards { display: grid; grid-template-columns: repeat(3, 1fr); gap: 16px; margin-bottom: 24px; }
+.scan-card { background: var(--surface); border: 1px solid var(--border); border-radius: 12px; padding: 24px 20px; text-align: center; transition: border-color 0.15s; }
+.scan-card:hover { border-color: var(--gold); }
+.scan-icon { font-size: 32px; margin-bottom: 12px; }
+.scan-name { font-family: 'Bebas Neue', sans-serif; font-size: 20px; letter-spacing: 2px; color: var(--text); margin-bottom: 4px; }
+.scan-price { font-size: 22px; font-weight: 700; color: var(--gold); margin-bottom: 10px; }
+.scan-desc { font-size: 12px; color: var(--muted2); line-height: 1.5; }
+
+/* HAMBURGER */
+.hamburger {
+  display: none; position: fixed; top: 48px; left: 12px; z-index: 200;
+  width: 38px; height: 38px; background: var(--surface); border: 1px solid var(--border2);
+  border-radius: 8px; align-items: center; justify-content: center;
+  cursor: pointer; flex-direction: column; gap: 5px;
+}
+.hamburger span { display: block; width: 18px; height: 2px; background: var(--text); border-radius: 1px; }
+.sidebar-overlay { display: none; position: fixed; inset: 0; background: rgba(0,0,0,0.6); z-index: 150; }
+
+@media (max-width: 640px) {
+  .hamburger { display: flex; }
+  .sidebar { position: fixed; left: -240px; top: 0; z-index: 160; width: 220px; transition: left 0.25s ease; box-shadow: 4px 0 24px rgba(0,0,0,0.4); }
+  .sidebar.open { left: 0; }
+  .sidebar-overlay.open { display: block; }
+  .main { width: 100%; }
+  .screen { padding: 20px 16px; padding-top: 24px; }
+  .stats-row { grid-template-columns: repeat(2, 1fr); }
+  .score-section { flex-direction: column; align-items: center; }
+  .score-breakdown { width: 100%; }
+  .grid-2 { grid-template-columns: 1fr; }
+  .scan-cards { grid-template-columns: 1fr; }
+  .tdee-grid { grid-template-columns: 1fr; }
+  .book-banner { font-size: 11px; gap: 8px; }
+  .book-banner .hide-mobile { display: none; }
+}
+@media (max-width: 1100px) { .stats-row { grid-template-columns: repeat(2, 1fr); } }
+</style>
+</head>
+<body>
+
+<!-- ══ ONBOARDING ══ -->
+<div id="onboarding">
+  <div class="ob-wrap">
+    <div class="ob-logo">
+      <div class="ob-logo-mark">LX</div>
+      <div class="ob-logo-name">Life X</div>
+      <div class="ob-logo-sub">Body Intelligence</div>
+    </div>
+    <div class="ob-card">
+      <div class="ob-headline">Your Free Body Estimate</div>
+      <div class="ob-sub">
+        Get an estimate of your body composition, metabolism, and Life X Score —
+        <strong>weighted against real DEXA scan data</strong> from Life X clients.
+      </div>
+
+      <div class="nav-group-label" style="padding:0 0 8px;margin-bottom:4px;">Sex</div>
+      <div class="sex-toggle">
+        <button class="sex-btn" id="btn-male" onclick="selectSex('male')">Male</button>
+        <button class="sex-btn" id="btn-female" onclick="selectSex('female')">Female</button>
+      </div>
+
+      <div class="ob-grid">
+        <div class="ob-field">
+          <label>Age</label>
+          <input type="number" id="inp-age" placeholder="32" min="16" max="90">
+        </div>
+        <div class="ob-field">
+          <label>Weight (kg)</label>
+          <input type="number" id="inp-weight" placeholder="78" min="30" max="300" step="0.1">
+        </div>
+        <div class="ob-field">
+          <label>Height (cm)</label>
+          <input type="number" id="inp-height" placeholder="175" min="100" max="230">
+        </div>
+        <div class="ob-field">
+          <label>Waist (cm) <span style="color:var(--muted);font-weight:400;">optional</span></label>
+          <input type="number" id="inp-waist" placeholder="85" min="50" max="200" step="0.5">
+        </div>
+      </div>
+
+      <div class="ob-error" id="ob-error"></div>
+      <button class="ob-btn" onclick="calculateEstimate()">Calculate My Results &rarr;</button>
+
+      <div class="ob-signin">
+        Already have an account? <a href="index.html">Sign In</a>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- ══ APP ══ -->
+<div id="app">
+  <!-- Top banner -->
+  <div class="book-banner">
+    <span class="hide-mobile">These are <strong>estimates</strong> based on Life X scan data.</span>
+    <span style="color:var(--muted2);">Want your <strong style="color:var(--text)">exact numbers</strong>?</span>
+    <a href="https://lifexclinic.square.site" target="_blank" class="book-banner-cta">Book a DEXA Scan</a>
+  </div>
+
+  <div class="hamburger" id="hamburger" onclick="toggleSidebar()">
+    <span></span><span></span><span></span>
+  </div>
+  <div class="sidebar-overlay" id="overlay" onclick="toggleSidebar()"></div>
+
+  <div class="app-inner">
+    <nav class="sidebar" id="sidebar">
+      <div class="sidebar-logo">
+        <div class="logo-mark">LX</div>
+        <div>
+          <div class="logo-text">Life X</div>
+          <div class="logo-sub">Body Intelligence</div>
+        </div>
+      </div>
+      <div class="sidebar-nav">
+        <div class="nav-group-label">Your Estimate</div>
+        <div class="nav-item active" data-screen="dashboard">
+          <span class="nav-icon">📊</span> Dashboard
+        </div>
+        <div class="nav-item" data-screen="body-comp">
+          <span class="nav-icon">🫀</span> Body Composition
+        </div>
+        <div class="nav-item" data-screen="rmr">
+          <span class="nav-icon">🔥</span> Metabolism
+        </div>
+        <div class="nav-group-label">Get Real Results</div>
+        <div class="nav-item" data-screen="book">
+          <span class="nav-icon">📅</span> Book a Scan
+        </div>
+      </div>
+      <div class="sidebar-footer">
+        <div class="guest-label">Viewing estimated results</div>
+        <a href="https://lifexclinic.square.site" target="_blank" class="btn-book">Book a DEXA Scan</a>
+        <a href="index.html" class="btn-signin">Sign In to My Account</a>
+      </div>
+    </nav>
+
+    <main class="main">
+
+      <!-- DASHBOARD -->
+      <div id="screen-dashboard" class="screen active">
+        <div id="dashboard-content"></div>
+      </div>
+
+      <!-- BODY COMP -->
+      <div id="screen-body-comp" class="screen">
+        <div id="body-comp-content"></div>
+      </div>
+
+      <!-- METABOLISM -->
+      <div id="screen-rmr" class="screen">
+        <div id="rmr-content"></div>
+      </div>
+
+      <!-- BOOK -->
+      <div id="screen-book" class="screen">
+        <div class="page-header">
+          <div class="page-title">Book a Scan</div>
+          <div class="page-subtitle">Castle Hill NSW &nbsp;&middot;&nbsp; Life X Clinic</div>
+        </div>
+        <div class="scan-cards">
+          <div class="scan-card">
+            <div class="scan-icon">🫀</div>
+            <div class="scan-name">DEXA Scan</div>
+            <div class="scan-price">$149</div>
+            <div class="scan-desc">Full body composition — exact fat mass, lean mass, bone density, VAT &amp; regional breakdown. Takes 10 minutes.</div>
+            <div style="margin-top:16px;"><a href="https://lifexclinic.square.site" target="_blank" class="btn btn-gold" style="width:100%;justify-content:center;">Book Now &rarr;</a></div>
+          </div>
+          <div class="scan-card">
+            <div class="scan-icon">🔥</div>
+            <div class="scan-name">RMR Test</div>
+            <div class="scan-price">$160</div>
+            <div class="scan-desc">Resting metabolic rate via indirect calorimetry. Discover your true calorie burn &amp; exact fat vs carb fuel mix.</div>
+            <div style="margin-top:16px;"><a href="https://lifexclinic.square.site" target="_blank" class="btn btn-gold" style="width:100%;justify-content:center;">Book Now &rarr;</a></div>
+          </div>
+          <div class="scan-card">
+            <div class="scan-icon">🩸</div>
+            <div class="scan-name">Blood Panel</div>
+            <div class="scan-price">Varies</div>
+            <div class="scan-desc">Comprehensive blood markers — hormones, inflammation, metabolic &amp; thyroid. Full clinical interpretation included.</div>
+            <div style="margin-top:16px;"><a href="https://lifexclinic.square.site" target="_blank" class="btn btn-gold" style="width:100%;justify-content:center;">View Panels &rarr;</a></div>
+          </div>
+        </div>
+        <div class="card">
+          <div class="card-title">Why DEXA vs Online Calculators?</div>
+          <div class="insight-list">
+            <div class="insight-item"><span class="icon">📏</span><span>Online tools estimate body fat from height &amp; weight alone — <strong>error margin of 5–8%.</strong> DEXA is accurate to within 1–2%.</span></div>
+            <div class="insight-item"><span class="icon">🫀</span><span>Only DEXA measures <strong>visceral adipose tissue (VAT)</strong> — the fat around your organs that drives disease risk. No calculator can estimate this.</span></div>
+            <div class="insight-item"><span class="icon">🦴</span><span>DEXA measures <strong>bone mineral density</strong> and gives you a T-score — critical for osteoporosis risk, invisible without a scan.</span></div>
+            <div class="insight-item"><span class="icon">📊</span><span>Your Life X dashboard tracks changes scan-to-scan so you can see <strong>exactly what's working</strong> in your training and nutrition.</span></div>
+          </div>
+        </div>
+      </div>
+
+    </main>
+  </div>
+</div>
+
+<script>
+// ── State ──
+let sex = null;
+let gAge, gWeight, gHeight, gWaist;
+let gBF, gLeanKg, gFatKg, gBMI, gRMR, gFMI, gScore;
+
+function selectSex(s) {
+  sex = s;
+  document.getElementById('btn-male').classList.toggle('selected', s === 'male');
+  document.getElementById('btn-female').classList.toggle('selected', s === 'female');
+}
+
+// ── Math helpers ──
+function normalCDF(x) {
+  const t = 1 / (1 + 0.3275911 * Math.abs(x));
+  const p = t * (0.254829592 + t * (-0.284496736 + t * (1.421413741 + t * (-1.453152027 + t * 1.061405429))));
+  const e = 1 - p * Math.exp(-x * x);
+  return x >= 0 ? e : 1 - e;
+}
+
+function bfPercentile(bf, age, sex) {
+  const table = sex === 'male'
+    ? [{a:29,m:18,s:4},{a:39,m:22,s:4},{a:49,m:25,s:4},{a:59,m:27,s:4},{a:999,m:28,s:4}]
+    : [{a:29,m:28,s:5},{a:39,m:30,s:5},{a:49,m:33,s:5},{a:59,m:35,s:5},{a:999,m:37,s:5}];
+  const row = table.find(r => age <= r.a) || table[table.length - 1];
+  const z = (bf - row.m) / row.s;
+  // percentile of people with LOWER body fat (i.e. leaner than you)
+  const pctHigher = Math.round(normalCDF(z) * 100); // % of people with same or higher BF
+  const leaner = Math.max(5, Math.min(95, pctHigher));
+  return { leaner, mean: row.m };
+}
+
+function bfCategory(bf, sex) {
+  if (sex === 'male') {
+    if (bf < 8)  return { label: 'Athletic', color: 'var(--teal)' };
+    if (bf < 18) return { label: 'Fit', color: 'var(--green)' };
+    if (bf < 25) return { label: 'Average', color: 'var(--gold)' };
+    if (bf < 30) return { label: 'Above Average', color: 'var(--orange)' };
+    return { label: 'High', color: 'var(--red)' };
+  } else {
+    if (bf < 18) return { label: 'Athletic', color: 'var(--teal)' };
+    if (bf < 28) return { label: 'Fit', color: 'var(--green)' };
+    if (bf < 35) return { label: 'Average', color: 'var(--gold)' };
+    if (bf < 40) return { label: 'Above Average', color: 'var(--orange)' };
+    return { label: 'High', color: 'var(--red)' };
+  }
+}
+
+// ── Estimate ──
+function calculateEstimate() {
+  const errEl = document.getElementById('ob-error');
+  errEl.style.display = 'none';
+
+  if (!sex) { errEl.textContent = 'Please select Male or Female.'; errEl.style.display = 'block'; return; }
+
+  gAge    = parseInt(document.getElementById('inp-age').value);
+  gWeight = parseFloat(document.getElementById('inp-weight').value);
+  gHeight = parseFloat(document.getElementById('inp-height').value);
+  gWaist  = parseFloat(document.getElementById('inp-waist').value) || null;
+
+  if (!gAge || !gWeight || !gHeight) {
+    errEl.textContent = 'Please fill in Age, Weight, and Height.';
+    errEl.style.display = 'block';
+    return;
+  }
+  if (gAge < 16 || gAge > 90 || gWeight < 30 || gWeight > 300 || gHeight < 100 || gHeight > 230) {
+    errEl.textContent = 'Please check your values are realistic.';
+    errEl.style.display = 'block';
+    return;
+  }
+
+  const hM = gHeight / 100;
+  gBMI = gWeight / (hM * hM);
+
+  // Deurenberg body fat formula
+  gBF = Math.max(3, Math.min(60, parseFloat(((1.20 * gBMI) + (0.23 * gAge) - (sex === 'male' ? 16.2 : 5.4)).toFixed(1))));
+
+  gFatKg  = parseFloat((gWeight * gBF / 100).toFixed(1));
+  gLeanKg = parseFloat((gWeight - gFatKg).toFixed(1));
+  gFMI    = parseFloat((gFatKg / (hM * hM)).toFixed(1));
+
+  // Mifflin-St Jeor RMR
+  gRMR = Math.round((10 * gWeight) + (6.25 * gHeight) - (5 * gAge) + (sex === 'male' ? 5 : -161));
+
+  // Life X Score estimate from body fat %
+  if      (gBF <= 12) gScore = 88;
+  else if (gBF <= 17) gScore = 76;
+  else if (gBF <= 22) gScore = 64;
+  else if (gBF <= 27) gScore = 52;
+  else                gScore = 38;
+
+  document.getElementById('onboarding').style.display = 'none';
+  document.getElementById('app').style.display = 'block';
+
+  renderDashboard();
+  renderBodyComp();
+  renderRMR();
+}
+
+// ── Router ──
+function navigate(id) {
+  document.querySelectorAll('.screen').forEach(s => s.classList.remove('active'));
+  document.querySelectorAll('.nav-item').forEach(n => n.classList.remove('active'));
+  const screen = document.getElementById('screen-' + id);
+  if (screen) screen.classList.add('active');
+  const nav = document.querySelector(`[data-screen="${id}"]`);
+  if (nav) nav.classList.add('active');
+  document.getElementById('sidebar').classList.remove('open');
+  document.getElementById('overlay').classList.remove('open');
+}
+document.querySelectorAll('.nav-item').forEach(item => {
+  item.addEventListener('click', () => navigate(item.dataset.screen));
+});
+function toggleSidebar() {
+  document.getElementById('sidebar').classList.toggle('open');
+  document.getElementById('overlay').classList.toggle('open');
+}
+
+// ── Render: Dashboard ──
+function renderDashboard() {
+  const { leaner, mean } = bfPercentile(gBF, gAge, sex);
+  const cat = bfCategory(gBF, sex);
+  const circumference = 2 * Math.PI * 65;
+  const offset = circumference - (gScore / 100) * circumference;
+
+  // marker position: leaner% of people have higher BF, so marker is at (100 - leaner)% from left
+  const markerLeft = Math.max(5, Math.min(95, 100 - leaner));
+
+  document.getElementById('dashboard-content').innerHTML = `
+    <div class="page-header">
+      <div class="page-title">Dashboard <span class="est-badge">ESTIMATED</span></div>
+      <div class="page-subtitle">${sex === 'male' ? 'Male' : 'Female'} &nbsp;&middot;&nbsp; ${gAge} yrs &nbsp;&middot;&nbsp; ${gWeight} kg &nbsp;&middot;&nbsp; ${gHeight} cm</div>
+    </div>
+
+    <div class="card mb20">
+      <div class="score-section">
+        <div class="score-ring-wrap">
+          <svg width="160" height="160" viewBox="0 0 160 160">
+            <circle cx="80" cy="80" r="65" fill="none" stroke="var(--surface3)" stroke-width="10"/>
+            <circle cx="80" cy="80" r="65" fill="none" stroke="var(--gold)" stroke-width="10"
+              stroke-dasharray="${circumference.toFixed(1)}" stroke-dashoffset="${offset.toFixed(1)}" stroke-linecap="round"/>
+          </svg>
+          <div class="score-center">
+            <div class="score-big">${gScore}</div>
+            <div class="score-denom">/100</div>
+            <div class="score-label">Life X Score</div>
+          </div>
+        </div>
+        <div class="score-breakdown">
+          <div style="font-size:12px;color:var(--muted2);margin-bottom:8px;">Based on estimated body fat only.<br>DEXA + Blood + RMR unlocks the full score.</div>
+          <div class="sub-score-row">
+            <div class="sub-score-label">Body Fat</div>
+            <div class="sub-score-bar-wrap"><div class="sub-score-bar" style="width:${gScore}%;background:var(--blue)"></div></div>
+            <div class="sub-score-val">${gScore}</div>
+          </div>
+          <div class="sub-score-row">
+            <div class="sub-score-label">Blood</div>
+            <div class="sub-score-bar-wrap"><div class="sub-score-bar" style="width:0%"></div></div>
+            <div class="sub-score-val" style="color:var(--muted);">—</div>
+          </div>
+          <div class="sub-score-row">
+            <div class="sub-score-label">Metabolism</div>
+            <div class="sub-score-bar-wrap"><div class="sub-score-bar" style="width:0%"></div></div>
+            <div class="sub-score-val" style="color:var(--muted);">—</div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <div class="stats-row mb20">
+      <div class="stat-tile blue">
+        <div class="tile-label">Body Fat <span class="est-badge">EST</span></div>
+        <div class="tile-value">${gBF}<span class="tile-unit">%</span></div>
+        <div class="tile-sub" style="color:${cat.color};font-weight:600;">${cat.label}</div>
+      </div>
+      <div class="stat-tile green">
+        <div class="tile-label">Lean Mass <span class="est-badge">EST</span></div>
+        <div class="tile-value">${gLeanKg}<span class="tile-unit">kg</span></div>
+        <div class="tile-sub">of ${gWeight} kg total</div>
+      </div>
+      <div class="stat-tile orange">
+        <div class="tile-label">RMR <span class="est-badge">EST</span></div>
+        <div class="tile-value">${gRMR.toLocaleString()}<span class="tile-unit">kcal</span></div>
+        <div class="tile-sub">at rest per day</div>
+      </div>
+    </div>
+
+    <div class="card mb20">
+      <div class="card-title">Where You Sit &mdash; Life X Scan Data &nbsp;<span style="font-size:10px;color:var(--muted2);">${sex === 'male' ? 'Male' : 'Female'}, age ${gAge}</span></div>
+      <div style="font-size:14px;color:var(--text);margin-bottom:4px;">
+        You're estimated to be leaner than
+        <strong style="color:var(--gold)">${leaner}%</strong>
+        of ${sex === 'male' ? 'men' : 'women'} your age in our scan database.
+      </div>
+      <div style="font-size:12px;color:var(--muted2);margin-bottom:10px;">
+        Average body fat for your group: <strong style="color:var(--text)">${mean}%</strong> &nbsp;&middot;&nbsp; Your estimate: <strong style="color:var(--text)">${gBF}%</strong>
+      </div>
+      <div class="sit-bar-wrap">
+        <div class="sit-marker" style="left:${markerLeft}%"></div>
+      </div>
+      <div class="sit-labels">
+        <span>Lean</span><span>Average</span><span>High Body Fat</span>
+      </div>
+      <div style="margin-top:14px;padding:12px 14px;background:var(--surface2);border-radius:8px;font-size:12px;color:var(--muted2);line-height:1.6;">
+        <strong style="color:var(--text);">Important:</strong> These estimates can be off by 3–5%. A DEXA scan measures your exact body fat to within 1–2% and also measures visceral fat, bone density, and regional distribution that no calculator can estimate.
+        &nbsp;<a href="https://lifexclinic.square.site" target="_blank" style="color:var(--gold);font-weight:600;text-decoration:none;">Book a scan &rarr;</a>
+      </div>
+    </div>
+
+    <div class="grid-2">
+      <div class="card">
+        <div class="card-title">Recommended Next Steps</div>
+        <div class="insight-list">
+          <div class="insight-item"><span class="icon">🎯</span><span>Book a <strong>DEXA scan</strong> to get your exact body fat %, lean mass, bone density, and VAT measurement.</span></div>
+          <div class="insight-item"><span class="icon">🔥</span><span>An <strong>RMR test</strong> will tell you your exact calorie burn at rest — estimates can be off by 200–300 kcal/day.</span></div>
+          <div class="insight-item"><span class="icon">🩸</span><span>A <strong>blood panel</strong> reveals inflammation, hormones, and metabolic markers invisible to any body composition tool.</span></div>
+        </div>
+        <div style="margin-top:14px;">
+          <a href="https://lifexclinic.square.site" target="_blank" class="btn btn-gold">Book a Scan &rarr;</a>
+        </div>
+      </div>
+      <div class="card">
+        <div class="card-title">Your Estimate Summary</div>
+        <div style="display:flex;flex-direction:column;gap:10px;">
+          ${[
+            ['BMI', gBMI.toFixed(1), gBMI < 18.5 ? 'Underweight' : gBMI < 25 ? 'Normal' : gBMI < 30 ? 'Overweight' : 'Obese'],
+            ['Body Fat', gBF + '%', cat.label],
+            ['Fat Mass', gFatKg + ' kg', ''],
+            ['Lean Mass', gLeanKg + ' kg', ''],
+            ['Fat Mass Index', gFMI + ' kg/m²', gFMI < 6 ? 'Low' : gFMI < 9 ? 'Normal' : 'Elevated'],
+            ['Est. RMR', gRMR.toLocaleString() + ' kcal', 'at rest'],
+          ].map(([label, val, sub]) => `
+            <div style="display:flex;align-items:center;justify-content:space-between;padding:8px 0;border-bottom:1px solid var(--border);">
+              <div style="font-size:12px;color:var(--muted2);">${label} <span class="est-badge">EST</span></div>
+              <div style="text-align:right;">
+                <div style="font-family:'Bebas Neue',sans-serif;font-size:18px;letter-spacing:1px;">${val}</div>
+                ${sub ? `<div style="font-size:10px;color:var(--muted2);">${sub}</div>` : ''}
+              </div>
+            </div>`).join('')}
+        </div>
+      </div>
+    </div>`;
+}
+
+// ── Render: Body Comp ──
+function renderBodyComp() {
+  const cat = bfCategory(gBF, sex);
+  const hM = gHeight / 100;
+  document.getElementById('body-comp-content').innerHTML = `
+    <div class="page-header">
+      <div class="page-title">Body Composition <span class="est-badge">ESTIMATED</span></div>
+      <div class="page-subtitle">Estimated from height, weight, age &amp; sex via Deurenberg formula</div>
+    </div>
+
+    <div class="stats-row mb20">
+      <div class="stat-tile blue">
+        <div class="tile-label">Body Fat <span class="est-badge">EST</span></div>
+        <div class="tile-value">${gBF}<span class="tile-unit">%</span></div>
+        <div class="tile-sub" style="color:${cat.color};font-weight:600;">${cat.label}</div>
+      </div>
+      <div class="stat-tile green">
+        <div class="tile-label">Lean Mass <span class="est-badge">EST</span></div>
+        <div class="tile-value">${gLeanKg}<span class="tile-unit">kg</span></div>
+      </div>
+      <div class="stat-tile red">
+        <div class="tile-label">Fat Mass <span class="est-badge">EST</span></div>
+        <div class="tile-value">${gFatKg}<span class="tile-unit">kg</span></div>
+      </div>
+      <div class="stat-tile gold">
+        <div class="tile-label">BMI</div>
+        <div class="tile-value">${gBMI.toFixed(1)}</div>
+        <div class="tile-sub">${gBMI < 18.5 ? 'Underweight' : gBMI < 25 ? 'Normal' : gBMI < 30 ? 'Overweight' : 'Obese'}</div>
+      </div>
+      <div class="stat-tile orange">
+        <div class="tile-label">Fat Mass Index <span class="est-badge">EST</span></div>
+        <div class="tile-value">${gFMI}<span class="tile-unit">kg/m²</span></div>
+        <div class="tile-sub">${gFMI < 6 ? 'Low' : gFMI < 9 ? 'Normal' : 'Elevated'}</div>
+      </div>
+    </div>
+
+    <div class="card mb20">
+      <div class="card-title">Why BMI is Not Enough</div>
+      <div class="insight-list">
+        <div class="insight-item"><span class="icon">⚠️</span><span>BMI can't distinguish <strong>fat from muscle</strong>. A muscular person can have the same BMI as someone with high body fat.</span></div>
+        <div class="insight-item"><span class="icon">📏</span><span><strong>Fat Mass Index (FMI)</strong> is more accurate — it accounts for height and separates fat mass from lean mass.</span></div>
+        <div class="insight-item"><span class="icon">🫀</span><span>Only a DEXA scan measures <strong>visceral adipose tissue (VAT)</strong> — the dangerous fat around your organs. Your estimate above can't capture this.</span></div>
+      </div>
+    </div>
+
+    <div class="card">
+      <div class="card-title">Body Fat Reference Ranges &mdash; ${sex === 'male' ? 'Male' : 'Female'}</div>
+      <div style="display:flex;gap:0;border-radius:8px;overflow:hidden;">
+        ${sex === 'male'
+          ? `<div style="flex:1;background:var(--teal);opacity:0.8;padding:8px 10px;font-size:11px;font-weight:600;color:#000;">&lt;8%<br><span style="font-weight:400;opacity:0.8">Athletic</span></div>
+             <div style="flex:2;background:var(--green);opacity:0.8;padding:8px 10px;font-size:11px;font-weight:600;color:#000;">8–17%<br><span style="font-weight:400">Fit</span></div>
+             <div style="flex:2;background:var(--gold);opacity:0.9;padding:8px 10px;font-size:11px;font-weight:700;color:#000;">18–24%${gBF>=18&&gBF<=24?' ← You':''}<br><span style="font-weight:400">Average</span></div>
+             <div style="flex:1;background:var(--orange);opacity:0.8;padding:8px 10px;font-size:11px;font-weight:600;color:#000;">25–29%${gBF>=25&&gBF<=29?' ← You':''}<br><span style="font-weight:400">Above Avg</span></div>
+             <div style="flex:1;background:var(--red);opacity:0.7;padding:8px 10px;font-size:11px;font-weight:600;color:#fff;">&gt;30%${gBF>30?' ← You':''}<br><span style="font-weight:400">High</span></div>`
+          : `<div style="flex:1;background:var(--teal);opacity:0.8;padding:8px 10px;font-size:11px;font-weight:600;color:#000;">&lt;18%<br><span style="font-weight:400">Athletic</span></div>
+             <div style="flex:2;background:var(--green);opacity:0.8;padding:8px 10px;font-size:11px;font-weight:600;color:#000;">18–27%<br><span style="font-weight:400">Fit</span></div>
+             <div style="flex:2;background:var(--gold);opacity:0.9;padding:8px 10px;font-size:11px;font-weight:700;color:#000;">28–34%${gBF>=28&&gBF<=34?' ← You':''}<br><span style="font-weight:400">Average</span></div>
+             <div style="flex:1;background:var(--orange);opacity:0.8;padding:8px 10px;font-size:11px;font-weight:600;color:#000;">35–39%${gBF>=35&&gBF<=39?' ← You':''}<br><span style="font-weight:400">Above Avg</span></div>
+             <div style="flex:1;background:var(--red);opacity:0.7;padding:8px 10px;font-size:11px;font-weight:600;color:#fff;">&gt;40%${gBF>40?' ← You':''}<br><span style="font-weight:400">High</span></div>`}
+      </div>
+      <div style="margin-top:12px;font-size:12px;color:var(--muted2);">
+        DEXA scan ranges based on Hologic reference data &amp; Life X clinical benchmarks.
+        ${gBF < (sex === 'male' ? 8 : 18) ? '<span style="color:var(--teal);font-weight:600;">Athletic range — excellent.</span>'
+          : gBF < (sex === 'male' ? 18 : 28) ? '<span style="color:var(--green);font-weight:600;">Fit range — good work.</span>'
+          : gBF < (sex === 'male' ? 25 : 35) ? '<span style="color:var(--gold);font-weight:600;">Average range — room to improve.</span>'
+          : '<span style="color:var(--orange);font-weight:600;">Consider booking a scan to understand your full picture.</span>'}
+      </div>
+    </div>`;
+}
+
+// ── Render: RMR ──
+function renderRMR() {
+  document.getElementById('rmr-content').innerHTML = `
+    <div class="page-header">
+      <div class="page-title">Metabolism <span class="est-badge">ESTIMATED</span></div>
+      <div class="page-subtitle">Mifflin-St Jeor equation &nbsp;&middot;&nbsp; Add your steps for a full daily estimate</div>
+    </div>
+
+    <div class="stats-row mb20">
+      <div class="stat-tile orange">
+        <div class="tile-label">Est. RMR <span class="est-badge">EST</span></div>
+        <div class="tile-value">${gRMR.toLocaleString()}<span class="tile-unit">kcal</span></div>
+        <div class="tile-sub">calories burned at complete rest</div>
+      </div>
+      <div class="stat-tile gold">
+        <div class="tile-label">BMR (alt)</div>
+        <div class="tile-value">${Math.round(gRMR * 0.95).toLocaleString()}<span class="tile-unit">kcal</span></div>
+        <div class="tile-sub">basal metabolic rate</div>
+      </div>
+    </div>
+
+    <div class="card mb20">
+      <div class="card-title">Daily Expenditure Estimate &mdash; Add Your Steps</div>
+      <div style="font-size:13px;color:var(--muted2);margin-bottom:4px;">How many steps do you average per day?</div>
+      <div class="slider-wrap">
+        <input type="range" id="steps-slider" min="0" max="25000" step="500" value="7500"
+          oninput="updateTDEE(this.value)">
+        <div class="slider-val" id="steps-display">7,500</div>
+      </div>
+      <div style="font-size:11px;color:var(--muted);margin-bottom:14px;">steps/day</div>
+      <div class="tdee-grid" id="tdee-grid"></div>
+    </div>
+
+    <div class="card">
+      <div class="card-title">Why RMR Estimates Are Often Wrong</div>
+      <div class="insight-list">
+        <div class="insight-item"><span class="icon">⚠️</span><span>The Mifflin-St Jeor equation is accurate for the average person but can be off by <strong>200–400 kcal/day</strong> depending on your muscle mass and metabolic health.</span></div>
+        <div class="insight-item"><span class="icon">🔬</span><span>An <strong>indirect calorimetry RMR test</strong> measures your actual oxygen consumption and CO2 production — accurate to within 5%.</span></div>
+        <div class="insight-item"><span class="icon">🫀</span><span>The test also reveals your <strong>fat vs carb fuel mix</strong> at rest — people who are metabolically flexible burn more fat, even sitting still.</span></div>
+      </div>
+      <div style="margin-top:14px;">
+        <a href="https://lifexclinic.square.site" target="_blank" class="btn btn-gold">Book RMR Test ($160) &rarr;</a>
+      </div>
+    </div>`;
+
+  updateTDEE(7500);
+}
+
+function updateTDEE(steps) {
+  steps = parseInt(steps);
+  document.getElementById('steps-display').textContent = steps.toLocaleString();
+  const mult = steps < 2000 ? 1.2 : steps < 5000 ? 1.35 : steps < 10000 ? 1.5 : steps < 15000 ? 1.65 : 1.8;
+  const tdee = Math.round(gRMR * mult);
+  document.getElementById('tdee-grid').innerHTML = `
+    <div class="tdee-card">
+      <div class="tdee-label">Fat Loss</div>
+      <div class="tdee-val">${Math.round(tdee * 0.80).toLocaleString()}</div>
+      <div class="tdee-unit">kcal/day (20% deficit)</div>
+    </div>
+    <div class="tdee-card" style="border-color:rgba(245,200,66,0.3);">
+      <div class="tdee-label">Maintenance</div>
+      <div class="tdee-val" style="color:var(--gold);">${tdee.toLocaleString()}</div>
+      <div class="tdee-unit">kcal/day</div>
+    </div>
+    <div class="tdee-card">
+      <div class="tdee-label">Lean Bulk</div>
+      <div class="tdee-val">${Math.round(tdee * 1.10).toLocaleString()}</div>
+      <div class="tdee-unit">kcal/day (10% surplus)</div>
+    </div>`;
+}
+</script>
+<script>
+if ('serviceWorker' in navigator) {
+  navigator.serviceWorker.register('sw.js');
+}
+</script>
+</body>
+</html>
