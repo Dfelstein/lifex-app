@@ -19,7 +19,7 @@ Deno.serve(async (req) => {
   if (req.method === 'OPTIONS') return new Response(null, { status: 204, headers: { 'Access-Control-Allow-Origin': '*', 'Access-Control-Allow-Headers': 'authorization, content-type' } });
 
   try {
-    const { email, firstName, lastName } = await req.json();
+    const { email, firstName, lastName, existingId } = await req.json();
     if (!email) return cors(JSON.stringify({ error: 'Email required' }), 400);
 
     const sb = createClient(SUPABASE_URL, SUPABASE_SERVICE_KEY, {
@@ -28,6 +28,15 @@ Deno.serve(async (req) => {
 
     const fullName = `${firstName || ''} ${lastName || ''}`.trim();
     const initials = `${firstName?.[0] || ''}${lastName?.[0] || ''}`.toUpperCase() || 'CL';
+
+    // If existingId: this is a ghost account being activated — update email + send invite
+    if (existingId) {
+      const { error: updateErr } = await sb.auth.admin.updateUserById(existingId, { email });
+      if (updateErr) return cors(JSON.stringify({ error: updateErr.message }), 500);
+      // Send invite to the new email
+      await sb.auth.admin.inviteUserByEmail(email, { data: { full_name: fullName, initials } });
+      return cors(JSON.stringify({ success: true, clientId: existingId, fullName }));
+    }
 
     // Create auth user and send invite email
     const { data: user, error: userErr } = await sb.auth.admin.inviteUserByEmail(email, {

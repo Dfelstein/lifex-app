@@ -255,6 +255,9 @@ html, body { height: 100%; background: var(--bg); color: var(--text); font-famil
     <div class="nav-item" data-panel="clients" onclick="showPanel('clients')"><span class="nav-icon">👥</span> All Clients</div>
     <div class="nav-item" data-panel="new-client" onclick="showPanel('new-client')"><span class="nav-icon">➕</span> New Client</div>
 
+    <div class="nav-group-label" style="margin-top:8px;">Data</div>
+    <div class="nav-item" data-panel="bulk-import" onclick="showPanel('bulk-import')"><span class="nav-icon">📥</span> Bulk Import</div>
+
   </div>
 
   <div class="sidebar-footer">
@@ -356,6 +359,77 @@ html, body { height: 100%; background: var(--bg); color: var(--text); font-famil
     </div>
   </div>
 
+
+  <!-- ── BULK IMPORT ── -->
+  <div id="panel-bulk-import" class="panel">
+    <div class="page-title">Bulk Import</div>
+    <div class="page-subtitle">Select your scan archive folder — all PDFs are processed first, then you can resolve unmatched clients</div>
+
+    <!-- Step 1: Folder picker -->
+    <div id="import-step-1">
+      <div class="card" style="max-width:640px;">
+        <div class="card-title">Select Archive Folder</div>
+        <div style="font-size:13px;color:var(--muted2);line-height:1.7;margin-bottom:20px;">
+          Expected folder structure:<br>
+          <code style="background:var(--surface2);padding:2px 7px;border-radius:4px;font-size:12px;color:var(--teal);">Archive / Date / Client Name / report.pdf</code>
+        </div>
+        <label id="folder-picker-label" style="display:flex;flex-direction:column;align-items:center;justify-content:center;gap:12px;padding:36px;border:2px dashed var(--border2);border-radius:10px;cursor:pointer;transition:border-color 0.15s;" onmouseover="this.style.borderColor='var(--blue)'" onmouseout="this.style.borderColor='var(--border2)'">
+          <span style="font-size:36px;">📁</span>
+          <span style="font-size:14px;font-weight:600;color:var(--text);">Click to select archive folder</span>
+          <span style="font-size:12px;color:var(--muted2);">or drag & drop your folder here</span>
+          <input type="file" id="folder-input" webkitdirectory multiple accept=".pdf" style="display:none;" onchange="onFolderSelected(this.files)">
+        </label>
+        <div id="import-scan-status" style="margin-top:14px;font-size:13px;color:var(--muted2);display:none;"></div>
+      </div>
+
+      <!-- Preview -->
+      <div id="import-preview" style="display:none;max-width:640px;">
+        <div class="card">
+          <div class="card-title">Ready to Import</div>
+          <div id="import-preview-summary" style="margin-bottom:16px;"></div>
+          <div id="import-preview-list" style="max-height:300px;overflow-y:auto;margin-bottom:16px;"></div>
+          <div style="display:flex;gap:10px;">
+            <button class="btn btn-blue" onclick="startImport()" id="import-start-btn">▶ Start Import</button>
+            <button class="btn" style="background:var(--surface2);color:var(--muted2);border:1px solid var(--border2);" onclick="resetImport()">Reset</button>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Step 2: Processing -->
+    <div id="import-step-2" style="display:none;max-width:640px;">
+      <div class="card">
+        <div class="card-title">Importing…</div>
+        <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:10px;">
+          <div id="import-progress-label" style="font-size:13px;color:var(--muted2);">Starting…</div>
+          <div id="import-progress-count" style="font-family:'Bebas Neue',sans-serif;font-size:20px;color:var(--blue);letter-spacing:1px;">0 / 0</div>
+        </div>
+        <div style="height:8px;background:var(--surface3);border-radius:4px;overflow:hidden;margin-bottom:20px;">
+          <div id="import-progress-bar" style="height:100%;background:var(--blue);border-radius:4px;transition:width 0.3s ease;width:0%"></div>
+        </div>
+        <div id="import-log" style="max-height:360px;overflow-y:auto;display:flex;flex-direction:column;gap:4px;"></div>
+      </div>
+    </div>
+
+    <!-- Step 3: Results -->
+    <div id="import-step-3" style="display:none;max-width:640px;">
+      <div class="card" style="margin-bottom:16px;">
+        <div class="card-title">Import Complete</div>
+        <div id="import-summary" style="margin-bottom:16px;"></div>
+        <button class="btn btn-blue" onclick="resetImport()">↩ Import Another Folder</button>
+      </div>
+      <div id="import-flagged-section" style="display:none;">
+        <div class="card">
+          <div class="card-title" style="color:var(--orange);">⚠ Unmatched Clients — Add Email to Activate</div>
+          <div style="font-size:13px;color:var(--muted2);margin-bottom:16px;line-height:1.6;">
+            These clients were created from folder names but have no email address. Their scan data is saved.
+            Add their email and click Send Invite to activate their account.
+          </div>
+          <div id="import-flagged-list"></div>
+        </div>
+      </div>
+    </div>
+  </div>
 
 </main>
 </div>
@@ -1470,6 +1544,272 @@ async function autofillRMR(input) {
 
 function signOut() {
   sb.auth.signOut().then(() => { window.location.href = 'index.html'; });
+}
+
+/* ══════════════════════════
+   BULK IMPORT
+══════════════════════════ */
+let importQueue = [];     // { file, date, clientName, clientId, status }
+let importProfiles = [];  // cached profiles for name matching
+let importGhosts = [];    // ghost profiles created during import
+
+function normName(s) {
+  return s.toLowerCase().replace(/[^a-z\s]/g, '').replace(/\s+/g, ' ').trim();
+}
+
+function parseImportDate(raw) {
+  // Try common formats: YYYY-MM-DD, DD-MM-YYYY, DD/MM/YYYY, YYYYMMDD
+  const s = raw.trim();
+  let d;
+  d = s.match(/^(\d{4})[-_](\d{2})[-_](\d{2})$/);
+  if (d) return `${d[1]}-${d[2]}-${d[3]}`;
+  d = s.match(/^(\d{2})[-\/](\d{2})[-\/](\d{4})$/);
+  if (d) return `${d[3]}-${d[2]}-${d[1]}`;
+  d = s.match(/^(\d{8})$/);
+  if (d) return `${s.slice(0,4)}-${s.slice(4,6)}-${s.slice(6,8)}`;
+  // Month name: e.g. "March 2024" or "2024 March"
+  const months = { jan:1,feb:2,mar:3,apr:4,may:5,jun:6,jul:7,aug:8,sep:9,oct:10,nov:11,dec:12 };
+  d = s.toLowerCase().match(/([a-z]+)\s+(\d{4})/);
+  if (d && months[d[1].slice(0,3)]) return `${d[2]}-${String(months[d[1].slice(0,3)]).padStart(2,'0')}-01`;
+  d = s.toLowerCase().match(/(\d{4})\s+([a-z]+)/);
+  if (d && months[d[2].slice(0,3)]) return `${d[1]}-${String(months[d[2].slice(0,3)]).padStart(2,'0')}-01`;
+  return null;
+}
+
+function onFolderSelected(files) {
+  const pdfs = Array.from(files).filter(f => f.name.toLowerCase().endsWith('.pdf'));
+  const statusEl = document.getElementById('import-scan-status');
+
+  if (!pdfs.length) {
+    statusEl.style.display = 'block';
+    statusEl.textContent = 'No PDF files found in the selected folder.';
+    return;
+  }
+
+  statusEl.style.display = 'block';
+  statusEl.textContent = `Found ${pdfs.length} PDF files — analysing structure…`;
+
+  // Parse paths: TopFolder/Date/ClientName/file.pdf
+  importQueue = pdfs.map(f => {
+    const parts = f.webkitRelativePath.split('/');
+    // Expect at least 4 parts: root / date / client / file
+    const date       = parts.length >= 4 ? parseImportDate(parts[parts.length - 3]) || parts[parts.length - 3] : null;
+    const clientName = parts.length >= 3 ? parts[parts.length - 2] : 'Unknown';
+    return { file: f, date, clientName: clientName.trim(), clientId: null, status: 'pending', error: null };
+  });
+
+  // Group by client for preview
+  const byClient = {};
+  importQueue.forEach(item => {
+    if (!byClient[item.clientName]) byClient[item.clientName] = [];
+    byClient[item.clientName].push(item);
+  });
+
+  const clientCount = Object.keys(byClient).length;
+  document.getElementById('import-preview-summary').innerHTML = `
+    <div style="display:grid;grid-template-columns:repeat(3,1fr);gap:12px;margin-bottom:4px;">
+      <div style="background:var(--surface2);border-radius:8px;padding:12px;text-align:center;">
+        <div style="font-family:'Bebas Neue',sans-serif;font-size:28px;color:var(--blue)">${pdfs.length}</div>
+        <div style="font-size:11px;color:var(--muted2);">PDFs</div>
+      </div>
+      <div style="background:var(--surface2);border-radius:8px;padding:12px;text-align:center;">
+        <div style="font-family:'Bebas Neue',sans-serif;font-size:28px;color:var(--gold)">${clientCount}</div>
+        <div style="font-size:11px;color:var(--muted2);">Clients</div>
+      </div>
+      <div style="background:var(--surface2);border-radius:8px;padding:12px;text-align:center;">
+        <div style="font-family:'Bebas Neue',sans-serif;font-size:28px;color:var(--orange)">~$${(pdfs.length * 0.04).toFixed(0)}</div>
+        <div style="font-size:11px;color:var(--muted2);">Est. API Cost</div>
+      </div>
+    </div>`;
+
+  const listEl = document.getElementById('import-preview-list');
+  listEl.innerHTML = Object.entries(byClient).map(([name, items]) =>
+    `<div style="display:flex;justify-content:space-between;align-items:center;padding:7px 0;border-bottom:1px solid var(--border);font-size:13px;">
+      <span style="color:var(--text)">${name}</span>
+      <span style="color:var(--muted2)">${items.length} PDF${items.length > 1 ? 's' : ''}</span>
+    </div>`).join('');
+
+  document.getElementById('import-preview').style.display = 'block';
+  statusEl.style.display = 'none';
+}
+
+async function startImport() {
+  document.getElementById('import-step-1').style.display = 'none';
+  document.getElementById('import-step-2').style.display = 'block';
+
+  const logEl = document.getElementById('import-log');
+  const barEl = document.getElementById('import-progress-bar');
+  const countEl = document.getElementById('import-progress-count');
+  const labelEl = document.getElementById('import-progress-label');
+
+  const total = importQueue.length;
+  let done = 0, success = 0, failed = 0;
+  importGhosts = [];
+
+  // Load all existing profiles once for name matching
+  const { data: profiles } = await sb.from('profiles').select('id, full_name').eq('is_staff', false);
+  importProfiles = profiles || [];
+
+  function addLog(msg, color = 'var(--muted2)') {
+    const el = document.createElement('div');
+    el.style.cssText = `font-size:12px;padding:3px 6px;border-radius:4px;color:${color};font-family:'Outfit',sans-serif;`;
+    el.textContent = msg;
+    logEl.appendChild(el);
+    logEl.scrollTop = logEl.scrollHeight;
+  }
+
+  for (const item of importQueue) {
+    labelEl.textContent = `Processing: ${item.clientName} — ${item.file.name}`;
+    countEl.textContent = `${done} / ${total}`;
+    barEl.style.width = `${(done / total) * 100}%`;
+
+    try {
+      // Match to existing profile
+      let clientId = null;
+      const normTarget = normName(item.clientName);
+      const match = importProfiles.find(p => normName(p.full_name) === normTarget);
+
+      if (match) {
+        clientId = match.id;
+      } else {
+        // Check if we already created a ghost for this name this session
+        const existing = importGhosts.find(g => normName(g.name) === normTarget);
+        if (existing) {
+          clientId = existing.id;
+        } else {
+          // Create ghost profile
+          const nameParts = item.clientName.trim().split(/\s+/);
+          const firstName = nameParts[0] || item.clientName;
+          const lastName  = nameParts.slice(1).join(' ') || 'Unknown';
+          const res = await fetch(`${SUPABASE_URL}/functions/v1/import-client`, {
+            method: 'POST',
+            headers: { 'Authorization': `Bearer ${SUPABASE_KEY}`, 'Content-Type': 'application/json' },
+            body: JSON.stringify({ firstName, lastName }),
+          });
+          const ghost = await res.json();
+          if (ghost.error) throw new Error('Profile create: ' + ghost.error);
+          clientId = ghost.id;
+          importGhosts.push({ id: ghost.id, name: item.clientName, firstName, lastName });
+          importProfiles.push({ id: ghost.id, full_name: item.clientName });
+          addLog(`  Created ghost profile: ${item.clientName}`, 'var(--orange)');
+        }
+      }
+
+      item.clientId = clientId;
+
+      // Convert PDF to base64
+      const arrayBuf = await item.file.arrayBuffer();
+      const bytes = new Uint8Array(arrayBuf);
+      let binary = '';
+      for (let i = 0; i < bytes.byteLength; i++) binary += String.fromCharCode(bytes[i]);
+      const pdfBase64 = btoa(binary);
+
+      // Call parse-pdf edge function
+      const parseRes = await fetch(`${SUPABASE_URL}/functions/v1/parse-pdf`, {
+        method: 'POST',
+        headers: { 'Authorization': `Bearer ${SUPABASE_KEY}`, 'Content-Type': 'application/json' },
+        body: JSON.stringify({ pdfBase64, clientId }),
+      });
+      const parseResult = await parseRes.json();
+      if (parseResult.error) throw new Error(parseResult.error);
+
+      item.status = 'success';
+      success++;
+      addLog(`✓ ${item.clientName} — ${item.file.name} (${parseResult.type || 'saved'})`, 'var(--green)');
+
+    } catch (err) {
+      item.status = 'failed';
+      item.error = err.message;
+      failed++;
+      addLog(`✗ ${item.clientName} — ${item.file.name}: ${err.message}`, 'var(--red)');
+    }
+
+    done++;
+    countEl.textContent = `${done} / ${total}`;
+    barEl.style.width = `${(done / total) * 100}%`;
+  }
+
+  labelEl.textContent = 'Complete!';
+  barEl.style.background = 'var(--green)';
+
+  // Show results
+  document.getElementById('import-step-2').style.display = 'none';
+  document.getElementById('import-step-3').style.display = 'block';
+
+  document.getElementById('import-summary').innerHTML = `
+    <div style="display:grid;grid-template-columns:repeat(3,1fr);gap:12px;margin-bottom:4px;">
+      <div style="background:var(--surface2);border-radius:8px;padding:12px;text-align:center;">
+        <div style="font-family:'Bebas Neue',sans-serif;font-size:28px;color:var(--green)">${success}</div>
+        <div style="font-size:11px;color:var(--muted2);">Imported</div>
+      </div>
+      <div style="background:var(--surface2);border-radius:8px;padding:12px;text-align:center;">
+        <div style="font-family:'Bebas Neue',sans-serif;font-size:28px;color:var(--red)">${failed}</div>
+        <div style="font-size:11px;color:var(--muted2);">Failed</div>
+      </div>
+      <div style="background:var(--surface2);border-radius:8px;padding:12px;text-align:center;">
+        <div style="font-family:'Bebas Neue',sans-serif;font-size:28px;color:var(--orange)">${importGhosts.length}</div>
+        <div style="font-size:11px;color:var(--muted2);">Need Email</div>
+      </div>
+    </div>
+    ${failed > 0 ? `<div style="margin-top:10px;font-size:12px;color:var(--muted2);">Failed PDFs: ${importQueue.filter(i=>i.status==='failed').map(i=>`${i.clientName}/${i.file.name}`).join(', ')}</div>` : ''}`;
+
+  // Render ghost clients that need emails
+  if (importGhosts.length > 0) {
+    document.getElementById('import-flagged-section').style.display = 'block';
+    document.getElementById('import-flagged-list').innerHTML = importGhosts.map(g => `
+      <div id="ghost-row-${g.id}" style="display:flex;align-items:center;gap:10px;padding:10px 0;border-bottom:1px solid var(--border);flex-wrap:wrap;">
+        <div style="min-width:150px;font-size:13px;font-weight:600;color:var(--text);">${g.name}</div>
+        <input type="email" placeholder="their@email.com" id="ghost-email-${g.id}"
+          style="flex:1;min-width:180px;background:var(--surface2);border:1px solid var(--border2);border-radius:6px;padding:7px 10px;color:var(--text);font-family:'Outfit',sans-serif;font-size:13px;outline:none;">
+        <button class="btn btn-blue" style="padding:7px 14px;font-size:12px;" onclick="activateGhost('${g.id}','${g.firstName}','${g.lastName}')">Send Invite</button>
+        <span id="ghost-status-${g.id}" style="font-size:12px;color:var(--muted2);"></span>
+      </div>`).join('');
+  }
+}
+
+async function activateGhost(id, firstName, lastName) {
+  const emailEl = document.getElementById(`ghost-email-${id}`);
+  const statusEl = document.getElementById(`ghost-status-${id}`);
+  const email = emailEl.value.trim();
+  if (!email) { statusEl.textContent = 'Enter an email first.'; statusEl.style.color = 'var(--red)'; return; }
+
+  statusEl.textContent = 'Sending…';
+  statusEl.style.color = 'var(--muted2)';
+  emailEl.disabled = true;
+
+  try {
+    // Update auth user email via create-client (will send invite)
+    const res = await fetch(`${SUPABASE_URL}/functions/v1/create-client`, {
+      method: 'POST',
+      headers: { 'Authorization': `Bearer ${SUPABASE_KEY}`, 'Content-Type': 'application/json' },
+      body: JSON.stringify({ email, firstName, lastName, existingId: id }),
+    });
+    const result = await res.json();
+    if (result.error) throw new Error(result.error);
+
+    statusEl.textContent = '✅ Invite sent';
+    statusEl.style.color = 'var(--green)';
+    document.getElementById(`ghost-row-${id}`).style.opacity = '0.5';
+  } catch (err) {
+    statusEl.textContent = '✗ ' + err.message;
+    statusEl.style.color = 'var(--red)';
+    emailEl.disabled = false;
+  }
+}
+
+function resetImport() {
+  importQueue = [];
+  importGhosts = [];
+  document.getElementById('folder-input').value = '';
+  document.getElementById('import-preview').style.display = 'none';
+  document.getElementById('import-scan-status').style.display = 'none';
+  document.getElementById('import-step-1').style.display = 'block';
+  document.getElementById('import-step-2').style.display = 'none';
+  document.getElementById('import-step-3').style.display = 'none';
+  document.getElementById('import-flagged-section').style.display = 'none';
+  document.getElementById('import-log').innerHTML = '';
+  document.getElementById('import-progress-bar').style.width = '0%';
+  document.getElementById('import-progress-bar').style.background = 'var(--blue)';
 }
 
 init();
