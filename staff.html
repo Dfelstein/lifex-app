@@ -1656,9 +1656,12 @@ async function startImport() {
   let done = 0, success = 0, failed = 0;
   importGhosts = [];
 
-  // Load all existing profiles once for name matching
-  const { data: profiles } = await sb.from('profiles').select('id, full_name').eq('is_staff', false);
-  importProfiles = profiles || [];
+  // Load all existing profiles via service role (bypasses RLS)
+  const profilesRes = await fetch(`${SUPABASE_URL}/functions/v1/list-profiles`, {
+    headers: { 'Authorization': `Bearer ${SUPABASE_KEY}` }
+  });
+  const profilesData = await profilesRes.json();
+  importProfiles = profilesData.profiles || [];
 
   function addLog(msg, color = 'var(--muted2)') {
     const el = document.createElement('div');
