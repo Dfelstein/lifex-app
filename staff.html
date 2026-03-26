@@ -377,7 +377,7 @@ html, body { height: 100%; background: var(--bg); color: var(--text); font-famil
           <span style="font-size:36px;">📁</span>
           <span style="font-size:14px;font-weight:600;color:var(--text);">Click to select archive folder</span>
           <span style="font-size:12px;color:var(--muted2);">or drag & drop your folder here</span>
-          <input type="file" id="folder-input" webkitdirectory multiple accept=".pdf" style="display:none;" onchange="onFolderSelected(this.files)">
+          <input type="file" id="folder-input" webkitdirectory multiple style="display:none;" onchange="onFolderSelected(this.files)">
         </label>
         <div id="import-scan-status" style="margin-top:14px;font-size:13px;color:var(--muted2);display:none;"></div>
       </div>
@@ -1558,26 +1558,36 @@ function normName(s) {
 }
 
 function parseImportDate(raw) {
-  // Try common formats: YYYY-MM-DD, DD-MM-YYYY, DD/MM/YYYY, YYYYMMDD
   const s = raw.trim();
+  const months = { jan:1,feb:2,mar:3,apr:4,may:5,jun:6,jul:7,aug:8,sep:9,oct:10,nov:11,dec:12 };
+  const m = (name) => months[name.toLowerCase().slice(0,3)];
+  const yr = (y) => y.length === 2 ? '20' + y : y;
   let d;
+  // "26 March 26" or "26 March 2026"
+  d = s.match(/^(\d{1,2})\s+([a-zA-Z]+)\s+(\d{2,4})$/);
+  if (d && m(d[2])) return `${yr(d[3])}-${String(m(d[2])).padStart(2,'0')}-${String(d[1]).padStart(2,'0')}`;
+  // YYYY-MM-DD
   d = s.match(/^(\d{4})[-_](\d{2})[-_](\d{2})$/);
   if (d) return `${d[1]}-${d[2]}-${d[3]}`;
+  // DD-MM-YYYY or DD/MM/YYYY
   d = s.match(/^(\d{2})[-\/](\d{2})[-\/](\d{4})$/);
   if (d) return `${d[3]}-${d[2]}-${d[1]}`;
+  // YYYYMMDD
   d = s.match(/^(\d{8})$/);
   if (d) return `${s.slice(0,4)}-${s.slice(4,6)}-${s.slice(6,8)}`;
-  // Month name: e.g. "March 2024" or "2024 March"
-  const months = { jan:1,feb:2,mar:3,apr:4,may:5,jun:6,jul:7,aug:8,sep:9,oct:10,nov:11,dec:12 };
+  // "March 2024" or "2024 March"
   d = s.toLowerCase().match(/([a-z]+)\s+(\d{4})/);
-  if (d && months[d[1].slice(0,3)]) return `${d[2]}-${String(months[d[1].slice(0,3)]).padStart(2,'0')}-01`;
+  if (d && m(d[1])) return `${d[2]}-${String(m(d[1])).padStart(2,'0')}-01`;
   d = s.toLowerCase().match(/(\d{4})\s+([a-z]+)/);
-  if (d && months[d[2].slice(0,3)]) return `${d[1]}-${String(months[d[2].slice(0,3)]).padStart(2,'0')}-01`;
+  if (d && m(d[2])) return `${d[1]}-${String(m(d[2])).padStart(2,'0')}-01`;
   return null;
 }
 
 function onFolderSelected(files) {
-  const pdfs = Array.from(files).filter(f => f.name.toLowerCase().endsWith('.pdf'));
+  const pdfs = Array.from(files).filter(f => {
+    const n = f.name.toLowerCase();
+    return n.endsWith('.pdf') || f.type === 'application/pdf' || n === 'report' || n === 'report.pdf';
+  });
   const statusEl = document.getElementById('import-scan-status');
 
   if (!pdfs.length) {
