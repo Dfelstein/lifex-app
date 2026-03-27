@@ -67,9 +67,12 @@ First, identify the scan type: DEXA, BLOOD, HORMONES, or RMR.
 Then extract all relevant data and return ONLY a valid JSON object with this structure:
 
 For DEXA:
-{"type":"DEXA","scan_date":"YYYY-MM-DD","scan_number":1,"patient_age":0,"sex":"male","height_cm":0.0,"weight_kg":0.0,"fat_pct":0.0,"fat_g":0,"lean_g":0,"total_g":0,"bmd":0.0,"t_score":0.0,"z_score":0.0,"pr_pct":0.0,"vat_g":0,"android_fat_pct":0.0,"gynoid_fat_pct":0.0,"ag_ratio":0.0}
+{"type":"DEXA","scan_date":"YYYY-MM-DD","scan_number":1,"dob":"YYYY-MM-DD","patient_age":0,"sex":"male","height_cm":0.0,"weight_kg":0.0,"fat_pct":0.0,"fat_g":0,"lean_g":0,"total_g":0,"bmd":0.0,"t_score":0.0,"z_score":0.0,"pr_pct":0.0,"vat_g":0,"vat_area_cm2":0.0,"android_fat_pct":0.0,"gynoid_fat_pct":0.0,"ag_ratio":0.0,"trunk_fat_pct":0.0,"ffmi":0.0,"almi":0.0,"fmi":0.0}
 
-Extract patient_age (integer years), sex ("male" or "female"), height_cm (numeric), weight_kg (numeric) from the patient info header at the top of the DEXA report.
+Extract from the patient info header: patient_age (integer years), sex ("male" or "female"), height_cm (numeric), weight_kg (numeric), dob (date of birth as YYYY-MM-DD).
+Extract from Adipose Indices: fmi = "Fat Mass/Height²", vat_area_cm2 = "Est. VAT Area (cm²)".
+Extract from Lean Indices: ffmi = "Lean/Height²", almi = "Appen. Lean/Height²".
+Extract trunk_fat_pct from the Trunk row % Fat in the Body Composition Results table.
 
 For RMR:
 {"type":"RMR","test_date":"YYYY-MM-DD","kcal":0,"kj":0,"fat_pct":0.0,"glucose_pct":0.0,"feo2":0.0,"pop_min":0,"pop_max":0}
@@ -116,10 +119,11 @@ Return ONLY the JSON, no other text.`,
     const scanType = parsed.type;
 
     if (scanType === 'DEXA') {
-      const { error } = await sb.from('dexa_scans').insert({
+      const { error } = await sb.from('dexa_scans').upsert({
         client_id: clientId,
         scan_date: parsed.scan_date,
         scan_number: parsed.scan_number,
+        dob: parsed.dob || null,
         patient_age: parsed.patient_age || null,
         sex: parsed.sex || null,
         height_cm: toNum(parsed.height_cm),
@@ -133,10 +137,15 @@ Return ONLY the JSON, no other text.`,
         z_score: parsed.z_score,
         pr_pct: parsed.pr_pct,
         vat_g: parsed.vat_g,
+        vat_area_cm2: toNum(parsed.vat_area_cm2),
         android_fat_pct: parsed.android_fat_pct,
         gynoid_fat_pct: parsed.gynoid_fat_pct,
         ag_ratio: parsed.ag_ratio,
-      });
+        trunk_fat_pct: toNum(parsed.trunk_fat_pct),
+        ffmi: toNum(parsed.ffmi),
+        almi: toNum(parsed.almi),
+        fmi: toNum(parsed.fmi),
+      }, { onConflict: 'client_id,scan_date' });
       if (error) return cors(JSON.stringify({ error: error.message }), 500);
 
     } else if (scanType === 'RMR') {

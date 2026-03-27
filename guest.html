@@ -408,7 +408,7 @@ body { background: var(--bg); color: var(--text); font-family: 'Outfit', sans-se
 // ── State ──
 let sex = null;
 let gAge, gWeight, gHeight, gWaist;
-let gBF, gLeanKg, gFatKg, gBMI, gRMR, gFMI, gScore;
+let gBF, gLeanKg, gFatKg, gBMI, gRMR, gFMI, gFFMI, gScore;
 let gScanStats = null; // real stats from get-scan-stats edge function
 
 function selectSex(s) {
@@ -489,6 +489,7 @@ function calculateEstimate() {
   gFatKg  = parseFloat((gWeight * gBF / 100).toFixed(1));
   gLeanKg = parseFloat((gWeight - gFatKg).toFixed(1));
   gFMI    = parseFloat((gFatKg / (hM * hM)).toFixed(1));
+  gFFMI   = parseFloat((gLeanKg / (hM * hM)).toFixed(1));
 
   // Mifflin-St Jeor RMR
   gRMR = Math.round((10 * gWeight) + (6.25 * gHeight) - (5 * gAge) + (sex === 'male' ? 5 : -161));
@@ -504,7 +505,7 @@ function calculateEstimate() {
   document.getElementById('app').style.display = 'block';
 
   // Fetch real scan stats, fall back to hardcoded if insufficient data
-  const statsUrl = `https://shvpwgrjqskccsdzajkj.supabase.co/functions/v1/get-scan-stats?sex=${sex}&age=${gAge}&value=${gBF}`;
+  const statsUrl = `https://shvpwgrjqskccsdzajkj.supabase.co/functions/v1/get-scan-stats?sex=${sex}&age=${gAge}&value=${gBF}&ffmi=${gFFMI}`;
   fetch(statsUrl, { headers: { 'Authorization': 'Bearer eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InNodnB3Z3JqcXNrY2NzZHphamtqIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzM5MDUzNTIsImV4cCI6MjA4OTQ4MTM1Mn0.2dL3J9XbzU8q8ogPPqhwR4w7_vSB0FxVKMzsAOxCgk4' } })
     .then(r => r.json())
     .then(stats => {
@@ -926,11 +927,19 @@ function renderCompare() {
   const top25BF = isMale ? [13,16,19,21][ageGroup] : [22,24,27,29][ageGroup];
   const avgFMI  = isMale ? [5.5,7.0,8.2,8.8][ageGroup] : [8.0,9.0,10.5,11.5][ageGroup];
   const top25FMI = isMale ? [3.8,5.0,6.0,6.5][ageGroup] : [5.5,6.5,7.5,8.5][ageGroup];
-  const hM = gHeight / 100;
-  const avgLeanKg  = Math.round((1 - avgBF/100) * (isMale ? 80 : 65));
-  const top25LeanKg = Math.round((1 - top25BF/100) * (isMale ? 85 : 68));
   const avgRMR  = isMale ? 1750 : 1450;
   const top25RMR = isMale ? 1900 : 1580;
+
+  // FFMI reference values — use real scan data if available, else population norms
+  let avgFFMI, top25FFMI, ffmiStronger = null;
+  if (gScanStats && gScanStats.ffmi && gScanStats.ffmi.count >= 3) {
+    avgFFMI    = gScanStats.ffmi.mean;
+    top25FFMI  = gScanStats.ffmi.top25;
+    ffmiStronger = gScanStats.ffmi.stronger;
+  } else {
+    avgFFMI   = isMale ? [18.5,18.0,17.5,17.0][ageGroup] : [14.5,14.0,13.5,13.0][ageGroup];
+    top25FFMI = isMale ? [20.5,20.0,19.5,19.0][ageGroup] : [16.5,16.0,15.5,15.0][ageGroup];
+  }
 
   document.getElementById('compare-content').innerHTML = `
     <div class="page-header">
@@ -971,9 +980,10 @@ function renderCompare() {
       <div class="card-title">You vs Average vs Top 25% &nbsp;<span style="font-size:10px;color:var(--muted);font-weight:400;">${isMale ? 'Male' : 'Female'}, age ${gAge}</span></div>
       ${compBar('Body Fat %', gBF, avgBF, top25BF, '%', true)}
       ${compBar('Fat Mass Index (kg/m²)', gFMI, avgFMI, top25FMI, '', true)}
-      ${compBar('Lean Mass', gLeanKg, avgLeanKg, top25LeanKg, ' kg', false)}
+      ${compBar('Muscle Mass Index (FFMI)', gFFMI, avgFFMI, top25FFMI, ' kg/m²', false)}
       ${compBar('Estimated RMR', gRMR, avgRMR, top25RMR, ' kcal', false)}
-      <div style="font-size:11px;color:var(--muted);margin-top:4px;">Green = better. All values estimated — actual measurements may differ.</div>
+      ${ffmiStronger !== null ? `<div style="margin-top:8px;padding:10px 12px;background:rgba(57,224,122,0.06);border:1px solid rgba(57,224,122,0.2);border-radius:8px;font-size:12px;color:var(--muted2);">Your estimated muscle index of <strong style="color:var(--text)">${gFFMI} kg/m²</strong> is higher than <strong style="color:var(--teal)">${ffmiStronger}% of ${isMale ? 'men' : 'women'} your age</strong> in our scan database.</div>` : ''}
+      <div style="font-size:11px;color:var(--muted);margin-top:6px;">Green = better. FFMI = lean mass ÷ height². All values estimated — actual measurements will differ.</div>
     </div>
 
     <!-- Locked Metrics -->
@@ -984,12 +994,12 @@ function renderCompare() {
         They're the difference between a guess and clinical knowledge.
       </div>
       <div class="locked-grid">
-        ${lockedTile('🫀', 'Visceral Fat (VAT)', '145', 'cm²')}
+        ${lockedTile('🫀', 'Visceral Fat Area', '79', 'cm²')}
         ${lockedTile('🦴', 'Bone Density T-Score', '-0.4', '')}
-        ${lockedTile('📊', 'Android Fat %', '28.4', '%')}
-        ${lockedTile('📊', 'Gynoid Fat %', '31.2', '%')}
-        ${lockedTile('⚖️', 'A:G Ratio', '0.91', '')}
-        ${lockedTile('🏋️', 'Lean Mass Index', '18.6', 'kg/m²')}
+        ${lockedTile('📊', 'Trunk Fat %', '21.3', '%')}
+        ${lockedTile('📊', 'Android Fat %', '24.1', '%')}
+        ${lockedTile('⚖️', 'A:G Ratio', '0.87', '')}
+        ${lockedTile('🏋️', 'Appendicular LMI', '9.1', 'kg/m²')}
       </div>
       <div style="text-align:center;margin-top:6px;">
         <a href="https://lifexclinic.square.site" target="_blank" class="btn btn-gold" style="font-size:15px;padding:13px 32px;">
