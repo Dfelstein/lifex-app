@@ -947,7 +947,9 @@ async function viewClientProfile(clientId, firstName, lastName) {
 
     // ── DEXA ──
     if (dexa) {
-      const vatStatus = dexa.vat_g != null ? (dexa.vat_g < 100 ? {c:'green',t:'Normal (<100g)'} : dexa.vat_g < 160 ? {c:'gold',t:'Increased Risk'} : {c:'red',t:'High Risk'}) : null;
+      const vatVal = dexa.vat_area_cm2 != null ? dexa.vat_area_cm2 : (dexa.vat_g != null ? dexa.vat_g : null);
+      const vatUnit = dexa.vat_area_cm2 != null ? 'cm²' : 'g';
+      const vatStatus = vatVal != null ? (vatVal < 100 ? {c:'green',t:'Normal (<100 cm²)'} : vatVal < 160 ? {c:'gold',t:'Increased Risk'} : {c:'red',t:'High Risk'}) : null;
       const agStatus = dexa.ag_ratio != null ? (dexa.ag_ratio < 1 ? {c:'green',t:'Pear shape — lower CVD risk'} : {c:'red',t:'Apple shape — higher CVD risk'}) : null;
       const tStatus = dexa.t_score != null ? (dexa.t_score >= -1 ? {c:'green',t:'Normal'} : dexa.t_score >= -2.5 ? {c:'gold',t:'Osteopenia'} : {c:'red',t:'Osteoporosis'}) : null;
       html += `<div class="card" style="margin-bottom:20px;">
@@ -959,7 +961,11 @@ async function viewClientProfile(clientId, firstName, lastName) {
           ${dexa.total_g != null ? `<div class="stat-chip blue"><div class="stat-chip-label">Total Mass</div><div class="stat-chip-value">${(dexa.total_g/1000).toFixed(1)}<span class="stat-chip-unit">kg</span></div></div>` : ''}
           ${dexa.bmd != null ? `<div class="stat-chip gold"><div class="stat-chip-label">Bone Density</div><div class="stat-chip-value">${dexa.bmd}<span class="stat-chip-unit">g/cm²</span></div></div>` : ''}
           ${tStatus ? `<div class="stat-chip ${tStatus.c}"><div class="stat-chip-label">T-Score</div><div class="stat-chip-value">${dexa.t_score}</div><div class="stat-chip-unit">${tStatus.t}</div></div>` : ''}
-          ${vatStatus ? `<div class="stat-chip ${vatStatus.c}"><div class="stat-chip-label">VAT</div><div class="stat-chip-value">${dexa.vat_g}<span class="stat-chip-unit">g</span></div><div class="stat-chip-unit">${vatStatus.t}</div></div>` : ''}
+          ${vatStatus ? `<div class="stat-chip ${vatStatus.c}"><div class="stat-chip-label">VAT Area</div><div class="stat-chip-value">${vatVal}<span class="stat-chip-unit">${vatUnit}</span></div><div class="stat-chip-unit">${vatStatus.t}</div></div>` : ''}
+          ${dexa.trunk_fat_pct != null ? `<div class="stat-chip orange"><div class="stat-chip-label">Trunk Fat</div><div class="stat-chip-value">${dexa.trunk_fat_pct}<span class="stat-chip-unit">%</span></div></div>` : ''}
+          ${dexa.ffmi != null ? `<div class="stat-chip green"><div class="stat-chip-label">FFMI</div><div class="stat-chip-value">${dexa.ffmi}<span class="stat-chip-unit">kg/m²</span></div></div>` : ''}
+          ${dexa.almi != null ? `<div class="stat-chip blue"><div class="stat-chip-label">ALMI</div><div class="stat-chip-value">${dexa.almi}<span class="stat-chip-unit">kg/m²</span></div></div>` : ''}
+          ${dexa.fmi != null ? `<div class="stat-chip red"><div class="stat-chip-label">FMI</div><div class="stat-chip-value">${dexa.fmi}<span class="stat-chip-unit">kg/m²</span></div></div>` : ''}
           ${agStatus ? `<div class="stat-chip ${agStatus.c}"><div class="stat-chip-label">A:G Ratio</div><div class="stat-chip-value">${dexa.ag_ratio}</div><div class="stat-chip-unit">${agStatus.t}</div></div>` : ''}
           ${dexa.android_fat_pct != null ? `<div class="stat-chip orange"><div class="stat-chip-label">Android Fat</div><div class="stat-chip-value">${dexa.android_fat_pct}<span class="stat-chip-unit">%</span></div></div>` : ''}
           ${dexa.gynoid_fat_pct != null ? `<div class="stat-chip blue"><div class="stat-chip-label">Gynoid Fat</div><div class="stat-chip-value">${dexa.gynoid_fat_pct}<span class="stat-chip-unit">%</span></div></div>` : ''}
@@ -1235,10 +1241,15 @@ async function saveDEXA() {
     lean_g:  val('dexa-lean-g'),  total_g: val('dexa-total-g'),
     bmd:     val('dexa-bmd'),     t_score: val('dexa-tscore'),
     z_score: val('dexa-zscore'),  pr_pct:  val('dexa-pr'),
-    vat_g:   val('dexa-vat'),
+    vat_g:        val('dexa-vat'),
+    vat_area_cm2: val('dexa-vat-area'),
     android_fat_pct: val('dexa-android'),
     gynoid_fat_pct:  val('dexa-gynoid'),
-    ag_ratio: val('dexa-ag'),
+    ag_ratio:     val('dexa-ag'),
+    trunk_fat_pct: val('dexa-trunk-fat'),
+    ffmi:         val('dexa-ffmi'),
+    almi:         val('dexa-almi'),
+    fmi:          val('dexa-fmi'),
   });
 
   btn.disabled=false; btn.textContent='💾 Save DEXA Scan';
@@ -1434,8 +1445,9 @@ async function saveRMR() {
 async function parseScanFile(file, type) {
   const prompts = {
     dexa: `Extract DEXA scan data from this report. Return ONLY valid JSON with these exact keys (use null for any missing values):
-{"scan_date":"YYYY-MM-DD","fat_pct":null,"fat_g":null,"lean_g":null,"total_g":null,"bmd":null,"t_score":null,"z_score":null,"pr_pct":null,"vat_g":null,"android_fat_pct":null,"gynoid_fat_pct":null,"ag_ratio":null}
-fat_g, lean_g, total_g, vat_g should be in grams as integers. fat_pct as a decimal like 22.4.`,
+{"scan_date":"YYYY-MM-DD","fat_pct":null,"fat_g":null,"lean_g":null,"total_g":null,"bmd":null,"t_score":null,"z_score":null,"pr_pct":null,"vat_g":null,"vat_area_cm2":null,"android_fat_pct":null,"gynoid_fat_pct":null,"ag_ratio":null,"trunk_fat_pct":null,"ffmi":null,"almi":null,"fmi":null}
+fat_g, lean_g, total_g, vat_g in grams as integers. fat_pct as decimal like 22.4.
+vat_area_cm2 = "Est. VAT Area (cm²)" from Adipose Indices. ffmi = "Lean/Height²", almi = "Appen. Lean/Height²" from Lean Indices. fmi = "Fat Mass/Height²" from Adipose Indices. trunk_fat_pct = Trunk row % Fat from Body Composition table.`,
 
     blood: `Extract all blood test markers from this pathology report. Return ONLY valid JSON:
 {"panel_date":"YYYY-MM-DD","lab_name":"","markers":[{"category":"Inflammation","name":"hsCRP","value":0.75,"unit":"mg/L","ref_min":0,"ref_max":5,"display_min":0,"display_max":10,"status":"optimal"}]}
@@ -1494,8 +1506,12 @@ async function autofillDEXA(input) {
     setVal('dexa-date', d.scan_date);
     setVal('dexa-fat-pct', d.fat_pct); setVal('dexa-fat-g', d.fat_g);
     setVal('dexa-lean-g', d.lean_g);   setVal('dexa-total-g', d.total_g);
-    setVal('dexa-vat', d.vat_g);       setVal('dexa-android', d.android_fat_pct);
+    setVal('dexa-vat', d.vat_g);        setVal('dexa-vat-area', d.vat_area_cm2);
+    setVal('dexa-android', d.android_fat_pct);
     setVal('dexa-gynoid', d.gynoid_fat_pct); setVal('dexa-ag', d.ag_ratio);
+    setVal('dexa-trunk-fat', d.trunk_fat_pct);
+    setVal('dexa-ffmi', d.ffmi);        setVal('dexa-almi', d.almi);
+    setVal('dexa-fmi', d.fmi);
     setVal('dexa-bmd', d.bmd);         setVal('dexa-tscore', d.t_score);
     setVal('dexa-zscore', d.z_score);  setVal('dexa-pr', d.pr_pct);
     toast('✅ DEXA form auto-filled!');
