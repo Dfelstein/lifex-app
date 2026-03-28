@@ -953,7 +953,10 @@ async function viewClientProfile(clientId, firstName, lastName) {
       const agStatus = dexa.ag_ratio != null ? (dexa.ag_ratio < 1 ? {c:'green',t:'Pear shape — lower CVD risk'} : {c:'red',t:'Apple shape — higher CVD risk'}) : null;
       const tStatus = dexa.t_score != null ? (dexa.t_score >= -1 ? {c:'green',t:'Normal'} : dexa.t_score >= -2.5 ? {c:'gold',t:'Osteopenia'} : {c:'red',t:'Osteoporosis'}) : null;
       html += `<div class="card" style="margin-bottom:20px;">
-        <div class="card-title">DEXA Scan — ${fmtDate(dexa.scan_date)}</div>
+        <div class="card-title" style="display:flex;align-items:center;justify-content:space-between;">
+          <span>DEXA Scan — ${fmtDate(dexa.scan_date)}</span>
+          ${dexa.pdf_path ? `<button onclick="downloadScanPdf('${dexa.pdf_path}')" style="background:rgba(255,255,255,0.07);border:1px solid rgba(255,255,255,0.12);border-radius:6px;color:var(--muted2);font-size:11px;padding:4px 10px;cursor:pointer;">⬇ PDF</button>` : ''}
+        </div>
         <div class="profile-stats">
           ${dexa.fat_pct != null ? `<div class="stat-chip orange"><div class="stat-chip-label">Body Fat</div><div class="stat-chip-value">${dexa.fat_pct}<span class="stat-chip-unit">%</span></div></div>` : ''}
           ${dexa.lean_g != null ? `<div class="stat-chip green"><div class="stat-chip-label">Lean Mass</div><div class="stat-chip-value">${(dexa.lean_g/1000).toFixed(1)}<span class="stat-chip-unit">kg</span></div></div>` : ''}
@@ -977,7 +980,10 @@ async function viewClientProfile(clientId, firstName, lastName) {
     // ── RMR ──
     if (rmr) {
       html += `<div class="card" style="margin-bottom:20px;">
-        <div class="card-title">RMR Test — ${fmtDate(rmr.test_date)}</div>
+        <div class="card-title" style="display:flex;align-items:center;justify-content:space-between;">
+          <span>RMR Test — ${fmtDate(rmr.test_date)}</span>
+          ${rmr.pdf_path ? `<button onclick="downloadScanPdf('${rmr.pdf_path}')" style="background:rgba(255,255,255,0.07);border:1px solid rgba(255,255,255,0.12);border-radius:6px;color:var(--muted2);font-size:11px;padding:4px 10px;cursor:pointer;">⬇ PDF</button>` : ''}
+        </div>
         <div class="profile-stats">
           ${rmr.kcal != null ? `<div class="stat-chip orange"><div class="stat-chip-label">Resting Metabolism</div><div class="stat-chip-value">${fmt(rmr.kcal)}<span class="stat-chip-unit">kcal/day</span></div></div>` : ''}
           ${rmr.fat_pct != null ? `<div class="stat-chip green"><div class="stat-chip-label">Fat Burning</div><div class="stat-chip-value">${rmr.fat_pct}<span class="stat-chip-unit">%</span></div></div>` : ''}
@@ -990,7 +996,10 @@ async function viewClientProfile(clientId, firstName, lastName) {
     // ── BLOOD ──
     if (bm.length) {
       html += `<div class="card" style="margin-bottom:20px;">
-        <div class="card-title">Blood Panel — ${fmtDate(bp.panel_date)}${bp.lab_name ? ' · ' + bp.lab_name : ''}</div>
+        <div class="card-title" style="display:flex;align-items:center;justify-content:space-between;">
+          <span>Blood Panel — ${fmtDate(bp.panel_date)}${bp.lab_name ? ' · ' + bp.lab_name : ''}</span>
+          ${bp.pdf_path ? `<button onclick="downloadScanPdf('${bp.pdf_path}')" style="background:rgba(255,255,255,0.07);border:1px solid rgba(255,255,255,0.12);border-radius:6px;color:var(--muted2);font-size:11px;padding:4px 10px;cursor:pointer;">⬇ PDF</button>` : ''}
+        </div>
         <div style="overflow-x:auto;">
           <table class="markers-table">
             <thead><tr><th>Marker</th><th>Value</th><th>Range</th><th>Status</th></tr></thead>
@@ -1010,7 +1019,10 @@ async function viewClientProfile(clientId, firstName, lastName) {
     // ── HORMONES ──
     if (hm.length) {
       html += `<div class="card" style="margin-bottom:20px;">
-        <div class="card-title">Hormone Panel — ${fmtDate(hp.panel_date)}</div>
+        <div class="card-title" style="display:flex;align-items:center;justify-content:space-between;">
+          <span>Hormone Panel — ${fmtDate(hp.panel_date)}</span>
+          ${hp.pdf_path ? `<button onclick="downloadScanPdf('${hp.pdf_path}')" style="background:rgba(255,255,255,0.07);border:1px solid rgba(255,255,255,0.12);border-radius:6px;color:var(--muted2);font-size:11px;padding:4px 10px;cursor:pointer;">⬇ PDF</button>` : ''}
+        </div>
         <div style="overflow-x:auto;">
           <table class="markers-table">
             <thead><tr><th>Hormone</th><th>Value</th><th>Range</th><th>Status</th></tr></thead>
@@ -1560,6 +1572,14 @@ async function autofillRMR(input) {
 
 function signOut() {
   sb.auth.signOut().then(() => { window.location.href = 'index.html'; });
+}
+
+async function downloadScanPdf(path) {
+  try {
+    const { data, error } = await sb.storage.from('scans').createSignedUrl(path, 3600);
+    if (error || !data?.signedUrl) { toast('Could not generate download link', 'error'); return; }
+    window.open(data.signedUrl, '_blank');
+  } catch(e) { toast('Download failed: ' + e.message, 'error'); }
 }
 
 /* ══════════════════════════

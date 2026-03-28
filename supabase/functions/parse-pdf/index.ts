@@ -118,6 +118,16 @@ Return ONLY the JSON, no other text.`,
     });
     const scanType = parsed.type;
 
+    // Upload original PDF to storage
+    const scanDate = parsed.scan_date || parsed.panel_date || parsed.test_date || new Date().toISOString().slice(0, 10);
+    const pdfPath = `${clientId}/${scanDate}-${scanType.toLowerCase()}.pdf`;
+    const pdfBytes = Uint8Array.from(atob(pdfBase64), c => c.charCodeAt(0));
+    await sb.storage.from('scans').upload(pdfPath, pdfBytes, {
+      contentType: 'application/pdf',
+      upsert: true,
+    });
+    // (storage errors are non-fatal — data still saves)
+
     if (scanType === 'DEXA') {
       const { error } = await sb.from('dexa_scans').upsert({
         client_id: clientId,
@@ -145,6 +155,7 @@ Return ONLY the JSON, no other text.`,
         ffmi: toNum(parsed.ffmi),
         almi: toNum(parsed.almi),
         fmi: toNum(parsed.fmi),
+        pdf_path: pdfPath,
       }, { onConflict: 'client_id,scan_date' });
       if (error) return cors(JSON.stringify({ error: error.message }), 500);
 
@@ -159,6 +170,7 @@ Return ONLY the JSON, no other text.`,
         feo2: parsed.feo2,
         pop_min: parsed.pop_min,
         pop_max: parsed.pop_max,
+        pdf_path: pdfPath,
       });
       if (error) return cors(JSON.stringify({ error: error.message }), 500);
 
@@ -167,6 +179,7 @@ Return ONLY the JSON, no other text.`,
         client_id: clientId,
         panel_date: parsed.panel_date,
         lab_name: parsed.lab_name || '',
+        pdf_path: pdfPath,
       }).select().single();
       if (panelErr) return cors(JSON.stringify({ error: panelErr.message }), 500);
 
@@ -189,6 +202,7 @@ Return ONLY the JSON, no other text.`,
       const { data: panel, error: panelErr } = await sb.from('hormone_panels').insert({
         client_id: clientId,
         panel_date: parsed.panel_date,
+        pdf_path: pdfPath,
       }).select().single();
       if (panelErr) return cors(JSON.stringify({ error: panelErr.message }), 500);
 
