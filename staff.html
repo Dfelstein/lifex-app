@@ -1597,7 +1597,7 @@ function normName(s) {
 function parseImportDate(raw) {
   const s = raw.trim();
   const months = { jan:1,feb:2,mar:3,apr:4,may:5,jun:6,jul:7,aug:8,sep:9,oct:10,nov:11,dec:12 };
-  const m = (name) => months[name.toLowerCase().slice(0,3)];
+  const m = (name) => name ? months[name.toLowerCase().slice(0,3)] : undefined;
   const yr = (y) => y.length === 2 ? '20' + y : y;
   let d;
   // "26 March 26" or "26 March 2026"
@@ -1622,7 +1622,7 @@ function parseImportDate(raw) {
 
 function onFolderSelected(files) {
   const pdfs = Array.from(files).filter(f => {
-    const n = f.name.toLowerCase();
+    const n = (f.name || '').toLowerCase();
     return n.endsWith('.pdf') || f.type === 'application/pdf' || n === 'report' || n === 'report.pdf';
   });
   const statusEl = document.getElementById('import-scan-status');
