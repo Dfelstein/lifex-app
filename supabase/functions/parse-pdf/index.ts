@@ -25,6 +25,11 @@ function toNum(v: any): number | null {
   return isNaN(n) ? null : n;
 }
 
+function toInt(v: any): number | null {
+  const n = toNum(v);
+  return n !== null ? Math.round(n) : null;
+}
+
 Deno.serve(async (req) => {
   if (req.method === 'OPTIONS') return new Response(null, { status: 204, headers: { 'Access-Control-Allow-Origin': '*', 'Access-Control-Allow-Headers': 'authorization, content-type' } });
 
@@ -138,15 +143,15 @@ Return ONLY the JSON, no other text.`,
         sex: parsed.sex || null,
         height_cm: toNum(parsed.height_cm),
         weight_kg: toNum(parsed.weight_kg),
-        fat_pct: parsed.fat_pct,
-        fat_g: parsed.fat_g,
-        lean_g: parsed.lean_g,
-        total_g: parsed.total_g,
+        fat_pct: toNum(parsed.fat_pct),
+        fat_g: toInt(parsed.fat_g),
+        lean_g: toInt(parsed.lean_g),
+        total_g: toInt(parsed.total_g),
         bmd: parsed.bmd,
         t_score: parsed.t_score,
         z_score: parsed.z_score,
         pr_pct: parsed.pr_pct,
-        vat_g: parsed.vat_g,
+        vat_g: toInt(parsed.vat_g),
         vat_area_cm2: toNum(parsed.vat_area_cm2),
         android_fat_pct: parsed.android_fat_pct,
         gynoid_fat_pct: parsed.gynoid_fat_pct,
@@ -163,8 +168,8 @@ Return ONLY the JSON, no other text.`,
       const { error } = await sb.from('rmr_tests').insert({
         client_id: clientId,
         test_date: parsed.test_date,
-        kcal: parsed.kcal,
-        kj: parsed.kj,
+        kcal: toInt(parsed.kcal),
+        kj: toInt(parsed.kj),
         fat_pct: parsed.fat_pct,
         glucose_pct: parsed.glucose_pct,
         feo2: parsed.feo2,
