@@ -1590,6 +1590,7 @@ let importProfiles = [];  // cached profiles for name matching
 let importGhosts = [];    // ghost profiles created during import
 
 function normName(s) {
+  if (!s) return '';
   return s.toLowerCase().replace(/[^a-z\s]/g, '').replace(/\s+/g, ' ').trim();
 }
 
