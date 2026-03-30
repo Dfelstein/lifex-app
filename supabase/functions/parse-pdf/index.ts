@@ -89,6 +89,9 @@ For HORMONES:
 {"type":"HORMONES","panel_date":"YYYY-MM-DD","markers":[{"name":"","value":0.0,"unit":"","ref_min":0.0,"ref_max":0.0,"display_min":0.0,"display_max":0.0,"status":"normal","note":""}]}
 
 Status must be one of: normal, high, low, optimal.
+
+If the document is NOT a health scan (e.g. a referral letter, consent form, invoice, or bone density-only report without body composition data), return exactly: {"type":"UNKNOWN"}
+
 Return ONLY the JSON, no other text.`,
             },
           ],
@@ -225,6 +228,10 @@ Return ONLY the JSON, no other text.`,
       }));
       const { error: markersErr } = await sb.from('hormone_markers').insert(markers);
       if (markersErr) return cors(JSON.stringify({ error: markersErr.message }), 500);
+    }
+
+    if (scanType === 'UNKNOWN') {
+      return cors(JSON.stringify({ success: true, type: 'UNKNOWN', skipped: true }));
     }
 
     return cors(JSON.stringify({ success: true, type: scanType }));

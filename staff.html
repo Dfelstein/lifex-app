@@ -1763,9 +1763,14 @@ async function startImport() {
       const parseResult = await parseRes.json();
       if (parseResult.error) throw new Error(parseResult.error);
 
-      item.status = 'success';
-      success++;
-      addLog(`✓ ${item.clientName} — ${item.file.name} (${parseResult.type || 'saved'})`, 'var(--green)');
+      if (parseResult.skipped) {
+        item.status = 'skipped';
+        addLog(`⊘ ${item.clientName} — ${item.file.name} (not a scan — skipped)`, 'var(--muted2)');
+      } else {
+        item.status = 'success';
+        success++;
+        addLog(`✓ ${item.clientName} — ${item.file.name} (${parseResult.type || 'saved'})`, 'var(--green)');
+      }
 
     } catch (err) {
       item.status = 'failed';
