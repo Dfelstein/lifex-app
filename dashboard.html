@@ -723,7 +723,10 @@ function renderDashboard() {
           ${rmr?.fat_pct && rmr.fat_pct < 80 ? '<div class="insight-item"><span class="icon">😴</span><span>Fat burning at ${rmr.fat_pct}% (goal 80%). <strong>Prioritise sleep &amp; fasted cardio.</strong></span></div>' : ''}
           <div class="insight-item" style="border-top:1px solid var(--border);padding-top:14px;margin-top:4px;"><span class="icon">📅</span><span><strong>Book your next DEXA</strong> in 3 months to track progress.</span></div>
         </div>
-        <div style="margin-top:14px;"><button class="btn btn-gold" onclick="navigate('book')">📅 Book Next Test</button></div>
+        <div style="margin-top:14px;display:flex;gap:10px;flex-wrap:wrap;">
+          <a href="https://xgym.com.au/dexa-scan/" target="_blank" class="btn btn-gold">📅 Book DEXA →</a>
+          <a href="https://xgym.com.au/metabolic-testing/" target="_blank" class="btn" style="background:var(--surface2);border:1px solid var(--border2);color:var(--muted2);">🔥 Book RMR →</a>
+        </div>
       </div>
       <div class="card">
         <div class="card-title">Your Scans</div>
@@ -800,11 +803,14 @@ function renderBodyComp() {
       <div class="stat-tile red"><div class="tile-label">Fat Mass</div><div class="tile-value">${(scan2.fat_g/1000).toFixed(2)}<span class="tile-unit">kg</span></div></div>
       ${scan2.vat_g!=null?`<div class="stat-tile orange"><div class="tile-label">Est. VAT</div><div class="tile-value">${fmt(scan2.vat_g)}<span class="tile-unit">g</span></div>${vatDiff!==null?`<div class="tile-delta ${vatDiff<0?'down':'up'}">${vatDiff<0?'▼ '+fmt(Math.abs(vatDiff))+'g excellent':'▲ +'+fmt(vatDiff)+'g'}</div>`:''}</div>`:''}
     </div>
-    ${scan2.android!=null?`<div class="card"><div class="card-title">Regional Fat Distribution</div><div style="display:flex;gap:20px;flex-wrap:wrap;">
+    ${scan2.android!=null?`<div class="card mb20"><div class="card-title">Regional Fat Distribution</div><div style="display:flex;gap:20px;flex-wrap:wrap;">
       <div style="flex:1;min-width:140px;text-align:center;padding:16px;background:var(--surface2);border-radius:8px;"><div style="font-size:11px;color:var(--muted2);text-transform:uppercase;letter-spacing:0.8px;margin-bottom:6px;">Android (Belly)</div><div style="font-family:'Bebas Neue',sans-serif;font-size:36px;color:var(--orange)">${scan2.android}%</div></div>
       <div style="flex:1;min-width:140px;text-align:center;padding:16px;background:var(--surface2);border-radius:8px;"><div style="font-size:11px;color:var(--muted2);text-transform:uppercase;letter-spacing:0.8px;margin-bottom:6px;">Gynoid (Hip)</div><div style="font-family:'Bebas Neue',sans-serif;font-size:36px;color:var(--blue)">${scan2.gynoid}%</div></div>
       <div style="flex:1;min-width:140px;text-align:center;padding:16px;background:var(--surface2);border-radius:8px;"><div style="font-size:11px;color:var(--muted2);text-transform:uppercase;letter-spacing:0.8px;margin-bottom:6px;">A:G Ratio</div><div style="font-family:'Bebas Neue',sans-serif;font-size:36px;color:${(scan2.ag_ratio||0)<1?'var(--green)':'var(--red)'}">${scan2.ag_ratio}</div><div style="font-size:11px;color:var(--muted2);margin-top:2px;">${(scan2.ag_ratio||0)<1?'✓ Healthy':'⚠️ Elevated'}</div></div>
-    </div></div>`:''}`;
+    </div></div>`:''}
+    <div style="margin-top:4px;">
+      <a href="https://xgym.com.au/dexa-scan/" target="_blank" class="btn btn-gold">📅 Book Next DEXA Scan →</a>
+    </div>`;
 }
 
 /* ══════════════════════════
@@ -825,7 +831,11 @@ function renderBone() {
       ${bmdDiff !== null && parseFloat(bmdDiff) > 0 ? `<div class="insight-item"><span class="icon">✅</span><span><strong>BMD improved +${bmdDiff}%</strong> between scans.</span></div>` : ''}
       ${scan2.t_score!=null?`<div class="insight-item"><span class="icon">${scan2.t_score>=-1?'✅':'⚠️'}</span><span>T-score of ${scan2.t_score} — ${scan2.t_score>=-1?'within normal range':'approaching osteopenia threshold (-1.0)'}. <strong>Maintain heavy compound lifts.</strong></span></div>`:''}
       <div class="insight-item"><span class="icon">💊</span><span>Ensure adequate <strong>Vitamin D3 + K2</strong> and calcium intake to support bone density.</span></div>
-    </div></div>`;
+    </div>
+    <div style="margin-top:14px;">
+      <a href="https://xgym.com.au/dexa-scan/" target="_blank" class="btn btn-gold">📅 Book Next DEXA Scan →</a>
+    </div>
+    </div>`;
 }
 
 /* ══════════════════════════
@@ -1069,6 +1079,9 @@ function renderRMR() {
         <div style="display:flex;flex-direction:column;gap:10px;" id="calorie-targets">
         </div>
       </div>
+    </div>
+    <div style="margin-top:4px;">
+      <a href="https://xgym.com.au/metabolic-testing/" target="_blank" class="btn btn-gold">📅 Book Next RMR Test →</a>
     </div>`;
   updateStepsTDEE(rmr.kcal);
 }
