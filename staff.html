@@ -255,8 +255,12 @@ html, body { height: 100%; background: var(--bg); color: var(--text); font-famil
     <div class="nav-item" data-panel="clients" onclick="showPanel('clients')"><span class="nav-icon">👥</span> All Clients</div>
     <div class="nav-item" data-panel="new-client" onclick="showPanel('new-client')"><span class="nav-icon">➕</span> New Client</div>
 
+    <div class="nav-group-label" style="margin-top:8px;">Insights</div>
+    <div class="nav-item" data-panel="analytics" onclick="showPanel('analytics')"><span class="nav-icon">📊</span> Analytics</div>
+
     <div class="nav-group-label" style="margin-top:8px;">Data</div>
     <div class="nav-item" data-panel="bulk-import" onclick="showPanel('bulk-import')"><span class="nav-icon">📥</span> Bulk Import</div>
+    <div class="nav-item" data-panel="intake-import" onclick="showPanel('intake-import')"><span class="nav-icon">📋</span> Intake Form Import</div>
 
   </div>
 
@@ -325,7 +329,7 @@ html, body { height: 100%; background: var(--bg); color: var(--text); font-famil
   <div id="panel-clients" class="panel">
     <div class="page-title">All Clients</div>
     <div style="display:flex;gap:10px;align-items:center;margin-bottom:16px;flex-wrap:wrap;">
-      <input type="text" id="client-search" placeholder="Search by name…" oninput="clientSearch=this.value;clientPage=0;renderClientList()"
+      <input type="text" id="client-search" placeholder="Search by name…" oninput="clientSearch=this.value;clientPage=0;searchClients()"
         style="flex:1;min-width:180px;background:var(--surface2);border:1px solid var(--border2);border-radius:8px;padding:9px 14px;color:var(--text);font-family:'Outfit',sans-serif;font-size:13px;outline:none;">
       <select id="client-sort" onchange="clientSort=this.value;clientPage=0;renderClientList()"
         style="background:var(--surface2);border:1px solid var(--border2);border-radius:8px;padding:9px 12px;color:var(--text);font-family:'Outfit',sans-serif;font-size:13px;outline:none;">
@@ -428,6 +432,133 @@ html, body { height: 100%; background: var(--bg); color: var(--text); font-famil
           <div id="import-flagged-list"></div>
         </div>
       </div>
+    </div>
+  </div>
+
+  <!-- ── INTAKE FORM IMPORT ── -->
+  <div id="panel-intake-import" class="panel">
+    <div class="page-title">Intake Form Import</div>
+    <div class="page-subtitle">Import client intake data from a Zoho Forms CSV export</div>
+
+    <div class="card">
+      <div class="card-title">How to Export from Zoho Forms</div>
+      <ol style="color:var(--muted2);font-size:13px;line-height:2;padding-left:20px;">
+        <li>Open your intake form at <span style="color:var(--blue);">forms.zoho.com.au/lifex1</span></li>
+        <li>Click the <strong style="color:var(--text);">Entries</strong> tab (or Responses)</li>
+        <li>Click <strong style="color:var(--text);">Export → Export as CSV</strong></li>
+        <li>Download the file and upload it below</li>
+      </ol>
+    </div>
+
+    <div class="card" id="intake-upload-step">
+      <div class="card-title">Upload CSV</div>
+      <div style="display:flex;gap:12px;align-items:center;flex-wrap:wrap;">
+        <label style="display:inline-flex;align-items:center;gap:8px;padding:10px 20px;background:var(--surface2);border:1px dashed var(--border2);border-radius:8px;cursor:pointer;font-size:13px;color:var(--muted2);transition:all 0.15s;" onmouseover="this.style.borderColor='var(--blue)'" onmouseout="this.style.borderColor='var(--border2)'">
+          📄 Choose CSV file
+          <input type="file" accept=".csv" id="intake-csv-input" style="display:none;" onchange="handleIntakeCsv(this)">
+        </label>
+        <span id="intake-file-name" style="font-size:13px;color:var(--muted2);"></span>
+      </div>
+    </div>
+
+    <div id="intake-preview-section" style="display:none;">
+      <div class="card">
+        <div class="card-title">Column Mapping</div>
+        <div style="font-size:13px;color:var(--muted2);margin-bottom:16px;">
+          Map your Zoho Forms columns to the fields below. We auto-detected matches — adjust if needed.
+        </div>
+        <div id="intake-column-map" style="display:grid;grid-template-columns:1fr 1fr;gap:12px;"></div>
+      </div>
+
+      <div class="card">
+        <div class="card-title">Preview — <span id="intake-row-count">0</span> entries</div>
+        <div id="intake-preview-table" style="overflow-x:auto;"></div>
+      </div>
+
+      <div style="display:flex;gap:12px;margin-bottom:20px;">
+        <button class="btn btn-blue" onclick="runIntakeImport()" id="intake-run-btn">▶ Import All</button>
+        <button class="btn" style="background:var(--surface2);color:var(--muted2);border:1px solid var(--border2);" onclick="resetIntakeImport()">Reset</button>
+      </div>
+    </div>
+
+    <div id="intake-results-section" style="display:none;">
+      <div class="card">
+        <div class="card-title">Import Results</div>
+        <div id="intake-stats" style="display:flex;gap:24px;margin-bottom:20px;flex-wrap:wrap;"></div>
+        <div id="intake-results-list" style="max-height:400px;overflow-y:auto;"></div>
+      </div>
+      <button class="btn btn-blue" onclick="resetIntakeImport()">↩ Import Another File</button>
+    </div>
+  </div>
+
+  <!-- ── ANALYTICS ── -->
+  <div id="panel-analytics" class="panel">
+    <div class="page-title">Analytics</div>
+    <div class="page-subtitle">Clinic-wide stats across all clients and scans</div>
+
+    <!-- KPI row -->
+    <div id="an-kpis" style="display:grid;grid-template-columns:repeat(4,1fr);gap:16px;margin-bottom:20px;"></div>
+
+    <!-- Row 2: Sex split + Age distribution -->
+    <div style="display:grid;grid-template-columns:1fr 2fr;gap:16px;margin-bottom:20px;">
+      <div class="card" style="margin-bottom:0;">
+        <div class="card-title">Sex Split</div>
+        <div id="an-sex-chart" style="display:flex;flex-direction:column;align-items:center;gap:12px;"></div>
+      </div>
+      <div class="card" style="margin-bottom:0;">
+        <div class="card-title">Age Distribution</div>
+        <div id="an-age-chart"></div>
+      </div>
+    </div>
+
+    <!-- Row 3: Scan volume over time -->
+    <div class="card" style="margin-bottom:20px;">
+      <div class="card-title">Scan Volume — Last 12 Months</div>
+      <div id="an-volume-chart"></div>
+    </div>
+
+    <!-- Row 4: Body fat distribution -->
+    <div class="card" style="margin-bottom:20px;">
+      <div class="card-title">Body Fat % Distribution (DEXA)</div>
+      <div id="an-fat-chart"></div>
+    </div>
+
+    <!-- Row 5: Member levels -->
+    <div class="card" style="margin-bottom:20px;">
+      <div class="card-title">Member Levels</div>
+      <div id="an-levels-chart"></div>
+    </div>
+
+    <!-- MARKETING INSIGHTS (from Zoho intake) -->
+    <div class="page-title" style="margin-top:8px;margin-bottom:4px;">Marketing Insights</div>
+    <div class="page-subtitle" style="margin-bottom:20px;">Based on all Zoho intake form submissions</div>
+
+    <div id="an-mkt-kpis" style="display:grid;grid-template-columns:repeat(4,1fr);gap:16px;margin-bottom:20px;"></div>
+
+    <div style="display:grid;grid-template-columns:1fr 1fr;gap:16px;margin-bottom:20px;">
+      <div class="card" style="margin-bottom:0;">
+        <div class="card-title">Lead Sex Split</div>
+        <div id="an-lead-sex" style="display:flex;flex-direction:column;align-items:center;gap:12px;"></div>
+      </div>
+      <div class="card" style="margin-bottom:0;">
+        <div class="card-title">Lead Age Groups</div>
+        <div id="an-lead-age"></div>
+      </div>
+    </div>
+
+    <div class="card" style="margin-bottom:20px;">
+      <div class="card-title">Intake Submissions — Last 12 Months</div>
+      <div id="an-lead-volume"></div>
+    </div>
+
+    <div class="card" style="margin-bottom:20px;">
+      <div class="card-title">Top Suburbs / Locations</div>
+      <div id="an-suburbs"></div>
+    </div>
+
+    <div class="card">
+      <div class="card-title">Conversion: Leads → Clients</div>
+      <div id="an-conversion"></div>
     </div>
   </div>
 
@@ -974,7 +1105,34 @@ async function viewClientProfile(clientId, firstName, lastName) {
           ${dexa.gynoid_fat_pct != null ? `<div class="stat-chip blue"><div class="stat-chip-label">Gynoid Fat</div><div class="stat-chip-value">${dexa.gynoid_fat_pct}<span class="stat-chip-unit">%</span></div></div>` : ''}
           ${dexa.pr_pct != null ? `<div class="stat-chip ${dexa.pr_pct>=85?'green':'gold'}"><div class="stat-chip-label">PR %</div><div class="stat-chip-value">${dexa.pr_pct}<span class="stat-chip-unit">%</span></div></div>` : ''}
         </div>
+        <div id="cp-comparison-${clientId}" style="margin-top:16px;"><div style="font-size:12px;color:var(--muted2);">Loading comparison…</div></div>
       </div>`;
+
+      // Async: fetch real stats and render comparison
+      if (dexa.fat_pct != null && dexa.patient_age && dexa.sex) {
+        const age = dexa.patient_age;
+        const sex = dexa.sex;
+        const bf  = dexa.fat_pct;
+        const ffmi = dexa.ffmi || 0;
+        const almi = dexa.almi || 0;
+        const fmi  = dexa.fmi  || 0;
+        (async () => {
+          let scanStats = null;
+          try {
+            const statsUrl = `${SUPABASE_URL}/functions/v1/get-scan-stats?sex=${sex}&age=${age}&value=${bf}&ffmi=${ffmi}&almi=${almi}`;
+            const sr = await fetch(statsUrl, { headers: { 'Authorization': `Bearer ${SUPABASE_KEY}` } });
+            scanStats = await sr.json();
+          } catch(e) { /* fallback to reference */ }
+          const compEl = document.getElementById(`cp-comparison-${clientId}`);
+          if (!compEl) return;
+          compEl.innerHTML = buildStaffComparison(dexa, scanStats);
+        })();
+      } else {
+        setTimeout(() => {
+          const compEl = document.getElementById(`cp-comparison-${clientId}`);
+          if (compEl) compEl.innerHTML = '';
+        }, 0);
+      }
     }
 
     // ── RMR ──
@@ -1040,12 +1198,73 @@ async function viewClientProfile(clientId, firstName, lastName) {
     }
 
     if (!html) {
-      html = `<div style="text-align:center;padding:60px 20px;color:var(--muted2);"><div style="font-size:48px;opacity:0.3;margin-bottom:12px;">📋</div><div>No scan data uploaded yet for this client.</div></div>`;
+      html = `<div style="text-align:center;padding:40px 20px 20px;color:var(--muted2);"><div style="font-size:48px;opacity:0.3;margin-bottom:12px;">📋</div><div>No scan data uploaded yet for this client.</div></div>`;
     }
 
-    el.innerHTML = html;
+    // Always show upload zone at top of profile
+    const uploadZone = `
+      <div id="cp-upload-zone" class="drop-zone" style="margin-bottom:20px;"
+        ondragover="event.preventDefault();this.classList.add('drag-over')"
+        ondragleave="this.classList.remove('drag-over')"
+        ondrop="event.preventDefault();this.classList.remove('drag-over');handleProfileDrop(event,'${clientId}')"
+        onclick="document.getElementById('cp-file-input').click()">
+        <div class="drop-icon">📄</div>
+        <div style="font-weight:600;">Upload Scan PDF</div>
+        <div style="font-size:12px;margin-top:4px;">Drop a DEXA, Blood, Hormone or RMR PDF here — or click to browse</div>
+        <input type="file" id="cp-file-input" accept="application/pdf" style="display:none"
+          onchange="handleProfileDrop({dataTransfer:{files:this.files}},'${clientId}')">
+      </div>`;
+
+    el.innerHTML = uploadZone + html;
   } catch(e) {
     el.innerHTML = `<div style="color:var(--red);">Error: ${e.message}</div>`;
+  }
+}
+
+async function handleProfileDrop(event, clientId) {
+  const file = event.dataTransfer?.files?.[0];
+  if (!file || file.type !== 'application/pdf') { toast('Please select a PDF file', 'error'); return; }
+
+  const zone = document.getElementById('cp-upload-zone');
+  zone.classList.add('uploading');
+  zone.innerHTML = `<div class="drop-icon">⏳</div><div>Reading PDF…</div>`;
+
+  try {
+    const base64 = await new Promise((res, rej) => {
+      const reader = new FileReader();
+      reader.onload = e => res(e.target.result.split(',')[1]);
+      reader.onerror = rej;
+      reader.readAsDataURL(file);
+    });
+
+    zone.innerHTML = `<div class="drop-icon">🤖</div><div>Detecting scan type…</div>`;
+
+    const resp = await fetch(`${SUPABASE_URL}/functions/v1/parse-pdf`, {
+      method: 'POST',
+      headers: { 'Authorization': `Bearer ${SUPABASE_KEY}`, 'Content-Type': 'application/json' },
+      body: JSON.stringify({ pdfBase64: base64, clientId })
+    });
+    const result = await resp.json();
+
+    if (result.error) throw new Error(result.error);
+    if (result.skipped) {
+      zone.classList.remove('uploading');
+      zone.classList.add('done');
+      zone.innerHTML = `<div class="drop-icon">⊘</div><div style="font-size:13px;">Not a recognised scan type — skipped</div>`;
+    } else {
+      zone.classList.remove('uploading');
+      zone.classList.add('done');
+      zone.innerHTML = `<div class="drop-icon">✅</div><div style="font-size:13px;">${result.type} scan uploaded successfully!</div>`;
+      // Reload profile data after short delay
+      setTimeout(() => {
+        const name = document.getElementById('cp-name').textContent.split(' ');
+        viewClientProfile(clientId, name[0], name.slice(1).join(' '));
+      }, 1500);
+    }
+  } catch(e) {
+    zone.classList.remove('uploading');
+    zone.innerHTML = `<div class="drop-icon">❌</div><div style="font-size:12px;color:var(--red);">${e.message}</div>`;
+    toast('Upload failed: ' + e.message, 'error');
   }
 }
 
@@ -1088,7 +1307,7 @@ const CLIENT_PAGE_SIZE = 10;
 
 async function loadClients() {
   const [profilesRes, dexaRes, rmrRes, bloodRes] = await Promise.all([
-    sb.from('profiles').select('*').eq('is_staff', false),
+    sb.from('profiles').select('*').or('is_staff.is.null,is_staff.eq.false').order('created_at', { ascending: false }).limit(1000),
     sb.from('dexa_scans').select('client_id, scan_date').order('scan_date', { ascending: false }),
     sb.from('rmr_tests').select('client_id, test_date').order('test_date', { ascending: false }),
     sb.from('blood_panels').select('client_id, panel_date').order('panel_date', { ascending: false }),
@@ -1107,6 +1326,45 @@ async function loadClients() {
   clients = (profilesRes.data || []).map(c => ({ ...c, lastScan: latestMap[c.id] || null }));
   renderClientList();
   populateClientSelects();
+}
+
+let searchDebounce = null;
+async function searchClients() {
+  const q = clientSearch.trim();
+  clearTimeout(searchDebounce);
+  if (!q) { renderClientList(); return; }
+  searchDebounce = setTimeout(async () => {
+    const { data } = await sb.from('profiles')
+      .select('*')
+      .or('is_staff.is.null,is_staff.eq.false')
+      .ilike('full_name', `%${q}%`)
+      .limit(50);
+    const el = document.getElementById('clients-list');
+    const pagEl = document.getElementById('clients-pagination');
+    if (!data || !data.length) {
+      el.innerHTML = '<div style="color:var(--muted2);font-size:13px;">No clients found.</div>';
+      pagEl.innerHTML = '';
+      return;
+    }
+    const fmtDate = d => d ? new Date(d + 'T00:00:00').toLocaleDateString('en-AU', { day:'numeric', month:'short', year:'numeric' }) : null;
+    const levelColour = { Platinum: 'var(--teal)', Gold: 'var(--gold)', Standard: 'var(--muted2)' };
+    el.innerHTML = data.map(c => {
+      const fn = c.full_name?.split(' ')[0] || '';
+      const ln = c.full_name?.split(' ').slice(1).join(' ') || '';
+      return `
+      <div class="client-card" onclick="viewClientProfile('${c.id}','${fn}','${ln}')">
+        <div class="client-avatar">${c.initials || '??'}</div>
+        <div class="client-info">
+          <div class="client-name">${c.full_name}</div>
+          <div class="client-meta" style="color:${levelColour[c.member_level]||'var(--muted2)'};">${c.member_level || 'Standard'} Member</div>
+        </div>
+        <div class="client-actions">
+          <button class="btn btn-outline btn-sm" onclick="event.stopPropagation();viewClientProfile('${c.id}','${fn}','${ln}')">View Profile</button>
+        </div>
+      </div>`;
+    }).join('');
+    pagEl.innerHTML = `<div style="font-size:12px;color:var(--muted2);">${data.length} result${data.length!==1?'s':''} for "${q}"</div>`;
+  }, 250);
 }
 
 function renderClientList() {
@@ -1184,6 +1442,7 @@ function showPanel(id) {
   document.getElementById('panel-' + id).classList.add('active');
   document.querySelector(`[data-panel="${id}"]`)?.classList.add('active');
   if (id === 'previous') setPrevView('week');
+  if (id === 'analytics') loadAnalytics();
 }
 
 /* ══ TOAST ══ */
@@ -1867,7 +2126,736 @@ function resetImport() {
   document.getElementById('import-progress-bar').style.background = 'var(--blue)';
 }
 
+// ─────────────────────────────────────────────
+//  DEXA COMPARISON (bell curve + bars)
+// ─────────────────────────────────────────────
+
+function buildBellCurve(mean, sd, userVal) {
+  const W = 560, H = 190;
+  const PL = 8, PR = 8, PT = 32, PB = 30;
+  const plotW = W - PL - PR, plotH = H - PT - PB;
+  const minX = Math.max(2, mean - 3.8 * sd);
+  const maxX = Math.min(58, mean + 3.8 * sd);
+  const pdf = x => Math.exp(-0.5 * ((x - mean) / sd) ** 2) / (sd * Math.sqrt(2 * Math.PI));
+  const maxPDF = pdf(mean);
+  const sx = x => PL + ((x - minX) / (maxX - minX)) * plotW;
+  const sy = y => PT + plotH - (y / maxPDF) * plotH;
+  const baseline = sy(0);
+  const cu = Math.min(Math.max(userVal, minX + 0.1), maxX - 0.1);
+  const usx = sx(cu);
+  const pts = Array.from({ length: 301 }, (_, i) => {
+    const x = minX + (i / 300) * (maxX - minX);
+    return [+sx(x).toFixed(1), +sy(pdf(x)).toFixed(1)];
+  });
+  const leftPts  = pts.filter(p => p[0] <= usx);
+  const rightPts = pts.filter(p => p[0] >= usx);
+  const leftArea  = leftPts.length  ? `M${leftPts[0][0]},${baseline} ` + leftPts.map(p=>`L${p[0]},${p[1]}`).join(' ') + ` L${usx},${baseline}Z` : '';
+  const rightArea = rightPts.length ? `M${usx},${baseline} ` + rightPts.map(p=>`L${p[0]},${p[1]}`).join(' ') + ` L${rightPts[rightPts.length-1][0]},${baseline}Z` : '';
+  const curve = pts.map((p,i)=>`${i===0?'M':'L'}${p[0]},${p[1]}`).join(' ');
+  const usy = sy(pdf(cu));
+  const lx = Math.min(Math.max(usx, PL+30), W-PR-30);
+  const ticks = [-2,-1,0,1,2].map(n=>mean+n*sd).filter(v=>v>minX&&v<maxX);
+  return `<svg viewBox="0 0 ${W} ${H}" width="100%" style="display:block;">
+    <defs>
+      <linearGradient id="cpgL" x1="0" x2="0" y1="0" y2="1"><stop offset="0%" stop-color="#39e07a" stop-opacity="0.4"/><stop offset="100%" stop-color="#39e07a" stop-opacity="0.05"/></linearGradient>
+      <linearGradient id="cpgR" x1="0" x2="0" y1="0" y2="1"><stop offset="0%" stop-color="#ff9f43" stop-opacity="0.35"/><stop offset="100%" stop-color="#ff9f43" stop-opacity="0.05"/></linearGradient>
+    </defs>
+    <text x="${PL+4}" y="${PT-16}" font-family="Outfit,sans-serif" font-size="10" fill="rgba(57,224,122,0.65)">◀ LEANER</text>
+    <text x="${W-PR-4}" y="${PT-16}" text-anchor="end" font-family="Outfit,sans-serif" font-size="10" fill="rgba(255,159,67,0.65)">MORE FAT ▶</text>
+    ${leftArea  ? `<path d="${leftArea}"  fill="url(#cpgL)"/>` : ''}
+    ${rightArea ? `<path d="${rightArea}" fill="url(#cpgR)"/>` : ''}
+    <path d="${curve}" fill="none" stroke="rgba(255,255,255,0.28)" stroke-width="1.5"/>
+    <line x1="${sx(mean)}" y1="${PT}" x2="${sx(mean)}" y2="${baseline}" stroke="rgba(255,255,255,0.1)" stroke-width="1" stroke-dasharray="3,3"/>
+    <text x="${sx(mean)}" y="${baseline+22}" text-anchor="middle" font-family="Outfit,sans-serif" font-size="10" fill="rgba(255,255,255,0.25)">avg ${Math.round(mean)}%</text>
+    <line x1="${usx}" y1="${PT-6}" x2="${usx}" y2="${baseline}" stroke="#f5c842" stroke-width="2"/>
+    <circle cx="${usx}" cy="${usy}" r="5.5" fill="#f5c842" stroke="#08090b" stroke-width="2"/>
+    <rect x="${lx-28}" y="${PT-25}" width="56" height="18" rx="5" fill="rgba(245,200,66,0.18)" stroke="rgba(245,200,66,0.5)" stroke-width="1"/>
+    <text x="${lx}" y="${PT-12}" text-anchor="middle" font-family="Bebas Neue,sans-serif" font-size="12" fill="#f5c842" letter-spacing="1">CLIENT — ${cu.toFixed(1)}%</text>
+    <line x1="${PL}" y1="${baseline}" x2="${W-PR}" y2="${baseline}" stroke="rgba(255,255,255,0.08)" stroke-width="1"/>
+    ${ticks.map(v=>`<line x1="${sx(v).toFixed(1)}" y1="${baseline}" x2="${sx(v).toFixed(1)}" y2="${baseline+5}" stroke="rgba(255,255,255,0.12)" stroke-width="1"/>
+      <text x="${sx(v).toFixed(1)}" y="${baseline+17}" text-anchor="middle" font-family="Outfit,sans-serif" font-size="10" fill="rgba(255,255,255,0.25)">${Math.round(v)}%</text>`).join('')}
+  </svg>`;
+}
+
+function cpCompBar(label, userVal, avgVal, top25Val, unit, lowerBetter) {
+  if (userVal == null) return '';
+  const cap = Math.max(userVal, avgVal, top25Val) * 1.25;
+  const pct = v => Math.min(100, (v / cap) * 100).toFixed(1);
+  const uc = lowerBetter
+    ? (userVal <= top25Val ? 'var(--green)' : userVal <= avgVal ? 'var(--teal)' : userVal <= avgVal*1.15 ? 'var(--gold)' : 'var(--orange)')
+    : (userVal >= top25Val ? 'var(--green)' : userVal >= avgVal ? 'var(--teal)' : 'var(--gold)');
+  return `<div style="margin-bottom:16px;">
+    <div style="font-size:11px;font-weight:600;text-transform:uppercase;letter-spacing:0.8px;color:var(--muted2);margin-bottom:6px;">${label}</div>
+    ${[{l:'Client',v:userVal,c:uc},{l:'Average',v:avgVal,c:'rgba(255,255,255,0.2)'},{l:'Top 25%',v:top25Val,c:'rgba(57,224,122,0.5)'}].map(r=>`
+    <div style="display:flex;align-items:center;gap:10px;margin-bottom:5px;">
+      <div style="width:52px;font-size:11px;color:var(--muted2);flex-shrink:0;">${r.l}</div>
+      <div style="flex:1;height:8px;background:var(--surface3);border-radius:4px;overflow:hidden;">
+        <div style="width:${pct(r.v)}%;height:100%;background:${r.c};border-radius:4px;"></div>
+      </div>
+      <div style="width:56px;text-align:right;font-family:'Bebas Neue',sans-serif;font-size:15px;color:${r.c};letter-spacing:1px;">${r.v}${unit}</div>
+    </div>`).join('')}
+  </div>`;
+}
+
+function buildStaffComparison(dexa, scanStats) {
+  const age = dexa.patient_age;
+  const sex = dexa.sex;
+  const bf  = dexa.fat_pct;
+  if (!bf || !age || !sex) return '';
+
+  const isMale = sex === 'male';
+  const ag = age < 30 ? 0 : age < 40 ? 1 : age < 50 ? 2 : 3;
+
+  // Reference values
+  const avgBF   = isMale ? [18,22,25,27][ag] : [28,30,33,35][ag];
+  const top25BF = isMale ? [13,16,19,21][ag] : [22,24,27,29][ag];
+  const avgFFMI   = isMale ? [18.5,18.0,17.5,17.0][ag] : [14.5,14.0,13.5,13.0][ag];
+  const top25FFMI = isMale ? [20.5,20.0,19.5,19.0][ag] : [16.5,16.0,15.5,15.0][ag];
+  const avgFMI   = isMale ? [5.5,7.0,8.2,8.8][ag] : [8.0,9.0,10.5,11.5][ag];
+  const top25FMI = isMale ? [3.8,5.0,6.0,6.5][ag] : [5.5,6.5,7.5,8.5][ag];
+  const avgRMR   = isMale ? 1750 : 1450;
+  const top25RMR = isMale ? 1900 : 1580;
+
+  // Use real scan stats if available
+  let mean = avgBF, sd = 5.5, count = null, leaner = null;
+  let ffmiAvg = avgFFMI, ffmiTop25 = top25FFMI, ffmiStronger = null;
+  if (scanStats && !scanStats.insufficient) {
+    if (scanStats.fat) { mean = scanStats.fat.mean; sd = scanStats.fat.sd; count = scanStats.fat.count; leaner = scanStats.fat.leaner; }
+    if (scanStats.ffmi && scanStats.ffmi.count >= 3) { ffmiAvg = scanStats.ffmi.mean; ffmiTop25 = scanStats.ffmi.top25; ffmiStronger = scanStats.ffmi.stronger; }
+  }
+  if (leaner === null) {
+    const pctHigher = (1 - 0.5 * (1 + erf((bf - mean) / (sd * Math.sqrt(2))))) * 100;
+    leaner = Math.max(5, Math.min(95, Math.round(pctHigher)));
+  }
+
+  return `
+    <div style="border-top:1px solid var(--border);padding-top:16px;margin-top:4px;">
+      <div style="font-size:11px;font-weight:600;letter-spacing:1px;text-transform:uppercase;color:var(--muted2);margin-bottom:12px;">
+        Population Comparison — ${isMale ? 'Male' : 'Female'}, Age ${age}
+        ${count ? `<span style="color:var(--teal);font-weight:400;margin-left:8px;">${count} Life X scans</span>` : '<span style="color:var(--muted);font-weight:400;margin-left:8px;">reference ranges</span>'}
+      </div>
+      <div style="display:flex;gap:8px;margin-bottom:16px;flex-wrap:wrap;">
+        <div style="padding:8px 16px;background:rgba(245,200,66,0.08);border:1px solid rgba(245,200,66,0.2);border-radius:8px;text-align:center;">
+          <div style="font-family:'Bebas Neue',sans-serif;font-size:26px;color:var(--gold);">Top ${leaner}%</div>
+          <div style="font-size:10px;color:var(--muted2);">Leaner than</div>
+        </div>
+        ${ffmiStronger !== null ? `<div style="padding:8px 16px;background:rgba(57,224,122,0.06);border:1px solid rgba(57,224,122,0.2);border-radius:8px;text-align:center;">
+          <div style="font-family:'Bebas Neue',sans-serif;font-size:26px;color:var(--green);">Top ${ffmiStronger}%</div>
+          <div style="font-size:10px;color:var(--muted2);">More muscle than</div>
+        </div>` : ''}
+      </div>
+      ${buildBellCurve(mean, sd, bf)}
+      <div style="margin-top:16px;">
+        ${cpCompBar('Body Fat %', bf, avgBF, top25BF, '%', true)}
+        ${dexa.ffmi != null ? cpCompBar('Muscle Mass Index (FFMI)', dexa.ffmi, ffmiAvg, ffmiTop25, ' kg/m²', false) : ''}
+        ${dexa.fmi  != null ? cpCompBar('Fat Mass Index (FMI)', dexa.fmi, avgFMI, top25FMI, ' kg/m²', true) : ''}
+      </div>
+    </div>`;
+}
+
+// Error function approximation (needed for percentile calc)
+function erf(x) {
+  const a1=0.254829592,a2=-0.284496736,a3=1.421413741,a4=-1.453152027,a5=1.061405429,p=0.3275911;
+  const sign = x < 0 ? -1 : 1; x = Math.abs(x);
+  const t = 1/(1+p*x);
+  const y = 1-(((((a5*t+a4)*t)+a3)*t+a2)*t+a1)*t*Math.exp(-x*x);
+  return sign*y;
+}
+
+// ─────────────────────────────────────────────
+//  INTAKE FORM CSV IMPORT
+// ─────────────────────────────────────────────
+
+let intakeCsvRows = [];
+let intakeCsvHeaders = [];
+
+const INTAKE_FIELD_MAP = {
+  first_name:  ['first name','firstname','first','given name','givenname'],
+  last_name:   ['last name','lastname','last','surname','family name','familyname'],
+  email:       ['email','email address','e-mail'],
+  phone:       ['phone','mobile','mobile number','phone number','contact number','contact'],
+  dob:         ['date of birth','dob','birthday','birth date','birthdate','birth'],
+  address:     ['address','street address','home address','residential address','street'],
+  suburb:      ['suburb','city','town'],
+  state:       ['state','province'],
+  postcode:    ['postcode','post code','zip','zip code'],
+  sex:         ['sex','gender','biological sex'],
+};
+
+function parseCsv(text) {
+  const lines = text.split(/\r?\n/).filter(l => l.trim());
+  if (!lines.length) return { headers: [], rows: [] };
+  const parseRow = line => {
+    const cells = []; let cur = ''; let inQ = false;
+    for (let i = 0; i < line.length; i++) {
+      const c = line[i];
+      if (c === '"') { inQ = !inQ; }
+      else if (c === ',' && !inQ) { cells.push(cur.trim()); cur = ''; }
+      else cur += c;
+    }
+    cells.push(cur.trim());
+    return cells;
+  };
+  const headers = parseRow(lines[0]);
+  const rows = lines.slice(1).map(l => {
+    const vals = parseRow(l);
+    const obj = {};
+    headers.forEach((h, i) => obj[h] = vals[i] || '');
+    return obj;
+  });
+  return { headers, rows };
+}
+
+function autoMapColumns(headers) {
+  const map = {};
+  for (const [field, aliases] of Object.entries(INTAKE_FIELD_MAP)) {
+    for (const h of headers) {
+      if (aliases.includes(h.toLowerCase().trim())) {
+        map[field] = h;
+        break;
+      }
+    }
+  }
+  return map;
+}
+
+function handleIntakeCsv(input) {
+  const file = input.files[0];
+  if (!file) return;
+  document.getElementById('intake-file-name').textContent = file.name;
+  const reader = new FileReader();
+  reader.onload = e => {
+    const { headers, rows } = parseCsv(e.target.result);
+    intakeCsvHeaders = headers;
+    intakeCsvRows = rows.filter(r => Object.values(r).some(v => v));
+    document.getElementById('intake-row-count').textContent = intakeCsvRows.length;
+    renderIntakeColumnMap(headers, autoMapColumns(headers));
+    renderIntakePreview();
+    document.getElementById('intake-preview-section').style.display = 'block';
+  };
+  reader.readAsText(file);
+}
+
+function renderIntakeColumnMap(headers, autoMap) {
+  const container = document.getElementById('intake-column-map');
+  const fields = [
+    { key: 'first_name', label: 'First Name' },
+    { key: 'last_name',  label: 'Last Name' },
+    { key: 'email',      label: 'Email' },
+    { key: 'phone',      label: 'Phone' },
+    { key: 'dob',        label: 'Date of Birth' },
+    { key: 'sex',        label: 'Sex / Gender' },
+    { key: 'address',    label: 'Address' },
+    { key: 'suburb',     label: 'Suburb' },
+    { key: 'postcode',   label: 'Postcode' },
+  ];
+  container.innerHTML = fields.map(f => `
+    <div class="field">
+      <label>${f.label}</label>
+      <select id="intake-map-${f.key}" onchange="renderIntakePreview()">
+        <option value="">— skip —</option>
+        ${headers.map(h => `<option value="${h}" ${autoMap[f.key] === h ? 'selected' : ''}>${h}</option>`).join('')}
+      </select>
+    </div>
+  `).join('');
+}
+
+function getMapping() {
+  const fields = ['first_name','last_name','email','phone','dob','sex','address','suburb','postcode'];
+  const m = {};
+  for (const f of fields) {
+    const el = document.getElementById(`intake-map-${f}`);
+    if (el) m[f] = el.value || null;
+  }
+  return m;
+}
+
+function getMappedValue(row, mapping, field) {
+  const col = mapping[field];
+  return col ? (row[col] || '').trim() : '';
+}
+
+function normIntakeDate(raw) {
+  if (!raw) return null;
+  const dmy = raw.match(/^(\d{1,2})[\/\-](\d{1,2})[\/\-](\d{4})$/);
+  if (dmy) return `${dmy[3]}-${dmy[2].padStart(2,'0')}-${dmy[1].padStart(2,'0')}`;
+  const ymd = raw.match(/^(\d{4})[\/\-](\d{1,2})[\/\-](\d{1,2})$/);
+  if (ymd) return `${ymd[1]}-${ymd[2].padStart(2,'0')}-${ymd[3].padStart(2,'0')}`;
+  return null;
+}
+
+function renderIntakePreview() {
+  const mapping = getMapping();
+  const table = document.getElementById('intake-preview-table');
+  const preview = intakeCsvRows.slice(0, 8);
+  if (!preview.length) { table.innerHTML = ''; return; }
+  const cols = ['first_name','last_name','email','phone','dob','sex'];
+  table.innerHTML = `
+    <table style="width:100%;border-collapse:collapse;font-size:12px;">
+      <thead>
+        <tr>${cols.map(c => `<th style="text-align:left;padding:8px;border-bottom:1px solid var(--border2);color:var(--muted2);font-weight:600;">${c.replace('_',' ')}</th>`).join('')}</tr>
+      </thead>
+      <tbody>
+        ${preview.map(row => `<tr>${cols.map(c => `<td style="padding:8px;border-bottom:1px solid var(--border);color:var(--text);">${getMappedValue(row, mapping, c) || '<span style="color:var(--muted)">—</span>'}</td>`).join('')}</tr>`).join('')}
+      </tbody>
+    </table>
+    ${intakeCsvRows.length > 8 ? `<div style="font-size:12px;color:var(--muted2);margin-top:8px;">… and ${intakeCsvRows.length - 8} more rows</div>` : ''}
+  `;
+}
+
+async function runIntakeImport() {
+  const btn = document.getElementById('intake-run-btn');
+  btn.disabled = true;
+  btn.textContent = 'Importing…';
+
+  const mapping = getMapping();
+  let updated = 0, created = 0, skipped = 0;
+  const results = [];
+
+  // Load all profiles once
+  const { data: profiles } = await sb.from('profiles').select('id,full_name,email');
+  const profilesByEmail = {};
+  const profilesByName = {};
+  (profiles || []).forEach(p => {
+    if (p.email) profilesByEmail[p.email.toLowerCase()] = p;
+    if (p.full_name) profilesByName[p.full_name.toLowerCase()] = p;
+  });
+
+  for (const row of intakeCsvRows) {
+    const firstName = getMappedValue(row, mapping, 'first_name');
+    const lastName  = getMappedValue(row, mapping, 'last_name');
+    const email     = getMappedValue(row, mapping, 'email').toLowerCase();
+    const phone     = getMappedValue(row, mapping, 'phone');
+    const dobRaw    = getMappedValue(row, mapping, 'dob');
+    const dob       = normIntakeDate(dobRaw);
+    const sexRaw    = getMappedValue(row, mapping, 'sex');
+    const sex       = sexRaw ? (sexRaw.toLowerCase().startsWith('f') ? 'female' : 'male') : null;
+    const address   = [
+      getMappedValue(row, mapping, 'address'),
+      getMappedValue(row, mapping, 'suburb'),
+      getMappedValue(row, mapping, 'postcode'),
+    ].filter(Boolean).join(', ') || null;
+
+    const fullName = [firstName, lastName].filter(Boolean).join(' ');
+    if (!fullName && !email) { skipped++; results.push({ name: '—', status: 'skipped', note: 'No name or email' }); continue; }
+
+    // Build update payload
+    const update = {};
+    if (fullName) update.full_name = fullName;
+    if (dob) update.dob = dob;
+    if (phone) update.phone = phone;
+    if (address) update.address = address;
+    if (sex) update.sex = sex;
+
+    // Match by email first, then name
+    let profile = email ? profilesByEmail[email] : null;
+    if (!profile && fullName) profile = profilesByName[fullName.toLowerCase()];
+
+    if (profile) {
+      const { error } = await sb.from('profiles').update(update).eq('id', profile.id);
+      if (error) { skipped++; results.push({ name: fullName, status: 'error', note: error.message }); }
+      else { updated++; results.push({ name: fullName, status: 'updated', note: `Profile updated` }); }
+    } else {
+      // Store in pending table
+      const { error } = await sb.from('zoho_intake_pending').upsert({
+        full_name: fullName || null,
+        email: email || null,
+        phone: phone || null,
+        dob: dob || null,
+        address: address || null,
+        sex: sex || null,
+        raw_fields: row,
+        received_at: new Date().toISOString(),
+      }, { onConflict: 'email' });
+      if (error) { skipped++; results.push({ name: fullName, status: 'error', note: error.message }); }
+      else { created++; results.push({ name: fullName, status: 'queued', note: 'No matching profile — stored for review' }); }
+    }
+  }
+
+  // Show results
+  document.getElementById('intake-preview-section').style.display = 'none';
+  document.getElementById('intake-results-section').style.display = 'block';
+  document.getElementById('intake-stats').innerHTML = `
+    <div style="text-align:center;">
+      <div style="font-family:'Bebas Neue',sans-serif;font-size:28px;color:var(--green)">${updated}</div>
+      <div style="font-size:11px;color:var(--muted2);">Profiles Updated</div>
+    </div>
+    <div style="text-align:center;">
+      <div style="font-family:'Bebas Neue',sans-serif;font-size:28px;color:var(--orange)">${created}</div>
+      <div style="font-size:11px;color:var(--muted2);">Queued for Review</div>
+    </div>
+    <div style="text-align:center;">
+      <div style="font-family:'Bebas Neue',sans-serif;font-size:28px;color:var(--muted)">${skipped}</div>
+      <div style="font-size:11px;color:var(--muted2);">Skipped / Errors</div>
+    </div>
+  `;
+  const statusColor = { updated: 'var(--green)', queued: 'var(--orange)', error: 'var(--red)', skipped: 'var(--muted)' };
+  document.getElementById('intake-results-list').innerHTML = results.map(r => `
+    <div style="display:flex;gap:12px;align-items:center;padding:8px 0;border-bottom:1px solid var(--border);">
+      <span style="font-size:12px;font-weight:600;color:${statusColor[r.status]};min-width:70px;">${r.status}</span>
+      <span style="font-size:13px;color:var(--text);min-width:160px;">${r.name}</span>
+      <span style="font-size:12px;color:var(--muted2);">${r.note}</span>
+    </div>
+  `).join('');
+}
+
+function resetIntakeImport() {
+  intakeCsvRows = [];
+  intakeCsvHeaders = [];
+  document.getElementById('intake-csv-input').value = '';
+  document.getElementById('intake-file-name').textContent = '';
+  document.getElementById('intake-preview-section').style.display = 'none';
+  document.getElementById('intake-results-section').style.display = 'none';
+}
+
 init();
+
+/* ══ ANALYTICS ══ */
+let analyticsLoaded = false;
+
+async function loadAnalytics() {
+  if (analyticsLoaded) return;
+  analyticsLoaded = true;
+
+  // Fetch profiles (non-staff) and dexa scans in parallel
+  const [{ data: profiles }, { data: dexaRaw }] = await Promise.all([
+    sb.from('profiles').select('id,sex,dob,member_level,created_at').or('is_staff.is.null,is_staff.eq.false').limit(2000),
+    sb.from('dexa_scans').select('client_id,scan_date,fat_pct,sex').order('scan_date').limit(5000),
+  ]);
+
+  const now = new Date();
+
+  /* ── KPIs ── */
+  const totalClients = profiles?.length || 0;
+  const totalScans   = dexaRaw?.length  || 0;
+
+  const monthStart = new Date(now.getFullYear(), now.getMonth(), 1).toISOString().slice(0,10);
+  const scansThisMonth = (dexaRaw || []).filter(s => s.scan_date >= monthStart).length;
+
+  const fatVals = (dexaRaw || []).map(s => s.fat_pct).filter(v => v != null);
+  const avgFat  = fatVals.length ? (fatVals.reduce((a,b) => a+b,0) / fatVals.length).toFixed(1) : '—';
+
+  document.getElementById('an-kpis').innerHTML = [
+    { label:'Total Clients',     value: totalClients, icon:'👥', color:'var(--blue)'   },
+    { label:'DEXA Scans Total',  value: totalScans,   icon:'🦴', color:'var(--gold)'   },
+    { label:'Scans This Month',  value: scansThisMonth, icon:'📅', color:'var(--teal)' },
+    { label:'Avg Body Fat %',    value: avgFat + (avgFat !== '—' ? '%' : ''), icon:'💪', color:'var(--green)' },
+  ].map(k => `
+    <div class="card" style="margin-bottom:0;text-align:center;">
+      <div style="font-size:28px;margin-bottom:6px;">${k.icon}</div>
+      <div style="font-size:32px;font-family:'Bebas Neue',sans-serif;color:${k.color};letter-spacing:1px;">${k.value}</div>
+      <div style="font-size:11px;color:var(--muted2);text-transform:uppercase;letter-spacing:0.8px;margin-top:2px;">${k.label}</div>
+    </div>`).join('');
+
+  /* ── SEX SPLIT ── */
+  const males   = (profiles||[]).filter(p => p.sex === 'male').length;
+  const females = (profiles||[]).filter(p => p.sex === 'female').length;
+  const unknown = totalClients - males - females;
+  const total   = totalClients || 1;
+
+  const sexData = [
+    { label:'Male',    count:males,   color:'var(--blue)' },
+    { label:'Female',  count:females, color:'var(--gold)' },
+    { label:'Unknown', count:unknown, color:'var(--muted)' },
+  ].filter(d => d.count > 0);
+
+  // Donut SVG
+  const r = 56, cx = 70, cy = 70, stroke = 22;
+  const circ = 2 * Math.PI * r;
+  let offset = 0;
+  const arcs = sexData.map(d => {
+    const pct = d.count / total;
+    const dash = pct * circ;
+    const arc = `<circle cx="${cx}" cy="${cy}" r="${r}" fill="none" stroke="${d.color}" stroke-width="${stroke}"
+      stroke-dasharray="${dash.toFixed(2)} ${(circ - dash).toFixed(2)}"
+      stroke-dashoffset="${(-offset).toFixed(2)}" transform="rotate(-90 ${cx} ${cy})" style="transition:stroke-dasharray 0.6s;"/>`;
+    offset += dash;
+    return arc;
+  }).join('');
+
+  document.getElementById('an-sex-chart').innerHTML = `
+    <svg width="140" height="140" viewBox="0 0 140 140">
+      <circle cx="${cx}" cy="${cy}" r="${r}" fill="none" stroke="var(--surface3)" stroke-width="${stroke}"/>
+      ${arcs}
+    </svg>
+    <div style="display:flex;flex-direction:column;gap:6px;width:100%;">
+      ${sexData.map(d => `
+        <div style="display:flex;align-items:center;gap:8px;justify-content:space-between;">
+          <div style="display:flex;align-items:center;gap:6px;">
+            <div style="width:10px;height:10px;border-radius:50%;background:${d.color};flex-shrink:0;"></div>
+            <span style="font-size:12px;color:var(--muted2);">${d.label}</span>
+          </div>
+          <span style="font-weight:600;font-size:13px;">${d.count} <span style="color:var(--muted2);font-size:11px;">(${Math.round(d.count/total*100)}%)</span></span>
+        </div>`).join('')}
+    </div>`;
+
+  /* ── AGE DISTRIBUTION ── */
+  function calcAge(dob) {
+    if (!dob) return null;
+    const d = new Date(dob);
+    let age = now.getFullYear() - d.getFullYear();
+    if (now < new Date(now.getFullYear(), d.getMonth(), d.getDate())) age--;
+    return age;
+  }
+
+  const ageBuckets = {'Under 20':0,'20s':0,'30s':0,'40s':0,'50s':0,'60s':0,'70+':0};
+  (profiles||[]).forEach(p => {
+    const age = calcAge(p.dob);
+    if (age === null) return;
+    if (age < 20)      ageBuckets['Under 20']++;
+    else if (age < 30) ageBuckets['20s']++;
+    else if (age < 40) ageBuckets['30s']++;
+    else if (age < 50) ageBuckets['40s']++;
+    else if (age < 60) ageBuckets['50s']++;
+    else if (age < 70) ageBuckets['60s']++;
+    else               ageBuckets['70+']++;
+  });
+
+  document.getElementById('an-age-chart').innerHTML = anBarChart(
+    Object.entries(ageBuckets).filter(([,v]) => v > 0),
+    'var(--blue)', totalClients
+  );
+
+  /* ── SCAN VOLUME LAST 12 MONTHS ── */
+  const monthBuckets = {};
+  for (let i = 11; i >= 0; i--) {
+    const d = new Date(now.getFullYear(), now.getMonth() - i, 1);
+    const key = `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}`;
+    const label = d.toLocaleString('en', {month:'short', year:'2-digit'});
+    monthBuckets[key] = { label, count: 0 };
+  }
+  (dexaRaw||[]).forEach(s => {
+    const key = s.scan_date?.slice(0,7);
+    if (key && monthBuckets[key]) monthBuckets[key].count++;
+  });
+
+  const volEntries = Object.values(monthBuckets);
+  const maxVol = Math.max(...volEntries.map(m => m.count), 1);
+  document.getElementById('an-volume-chart').innerHTML = anColumnChart(
+    volEntries.map(m => [m.label, m.count]),
+    'var(--teal)', maxVol
+  );
+
+  /* ── BODY FAT DISTRIBUTION ── */
+  const fatBuckets = {'<15%':0,'15–20%':0,'20–25%':0,'25–30%':0,'30–35%':0,'35%+':0};
+  (dexaRaw||[]).forEach(s => {
+    const f = s.fat_pct;
+    if (f == null) return;
+    if (f < 15)      fatBuckets['<15%']++;
+    else if (f < 20) fatBuckets['15–20%']++;
+    else if (f < 25) fatBuckets['20–25%']++;
+    else if (f < 30) fatBuckets['25–30%']++;
+    else if (f < 35) fatBuckets['30–35%']++;
+    else             fatBuckets['35%+']++;
+  });
+
+  document.getElementById('an-fat-chart').innerHTML = anBarChart(
+    Object.entries(fatBuckets),
+    'var(--gold)', totalScans
+  );
+
+  /* ── MEMBER LEVELS ── */
+  const levelOrder = ['Bronze','Silver','Gold','Platinum'];
+  const levelColors = { Bronze:'#cd7f32', Silver:'#b0b0b0', Gold:'var(--gold)', Platinum:'var(--blue)' };
+  const levelBuckets = {};
+  levelOrder.forEach(l => levelBuckets[l] = 0);
+  (profiles||[]).forEach(p => {
+    const l = p.member_level || 'Bronze';
+    if (levelBuckets[l] !== undefined) levelBuckets[l]++;
+    else levelBuckets['Bronze']++;
+  });
+
+  document.getElementById('an-levels-chart').innerHTML = anBarChart(
+    levelOrder.map(l => [l, levelBuckets[l]]),
+    null, totalClients,
+    levelOrder.map(l => levelColors[l])
+  );
+
+  /* ── MARKETING: fetch Zoho intake pending ── */
+  const { data: leads } = await sb.from('zoho_intake_pending')
+    .select('full_name,email,sex,dob,address,received_at')
+    .order('received_at')
+    .limit(5000);
+
+  const allLeads = leads || [];
+  const totalLeads = allLeads.length;
+
+  // Conversion: how many lead emails match a profile email
+  const profileEmails = new Set(
+    (profiles||[]).map(p => p.email).filter(Boolean).map(e => e.toLowerCase())
+  );
+  // We don't have emails in profiles table directly — use name match as proxy
+  // Count leads that were presumably linked (not in pending = converted)
+  // Since zoho_intake_pending only stores unmatched ones, all rows = unconverted leads
+  // But if they were matched, they were never stored here — so totalLeads = unconverted
+  const converted = totalClients; // all clients could have come via intake
+  const conversionRate = totalLeads > 0 ? Math.round(converted / (converted + totalLeads) * 100) : 0;
+
+  document.getElementById('an-mkt-kpis').innerHTML = [
+    { label:'Total Leads (unmatched)', value: totalLeads, icon:'📋', color:'var(--orange)' },
+    { label:'Converted to Clients',   value: converted,  icon:'✅', color:'var(--green)'  },
+    { label:'Est. Conversion Rate',   value: conversionRate + '%', icon:'📈', color:'var(--teal)' },
+    { label:'Leads This Month',       value: allLeads.filter(l => l.received_at?.slice(0,7) === now.toISOString().slice(0,7)).length, icon:'🆕', color:'var(--blue)' },
+  ].map(k => `
+    <div class="card" style="margin-bottom:0;text-align:center;">
+      <div style="font-size:28px;margin-bottom:6px;">${k.icon}</div>
+      <div style="font-size:32px;font-family:'Bebas Neue',sans-serif;color:${k.color};letter-spacing:1px;">${k.value}</div>
+      <div style="font-size:11px;color:var(--muted2);text-transform:uppercase;letter-spacing:0.8px;margin-top:2px;">${k.label}</div>
+    </div>`).join('');
+
+  /* Lead sex split */
+  const lMales   = allLeads.filter(l => l.sex === 'male').length;
+  const lFemales = allLeads.filter(l => l.sex === 'female').length;
+  const lUnknown = totalLeads - lMales - lFemales;
+  const lTotal   = totalLeads || 1;
+  const lSexData = [
+    { label:'Male',    count:lMales,   color:'var(--blue)' },
+    { label:'Female',  count:lFemales, color:'var(--gold)' },
+    { label:'Unknown', count:lUnknown, color:'var(--muted)' },
+  ].filter(d => d.count > 0);
+
+  let lOffset = 0;
+  const lArcs = lSexData.map(d => {
+    const pct = d.count / lTotal;
+    const dash = pct * circ;
+    const arc = `<circle cx="${cx}" cy="${cy}" r="${r}" fill="none" stroke="${d.color}" stroke-width="${stroke}"
+      stroke-dasharray="${dash.toFixed(2)} ${(circ-dash).toFixed(2)}"
+      stroke-dashoffset="${(-lOffset).toFixed(2)}" transform="rotate(-90 ${cx} ${cy})"/>`;
+    lOffset += dash;
+    return arc;
+  }).join('');
+
+  document.getElementById('an-lead-sex').innerHTML = `
+    <svg width="140" height="140" viewBox="0 0 140 140">
+      <circle cx="${cx}" cy="${cy}" r="${r}" fill="none" stroke="var(--surface3)" stroke-width="${stroke}"/>
+      ${lArcs}
+    </svg>
+    <div style="display:flex;flex-direction:column;gap:6px;width:100%;">
+      ${lSexData.map(d => `
+        <div style="display:flex;align-items:center;gap:8px;justify-content:space-between;">
+          <div style="display:flex;align-items:center;gap:6px;">
+            <div style="width:10px;height:10px;border-radius:50%;background:${d.color};flex-shrink:0;"></div>
+            <span style="font-size:12px;color:var(--muted2);">${d.label}</span>
+          </div>
+          <span style="font-weight:600;font-size:13px;">${d.count} <span style="color:var(--muted2);font-size:11px;">(${Math.round(d.count/lTotal*100)}%)</span></span>
+        </div>`).join('')}
+    </div>`;
+
+  /* Lead age groups */
+  const lAgeBuckets = {'Under 20':0,'20s':0,'30s':0,'40s':0,'50s':0,'60s':0,'70+':0};
+  allLeads.forEach(l => {
+    const age = calcAge(l.dob);
+    if (age === null) return;
+    if (age < 20)      lAgeBuckets['Under 20']++;
+    else if (age < 30) lAgeBuckets['20s']++;
+    else if (age < 40) lAgeBuckets['30s']++;
+    else if (age < 50) lAgeBuckets['40s']++;
+    else if (age < 60) lAgeBuckets['50s']++;
+    else if (age < 70) lAgeBuckets['60s']++;
+    else               lAgeBuckets['70+']++;
+  });
+  document.getElementById('an-lead-age').innerHTML = anBarChart(
+    Object.entries(lAgeBuckets).filter(([,v]) => v > 0),
+    'var(--orange)', totalLeads
+  );
+
+  /* Lead volume over time */
+  const lMonthBuckets = {};
+  for (let i = 11; i >= 0; i--) {
+    const d = new Date(now.getFullYear(), now.getMonth() - i, 1);
+    const key = `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}`;
+    const label = d.toLocaleString('en', {month:'short', year:'2-digit'});
+    lMonthBuckets[key] = { label, count: 0 };
+  }
+  allLeads.forEach(l => {
+    const key = l.received_at?.slice(0,7);
+    if (key && lMonthBuckets[key]) lMonthBuckets[key].count++;
+  });
+  const lVolEntries = Object.values(lMonthBuckets);
+  const lMaxVol = Math.max(...lVolEntries.map(m => m.count), 1);
+  document.getElementById('an-lead-volume').innerHTML = anColumnChart(
+    lVolEntries.map(m => [m.label, m.count]),
+    'var(--orange)', lMaxVol
+  );
+
+  /* Top suburbs */
+  const suburbCount = {};
+  allLeads.forEach(l => {
+    if (!l.address) return;
+    // Address format: "street, suburb, state, postcode" — pick second segment
+    const parts = l.address.split(',').map(s => s.trim());
+    const suburb = parts.length >= 2 ? parts[1] : parts[0];
+    if (suburb && suburb.length > 1) {
+      suburbCount[suburb] = (suburbCount[suburb] || 0) + 1;
+    }
+  });
+  const topSuburbs = Object.entries(suburbCount)
+    .sort((a,b) => b[1]-a[1])
+    .slice(0, 10);
+
+  document.getElementById('an-suburbs').innerHTML = topSuburbs.length
+    ? anBarChart(topSuburbs, 'var(--teal)', totalLeads)
+    : '<p style="color:var(--muted2);font-size:13px;">No address data in intake submissions yet.</p>';
+
+  /* Conversion visual */
+  const convW = Math.max(conversionRate, 1);
+  document.getElementById('an-conversion').innerHTML = `
+    <div style="display:grid;grid-template-columns:1fr 1fr;gap:32px;align-items:center;">
+      <div>
+        <div style="display:flex;justify-content:space-between;margin-bottom:6px;">
+          <span style="font-size:13px;color:var(--muted2);">Leads matched → Clients</span>
+          <span style="font-weight:600;">${converted}</span>
+        </div>
+        <div style="height:12px;background:var(--surface3);border-radius:6px;overflow:hidden;margin-bottom:12px;">
+          <div style="height:100%;width:${convW}%;background:var(--green);border-radius:6px;transition:width 0.6s;"></div>
+        </div>
+        <div style="display:flex;justify-content:space-between;margin-bottom:6px;">
+          <span style="font-size:13px;color:var(--muted2);">Unmatched leads (pending)</span>
+          <span style="font-weight:600;">${totalLeads}</span>
+        </div>
+        <div style="height:12px;background:var(--surface3);border-radius:6px;overflow:hidden;">
+          <div style="height:100%;width:${100-convW}%;background:var(--orange);border-radius:6px;transition:width 0.6s;"></div>
+        </div>
+      </div>
+      <div style="text-align:center;">
+        <div style="font-size:64px;font-family:'Bebas Neue',sans-serif;color:var(--green);letter-spacing:2px;">${conversionRate}%</div>
+        <div style="font-size:12px;color:var(--muted2);text-transform:uppercase;letter-spacing:1px;">Est. Conversion Rate</div>
+        <div style="font-size:11px;color:var(--muted);margin-top:6px;">${converted} clients vs ${totalLeads} unmatched leads</div>
+      </div>
+    </div>`;
+}
+
+function anBarChart(entries, color, total, colors) {
+  const max = Math.max(...entries.map(([,v]) => v), 1);
+  return `<div style="display:flex;flex-direction:column;gap:8px;">
+    ${entries.map(([label, val], i) => {
+      const pct = (val / max * 100).toFixed(1);
+      const bar_color = colors ? colors[i] : color;
+      return `<div style="display:grid;grid-template-columns:90px 1fr 48px;align-items:center;gap:10px;">
+        <span style="font-size:12px;color:var(--muted2);text-align:right;">${label}</span>
+        <div style="height:20px;background:var(--surface3);border-radius:4px;overflow:hidden;">
+          <div style="height:100%;width:${pct}%;background:${bar_color};border-radius:4px;transition:width 0.6s;"></div>
+        </div>
+        <span style="font-size:12px;font-weight:600;">${val} <span style="color:var(--muted2);font-size:10px;">${total ? '(' + Math.round(val/total*100) + '%)' : ''}</span></span>
+      </div>`;
+    }).join('')}
+  </div>`;
+}
+
+function anColumnChart(entries, color, maxVal) {
+  const barW = Math.max(24, Math.floor(560 / entries.length) - 6);
+  return `<div style="display:flex;align-items:flex-end;gap:4px;height:140px;padding-bottom:24px;position:relative;">
+    ${entries.map(([label, val]) => {
+      const h = Math.round((val / maxVal) * 110);
+      return `<div style="display:flex;flex-direction:column;align-items:center;flex:1;gap:3px;">
+        <div style="font-size:10px;color:var(--muted2);margin-bottom:2px;">${val || ''}</div>
+        <div style="width:100%;height:${h}px;background:${color};border-radius:3px 3px 0 0;min-height:2px;transition:height 0.5s;"></div>
+        <div style="font-size:9px;color:var(--muted2);white-space:nowrap;transform:rotate(-35deg);transform-origin:top center;margin-top:2px;position:absolute;bottom:0;">${label}</div>
+      </div>`;
+    }).join('')}
+  </div>`;
+}
+
 </script>
 </body>
 </html>
