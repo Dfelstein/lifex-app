@@ -149,15 +149,33 @@ html, body { height: 100%; background: var(--bg); color: var(--text); font-famil
 .month-cell.empty { cursor:default;background:transparent;border-color:transparent; }
 
 /* TODAY'S APPOINTMENTS */
-.today-grid { display:grid;grid-template-columns:repeat(auto-fill,minmax(320px,1fr));gap:20px; }
+/* TODAY TIMELINE */
+.today-grid { display:flex;flex-direction:column;gap:0; }
+.today-summary { display:flex;gap:16px;margin-bottom:20px;flex-wrap:wrap; }
+.today-stat { background:var(--surface);border:1px solid var(--border);border-radius:10px;padding:12px 20px;display:flex;align-items:center;gap:12px; }
+.today-stat-num { font-family:'Bebas Neue',sans-serif;font-size:28px;line-height:1; }
+.today-stat-label { font-size:11px;color:var(--muted2);text-transform:uppercase;letter-spacing:0.8px; }
+.appt-row { border-bottom:1px solid var(--border);transition:background 0.15s; }
+.appt-row:last-child { border-bottom:none; }
+.appt-row-header { display:grid;grid-template-columns:80px 44px 1fr auto auto;align-items:center;gap:14px;padding:14px 20px;cursor:pointer; }
+.appt-row-header:hover { background:var(--surface2); }
+.appt-time { font-family:'Bebas Neue',sans-serif;font-size:18px;color:var(--muted2);letter-spacing:1px;text-align:right; }
+.appt-avatar { width:40px;height:40px;border-radius:50%;display:flex;align-items:center;justify-content:center;font-family:'Bebas Neue',sans-serif;font-size:17px;color:#000;flex-shrink:0; }
+.appt-avatar.status-scans { background:linear-gradient(135deg,var(--green),var(--teal)); }
+.appt-avatar.status-confirmed { background:linear-gradient(135deg,var(--teal),var(--blue)); }
+.appt-avatar.status-pending { background:linear-gradient(135deg,var(--gold),var(--orange)); }
+.appt-avatar.status-none { background:var(--surface3);color:var(--muted2); }
+.appt-name { font-weight:600;font-size:14px;line-height:1.2; }
+.appt-name.clickable { cursor:pointer;color:var(--blue); }
+.appt-name.clickable:hover { color:#3d9aff; }
+.appt-row-detail { display:none;padding:0 20px 16px 158px;border-top:1px solid var(--border); }
+.appt-row.expanded .appt-row-detail { display:block; }
+.appt-row.expanded .appt-row-header { background:var(--surface2); }
+/* Legacy card styles kept for prev-appointments grid */
 .appt-card { background:var(--surface);border:1px solid var(--border);border-radius:14px;overflow:hidden;transition:border-color 0.2s; }
 .appt-card.has-client { border-color:var(--border2); }
 .appt-card.no-client { opacity:0.6; }
 .appt-header { display:flex;align-items:center;gap:12px;padding:16px 18px;border-bottom:1px solid var(--border); }
-.appt-avatar { width:44px;height:44px;border-radius:50%;background:linear-gradient(135deg,var(--blue),var(--teal));display:flex;align-items:center;justify-content:center;font-family:'Bebas Neue',sans-serif;font-size:20px;color:#000;flex-shrink:0; }
-.appt-name { font-weight:600;font-size:15px;line-height:1.2; }
-.appt-name.clickable { cursor:pointer;color:var(--blue);text-decoration:underline;text-underline-offset:2px; }
-.appt-name.clickable:hover { color:#3d9aff; }
 
 /* CLIENT PROFILE PANEL */
 .profile-header { display:flex;align-items:center;gap:16px;margin-bottom:24px; }
@@ -286,7 +304,10 @@ html, body { height: 100%; background: var(--bg); color: var(--text); font-famil
       </div>
       <div class="date-pill" id="today-date">—</div>
     </div>
-    <div id="today-grid" class="today-grid"></div>
+    <div id="today-summary" class="today-summary"></div>
+    <div class="card" style="padding:0;overflow:hidden;">
+      <div id="today-grid" class="today-grid"></div>
+    </div>
   </div>
 
   <!-- ── PREVIOUS APPOINTMENTS ── -->
@@ -627,33 +648,60 @@ async function init() {
 
 /* ══ TODAY'S APPOINTMENTS ══ */
 async function loadTodayAppointments() {
-  const grid = document.getElementById('today-grid');
+  const grid    = document.getElementById('today-grid');
+  const summary = document.getElementById('today-summary');
   const subtitle = document.getElementById('today-subtitle');
-  const dateEl = document.getElementById('today-date');
+  const dateEl  = document.getElementById('today-date');
 
   try {
-    const res = await fetch(`${SUPABASE_URL}/functions/v1/get-appointments`, {
-      headers: { 'Authorization': `Bearer ${SUPABASE_KEY}` }
-    });
-    const data = await res.json();
-
+    const data = await fetchAppts('today');
     if (data.error) throw new Error(data.error);
 
     const appts = data.appointments || [];
     const now = new Date();
     const monthNames = ['January','February','March','April','May','June','July','August','September','October','November','December'];
-    const dayNames = ['Sunday','Monday','Tuesday','Wednesday','Thursday','Friday','Saturday'];
+    const dayNames   = ['Sunday','Monday','Tuesday','Wednesday','Thursday','Friday','Saturday'];
     dateEl.textContent = `${dayNames[now.getDay()]}, ${now.getDate()} ${monthNames[now.getMonth()]}`;
     subtitle.textContent = appts.length === 0 ? 'No appointments today' : `${appts.length} appointment${appts.length > 1 ? 's' : ''} booked`;
 
     if (appts.length === 0) {
+      summary.innerHTML = '';
       grid.innerHTML = `<div class="no-acuity"><div class="no-acuity-icon">📅</div><div>No appointments scheduled for today</div></div>`;
       return;
     }
 
-    grid.innerHTML = appts.map(a => renderApptCard(a)).join('');
+    // Check which clients have scans
+    const clientIds = [...new Set(appts.filter(a => a.clientId).map(a => a.clientId))];
+    let hasScansSet = new Set();
+    if (clientIds.length) {
+      const [dexaRes, rmrRes] = await Promise.all([
+        sb.from('dexa_scans').select('client_id').in('client_id', clientIds),
+        sb.from('rmr_tests').select('client_id').in('client_id', clientIds),
+      ]);
+      [...(dexaRes.data||[]), ...(rmrRes.data||[])].forEach(r => hasScansSet.add(r.client_id));
+    }
 
-    // Wire up drag and drop for each card
+    // Summary stats
+    const withAccount = appts.filter(a => a.clientId).length;
+    const withScans   = appts.filter(a => a.clientId && hasScansSet.has(a.clientId)).length;
+    const noAccount   = appts.length - withAccount;
+    summary.innerHTML = `
+      <div class="today-stat">
+        <div><div class="today-stat-num" style="color:var(--text);">${appts.length}</div><div class="today-stat-label">Total today</div></div>
+      </div>
+      <div class="today-stat">
+        <div><div class="today-stat-num" style="color:var(--green);">${withScans}</div><div class="today-stat-label">Has scans</div></div>
+      </div>
+      <div class="today-stat">
+        <div><div class="today-stat-num" style="color:var(--teal);">${withAccount - withScans}</div><div class="today-stat-label">Account, no scans</div></div>
+      </div>
+      <div class="today-stat">
+        <div><div class="today-stat-num" style="color:var(--orange);">${noAccount}</div><div class="today-stat-label">No account yet</div></div>
+      </div>`;
+
+    grid.innerHTML = appts.map(a => renderTodayRow(a, hasScansSet)).join('');
+
+    // Wire drag & drop on detail zones
     appts.forEach(a => {
       if (!a.clientId) return;
       const zone = document.getElementById(`drop-${a.id}`);
@@ -670,15 +718,71 @@ async function loadTodayAppointments() {
   }
 }
 
+function getApptStatus(a, hasScansSet) {
+  if (!a.clientId) return 'none';
+  if (!a.emailConfirmed) return 'pending';
+  if (hasScansSet.has(a.clientId)) return 'scans';
+  return 'confirmed';
+}
+
+const statusLabel = { scans:'Has scans', confirmed:'Active — no scans', pending:'Invite pending', none:'No account' };
+const statusColor = { scans:'var(--green)', confirmed:'var(--teal)', pending:'var(--gold)', none:'var(--muted2)' };
+
+function renderTodayRow(a, hasScansSet) {
+  const initials = `${a.firstName?.[0]||''}${a.lastName?.[0]||''}`.toUpperCase();
+  const time     = new Date(a.datetime).toLocaleTimeString('en-AU', { hour:'numeric', minute:'2-digit', hour12:true });
+  const status   = getApptStatus(a, hasScansSet);
+  const sColor   = statusColor[status];
+  const sLabel   = statusLabel[status];
+
+  return `
+  <div class="appt-row" id="row-${a.id}">
+    <div class="appt-row-header" onclick="toggleTodayRow('${a.id}')">
+      <div class="appt-time">${time}</div>
+      <div class="appt-avatar status-${status}">${initials}</div>
+      <div>
+        <div class="appt-name ${a.clientId ? 'clickable' : ''}"
+          ${a.clientId ? `onclick="event.stopPropagation();viewClientProfile('${a.clientId}','${a.firstName}','${a.lastName}')"` : ''}
+        >${a.firstName} ${a.lastName}</div>
+        <div class="appt-meta" style="margin-top:2px;">${a.type || 'Appointment'} · <span style="color:${sColor};">${sLabel}</span></div>
+      </div>
+      <div class="scan-badges" id="badges-${a.id}" style="justify-content:flex-end;"></div>
+      <div style="color:var(--muted2);font-size:12px;padding-left:8px;" id="chevron-${a.id}">▼</div>
+    </div>
+    <div class="appt-row-detail">
+      ${a.clientId ? `
+        <div class="drop-zone" id="drop-${a.id}" data-client-id="${a.clientId}" data-first-name="${a.firstName}" style="margin-top:12px;">
+          <div class="drop-icon">📄</div>
+          <div>Drop PDF here or click to browse</div>
+          <div style="font-size:11px;margin-top:4px;opacity:0.6">DEXA · Blood · RMR · Hormones — auto-detected</div>
+        </div>
+      ` : `
+        <div style="padding:16px 0;display:flex;align-items:center;gap:16px;">
+          <div style="font-size:13px;color:var(--muted2);">No Life X account yet</div>
+          <button class="btn btn-blue btn-sm" onclick="createAccountFromAppt('${a.id}','${a.email}','${a.firstName}','${a.lastName}')">➕ Create Account</button>
+          <div id="create-status-${a.id}" style="font-size:12px;"></div>
+        </div>
+      `}
+    </div>
+  </div>`;
+}
+
+function toggleTodayRow(id) {
+  const row = document.getElementById(`row-${id}`);
+  const chevron = document.getElementById(`chevron-${id}`);
+  const isOpen = row.classList.toggle('expanded');
+  if (chevron) chevron.textContent = isOpen ? '▲' : '▼';
+}
+
+// Legacy card renderer kept for prev-appointments panel
 function renderApptCard(a) {
   const initials = `${a.firstName?.[0]||''}${a.lastName?.[0]||''}`.toUpperCase();
   const time = new Date(a.datetime).toLocaleTimeString('en-AU', { hour:'numeric', minute:'2-digit', hour12:true });
   const hasClient = !!a.clientId;
-
   return `
   <div class="appt-card ${hasClient ? 'has-client' : 'no-client'}">
     <div class="appt-header">
-      <div class="appt-avatar">${initials}</div>
+      <div class="appt-avatar" style="background:linear-gradient(135deg,var(--blue),var(--teal));color:#000;">${initials}</div>
       <div style="flex:1">
         <div class="appt-name ${hasClient ? 'clickable' : ''}" ${hasClient ? `onclick="viewClientProfile('${a.clientId}','${a.firstName}','${a.lastName}')"` : ''}>${a.firstName} ${a.lastName}</div>
         <div class="appt-meta">${time} · ${a.type || 'Appointment'}${!hasClient ? ' · <span style="color:var(--red)">No Life X account</span>' : ''}</div>
@@ -688,8 +792,7 @@ function renderApptCard(a) {
     <div class="appt-body">
       ${hasClient ? `
         <div class="drop-zone" id="drop-${a.id}" data-client-id="${a.clientId}" data-first-name="${a.firstName}">
-          <div class="drop-icon">📄</div>
-          <div>Drop PDF here or click to browse</div>
+          <div class="drop-icon">📄</div><div>Drop PDF here or click to browse</div>
           <div style="font-size:11px;margin-top:4px;opacity:0.6">DEXA · Blood · RMR · Hormones — auto-detected</div>
         </div>
         <div class="scan-badges" id="badges-${a.id}"></div>
@@ -838,7 +941,10 @@ const APPT_CACHE_TTL = 5 * 60 * 1000; // 5 minutes
 async function fetchAppts(date) {
   const cached = apptCache.get(date);
   if (cached && Date.now() - cached.ts < APPT_CACHE_TTL) return cached.data;
-  const res = await fetch(`${SUPABASE_URL}/functions/v1/get-appointments?date=${date}`, {
+  const url = date === 'today'
+    ? `${SUPABASE_URL}/functions/v1/get-appointments`
+    : `${SUPABASE_URL}/functions/v1/get-appointments?date=${date}`;
+  const res = await fetch(url, {
     headers: { 'Authorization': `Bearer ${SUPABASE_KEY}` }
   }).then(r => r.json()).catch(() => ({ appointments: [] }));
   apptCache.set(date, { data: res, ts: Date.now() });
@@ -3040,54 +3146,56 @@ async function renderSuburbMap(suburbs) {
   const heatPoints = [];
   const bounds = [];
 
+  const GEO_CACHE_KEY = 'lifex_geocache_v1';
+  let geoCache = {};
+  try { geoCache = JSON.parse(localStorage.getItem(GEO_CACHE_KEY) || '{}'); } catch {}
+
   for (const { suburb, state, count } of suburbs) {
-    const query = [suburb, state, 'Australia'].filter(Boolean).join(', ');
-    try {
-      const res = await fetch(
-        `https://nominatim.openstreetmap.org/search?q=${encodeURIComponent(query)}&format=json&limit=1`,
-        { headers: { 'Accept-Language': 'en' } }
-      );
-      const data = await res.json();
-      if (!data.length) continue;
+    const cacheKey = `${suburb}||${state}`.toLowerCase();
+    let lat, lng;
 
-      const lat = parseFloat(data[0].lat);
-      const lng = parseFloat(data[0].lon);
-      bounds.push([lat, lng]);
+    if (geoCache[cacheKey]) {
+      ({ lat, lng } = geoCache[cacheKey]);
+    } else {
+      const query = [suburb, state, 'Australia'].filter(Boolean).join(', ');
+      try {
+        const res = await fetch(
+          `https://nominatim.openstreetmap.org/search?q=${encodeURIComponent(query)}&format=json&limit=1`,
+          { headers: { 'Accept-Language': 'en' } }
+        );
+        const data = await res.json();
+        if (!data.length) continue;
+        lat = parseFloat(data[0].lat);
+        lng = parseFloat(data[0].lon);
+        geoCache[cacheKey] = { lat, lng };
+        try { localStorage.setItem(GEO_CACHE_KEY, JSON.stringify(geoCache)); } catch {}
+        await new Promise(r => setTimeout(r, 1100)); // rate limit only for new lookups
+      } catch { continue; }
+    }
 
-      // Heatmap point — weight by count
-      heatPoints.push([lat, lng, count / maxCount]);
+    bounds.push([lat, lng]);
+    heatPoints.push([lat, lng, count / maxCount]);
 
-      // Colour-coded circle
-      const { fill, border } = countToColor(count, maxCount);
-      const radius = 10 + Math.round((count / maxCount) * 22);
+    const { fill, border } = countToColor(count, maxCount);
+    const radius = 10 + Math.round((count / maxCount) * 22);
+    const circle = L.circleMarker([lat, lng], {
+      radius, fillColor: fill, color: border, weight: 2, opacity: 1, fillOpacity: 0.75,
+    }).addTo(anLeafletMap);
 
-      const circle = L.circleMarker([lat, lng], {
-        radius,
-        fillColor: fill,
-        color: border,
-        weight: 2,
-        opacity: 1,
-        fillOpacity: 0.75,
+    if (count === maxCount || count >= Math.ceil(maxCount * 0.5)) {
+      L.marker([lat, lng], {
+        icon: L.divIcon({
+          className: '',
+          html: `<div style="background:rgba(0,0,0,0.75);color:#fff;font-size:10px;font-weight:600;padding:2px 5px;border-radius:3px;white-space:nowrap;pointer-events:none;">${suburb}</div>`,
+          iconAnchor: [0, -radius - 4],
+        }),
+        interactive: false,
       }).addTo(anLeafletMap);
+    }
 
-      // Permanent label for suburbs with high counts, tooltip for all
-      if (count === maxCount || count >= Math.ceil(maxCount * 0.5)) {
-        L.marker([lat, lng], {
-          icon: L.divIcon({
-            className: '',
-            html: `<div style="background:rgba(0,0,0,0.75);color:#fff;font-size:10px;font-weight:600;padding:2px 5px;border-radius:3px;white-space:nowrap;pointer-events:none;">${suburb}</div>`,
-            iconAnchor: [0, -radius - 4],
-          }),
-          interactive: false,
-        }).addTo(anLeafletMap);
-      }
-
-      circle.bindTooltip(`<b>${suburb}</b>${state ? ', '+state : ''}<br><span style="color:#f5c842;font-weight:600;">${count} lead${count !== 1 ? 's' : ''}</span>`, {
-        permanent: false, direction: 'top', offset: [0, -radius],
-      });
-
-      await new Promise(r => setTimeout(r, 1100));
-    } catch { /* skip */ }
+    circle.bindTooltip(`<b>${suburb}</b>${state ? ', '+state : ''}<br><span style="color:#f5c842;font-weight:600;">${count} lead${count !== 1 ? 's' : ''}</span>`, {
+      permanent: false, direction: 'top', offset: [0, -radius],
+    });
   }
 
   // Add heatmap layer underneath circles
