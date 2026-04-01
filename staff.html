@@ -85,6 +85,8 @@ html, body { height: 100%; background: var(--bg); color: var(--text); font-famil
 .btn-danger { background:rgba(255,85,85,0.15);color:var(--red);border:1px solid rgba(255,85,85,0.3); }
 .btn-danger:hover { background:rgba(255,85,85,0.25); }
 .btn-sm { padding:6px 12px;font-size:12px; }
+.intake-svc-btn { background:var(--surface2);color:var(--muted2);border:1px solid var(--border2); }
+.intake-svc-btn.active { background:rgba(245,200,66,0.12);border-color:var(--gold);color:var(--gold); }
 
 /* TOAST */
 .toast { position:fixed;bottom:24px;right:24px;padding:12px 20px;border-radius:10px;font-size:13px;font-weight:500;z-index:1000;transition:all 0.3s;transform:translateY(20px);opacity:0; }
@@ -454,6 +456,16 @@ html, body { height: 100%; background: var(--bg); color: var(--text); font-famil
 
     <div class="card" id="intake-upload-step">
       <div class="card-title">Upload CSV</div>
+      <div style="margin-bottom:16px;">
+        <label style="font-size:11px;font-weight:600;text-transform:uppercase;letter-spacing:0.8px;color:var(--muted2);display:block;margin-bottom:6px;">Which service is this form for?</label>
+        <div style="display:flex;gap:8px;flex-wrap:wrap;" id="intake-service-btns">
+          <button class="btn btn-sm intake-svc-btn active" data-svc="DEXA" onclick="selectIntakeService(this)">🦴 DEXA</button>
+          <button class="btn btn-sm intake-svc-btn" data-svc="RMR" onclick="selectIntakeService(this)">🔥 RMR</button>
+          <button class="btn btn-sm intake-svc-btn" data-svc="Bone Density" onclick="selectIntakeService(this)">🦷 Bone Density</button>
+          <button class="btn btn-sm intake-svc-btn" data-svc="Blood" onclick="selectIntakeService(this)">🩸 Blood</button>
+          <button class="btn btn-sm intake-svc-btn" data-svc="General" onclick="selectIntakeService(this)">📋 General</button>
+        </div>
+      </div>
       <div style="display:flex;gap:12px;align-items:center;flex-wrap:wrap;">
         <label style="display:inline-flex;align-items:center;gap:8px;padding:10px 20px;background:var(--surface2);border:1px dashed var(--border2);border-radius:8px;cursor:pointer;font-size:13px;color:var(--muted2);transition:all 0.15s;" onmouseover="this.style.borderColor='var(--blue)'" onmouseout="this.style.borderColor='var(--border2)'">
           📄 Choose CSV file
@@ -546,6 +558,11 @@ html, body { height: 100%; background: var(--bg); color: var(--text); font-famil
         <div class="card-title">Lead Age Groups</div>
         <div id="an-lead-age"></div>
       </div>
+    </div>
+
+    <div class="card" style="margin-bottom:20px;">
+      <div class="card-title">Leads by Service</div>
+      <div id="an-lead-services"></div>
     </div>
 
     <div class="card" style="margin-bottom:20px;">
@@ -2481,7 +2498,7 @@ async function runIntakeImport() {
         dob: dob || null,
         address: address || null,
         sex: sex || null,
-        raw_fields: row,
+        raw_fields: { ...row, _service: getIntakeService() },
         received_at: new Date().toISOString(),
       }, { onConflict: 'email' });
       if (error) { skipped++; results.push({ name: fullName, status: 'error', note: error.message }); }
@@ -2514,6 +2531,15 @@ async function runIntakeImport() {
       <span style="font-size:12px;color:var(--muted2);">${r.note}</span>
     </div>
   `).join('');
+}
+
+function selectIntakeService(btn) {
+  document.querySelectorAll('.intake-svc-btn').forEach(b => b.classList.remove('active'));
+  btn.classList.add('active');
+}
+
+function getIntakeService() {
+  return document.querySelector('.intake-svc-btn.active')?.dataset.svc || 'General';
 }
 
 function resetIntakeImport() {
@@ -2781,6 +2807,18 @@ async function loadAnalytics() {
     Object.entries(lAgeBuckets).filter(([,v]) => v > 0),
     'var(--orange)', totalLeads
   );
+
+  /* Leads by service */
+  const svcColors = { DEXA:'var(--blue)', RMR:'var(--orange)', 'Bone Density':'var(--teal)', Blood:'var(--red)', General:'var(--muted2)' };
+  const svcBuckets = {};
+  allLeads.forEach(l => {
+    const svc = l.raw_fields?._service || 'General';
+    svcBuckets[svc] = (svcBuckets[svc] || 0) + 1;
+  });
+  const svcEntries = Object.entries(svcBuckets).sort((a,b) => b[1]-a[1]);
+  document.getElementById('an-lead-services').innerHTML = svcEntries.length
+    ? anBarChart(svcEntries, null, totalLeads, svcEntries.map(([s]) => svcColors[s] || 'var(--muted2)'))
+    : '<p style="color:var(--muted2);font-size:13px;">No service data yet — tag your imports when uploading CSVs.</p>';
 
   /* Lead volume over time */
   const lMonthBuckets = {};
