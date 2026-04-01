@@ -110,11 +110,29 @@ html, body { height: 100%; background: var(--bg); color: var(--text); font-famil
 .del-btn { width:32px;height:32px;background:rgba(255,85,85,0.1);border:none;border-radius:6px;color:var(--red);cursor:pointer;display:flex;align-items:center;justify-content:center;font-size:14px; }
 
 /* CLIENT LIST */
+.client-grid { display:grid;grid-template-columns:repeat(auto-fill,minmax(280px,1fr));gap:14px; }
+.client-card { background:var(--surface);border:1px solid var(--border);border-radius:14px;overflow:hidden;cursor:pointer;transition:border-color 0.2s,transform 0.15s; }
+.client-card:hover { border-color:var(--blue);transform:translateY(-2px); }
+.client-card-top { padding:18px 18px 14px;display:flex;gap:14px;align-items:flex-start; }
+.client-avatar { width:48px;height:48px;border-radius:50%;display:flex;align-items:center;justify-content:center;font-family:'Bebas Neue',sans-serif;font-size:20px;color:#000;flex-shrink:0;border:2px solid transparent; }
+.client-info { flex:1;min-width:0; }
+.client-name { font-weight:600;font-size:14px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis; }
+.client-meta { font-size:11px;color:var(--muted2);margin-top:2px; }
+.client-card-body { padding:0 18px 14px; }
+.client-scan-badges { display:flex;gap:5px;flex-wrap:wrap;margin-top:10px; }
+.client-scan-badge { font-size:10px;font-weight:700;padding:3px 8px;border-radius:10px;letter-spacing:0.3px; }
+.client-scan-badge.dexa  { background:rgba(77,166,255,0.15);color:var(--blue); }
+.client-scan-badge.rmr   { background:rgba(255,159,67,0.15);color:var(--orange); }
+.client-scan-badge.blood { background:rgba(255,85,85,0.15);color:var(--red); }
+.client-scan-badge.hormone { background:rgba(45,212,191,0.15);color:var(--teal); }
+.client-fat-bar { margin-top:10px; }
+.client-fat-bar-track { height:5px;background:var(--surface3);border-radius:3px;overflow:hidden;margin-top:4px; }
+.client-fat-bar-fill { height:100%;border-radius:3px;transition:width 0.5s; }
+.client-filter-btn { padding:6px 14px;border-radius:20px;border:1px solid var(--border2);background:var(--surface2);color:var(--muted2);font-family:'Outfit',sans-serif;font-size:12px;font-weight:600;cursor:pointer;transition:all 0.15s; }
+.client-filter-btn:hover { border-color:var(--blue);color:var(--text); }
+.client-filter-btn.active { background:rgba(77,166,255,0.12);border-color:var(--blue);color:var(--blue); }
+/* keep old .client-list for any legacy references */
 .client-list { display:flex;flex-direction:column;gap:8px; }
-.client-card { display:flex;align-items:center;gap:14px;padding:14px 16px;background:var(--surface2);border:1px solid var(--border);border-radius:10px;cursor:pointer;transition:border-color 0.15s; }
-.client-card:hover { border-color:var(--blue); }
-.client-avatar { width:40px;height:40px;border-radius:50%;background:linear-gradient(135deg,var(--blue),var(--teal));display:flex;align-items:center;justify-content:center;font-family:'Bebas Neue',sans-serif;font-size:18px;color:#000;flex-shrink:0; }
-.client-info { flex:1; }
 .client-name { font-weight:600;font-size:14px; }
 .client-meta { font-size:12px;color:var(--muted2);margin-top:2px; }
 .client-actions { display:flex;gap:8px; }
@@ -354,7 +372,8 @@ html, body { height: 100%; background: var(--bg); color: var(--text); font-famil
   <!-- ── CLIENTS LIST ── -->
   <div id="panel-clients" class="panel">
     <div class="page-title">All Clients</div>
-    <div style="display:flex;gap:10px;align-items:center;margin-bottom:16px;flex-wrap:wrap;">
+    <div id="clients-stats" style="display:flex;gap:12px;margin-bottom:20px;flex-wrap:wrap;"></div>
+    <div style="display:flex;gap:10px;align-items:center;margin-bottom:12px;flex-wrap:wrap;">
       <input type="text" id="client-search" placeholder="Search by name…" oninput="clientSearch=this.value;clientPage=0;searchClients()"
         style="flex:1;min-width:180px;background:var(--surface2);border:1px solid var(--border2);border-radius:8px;padding:9px 14px;color:var(--text);font-family:'Outfit',sans-serif;font-size:13px;outline:none;">
       <select id="client-sort" onchange="clientSort=this.value;clientPage=0;renderClientList()"
@@ -362,10 +381,18 @@ html, body { height: 100%; background: var(--bg); color: var(--text); font-famil
         <option value="date">Latest Scan</option>
         <option value="name">Name A–Z</option>
         <option value="level">Member Level</option>
+        <option value="fat">Body Fat %</option>
       </select>
     </div>
-    <div id="clients-list" class="client-list"></div>
-    <div id="clients-pagination" style="display:flex;align-items:center;justify-content:space-between;margin-top:16px;"></div>
+    <div style="display:flex;gap:8px;margin-bottom:20px;flex-wrap:wrap;" id="client-filter-btns">
+      <button class="client-filter-btn active" data-filter="all"      onclick="setClientFilter('all',this)">All</button>
+      <button class="client-filter-btn"        data-filter="scans"    onclick="setClientFilter('scans',this)">Has Scans</button>
+      <button class="client-filter-btn"        data-filter="noscans"  onclick="setClientFilter('noscans',this)">No Scans</button>
+      <button class="client-filter-btn"        data-filter="male"     onclick="setClientFilter('male',this)">Male</button>
+      <button class="client-filter-btn"        data-filter="female"   onclick="setClientFilter('female',this)">Female</button>
+    </div>
+    <div id="clients-list"></div>
+    <div id="clients-pagination" style="display:flex;align-items:center;justify-content:space-between;margin-top:20px;"></div>
   </div>
 
   <!-- ── NEW CLIENT ── -->
@@ -1446,29 +1473,48 @@ async function createAccountFromAppt(apptId, email, firstName, lastName) {
 }
 
 let clientSearch = '';
-let clientSort = 'date';
-let clientPage = 0;
-const CLIENT_PAGE_SIZE = 10;
+let clientSort   = 'date';
+let clientPage   = 0;
+let clientFilter = 'all';
+const CLIENT_PAGE_SIZE = 21;
 
 async function loadClients() {
-  const [profilesRes, dexaRes, rmrRes, bloodRes] = await Promise.all([
-    sb.from('profiles').select('*').or('is_staff.is.null,is_staff.eq.false').order('created_at', { ascending: false }).limit(1000),
-    sb.from('dexa_scans').select('client_id, scan_date').order('scan_date', { ascending: false }),
-    sb.from('rmr_tests').select('client_id, test_date').order('test_date', { ascending: false }),
-    sb.from('blood_panels').select('client_id, panel_date').order('panel_date', { ascending: false }),
+  const [profilesRes, dexaRes, rmrRes, bloodRes, hormoneRes] = await Promise.all([
+    sb.from('profiles').select('*').or('is_staff.is.null,is_staff.eq.false').order('created_at', { ascending: false }).limit(2000),
+    sb.from('dexa_scans').select('client_id,scan_date,fat_pct,weight_kg,lean_g').order('scan_date', { ascending: false }),
+    sb.from('rmr_tests').select('client_id,test_date').order('test_date', { ascending: false }),
+    sb.from('blood_panels').select('client_id,panel_date').order('panel_date', { ascending: false }),
+    sb.from('hormone_panels').select('client_id,panel_date').order('panel_date', { ascending: false }),
   ]);
 
-  // Build latest scan date map per client
   const latestMap = {};
+  const scanCount  = {}; // {clientId: {dexa,rmr,blood,hormone}}
+  const latestDexa = {}; // {clientId: {fat_pct, weight_kg, lean_g}}
+
   const updateLatest = (clientId, dateStr) => {
     if (!dateStr) return;
     if (!latestMap[clientId] || dateStr > latestMap[clientId]) latestMap[clientId] = dateStr;
   };
-  (dexaRes.data || []).forEach(r => updateLatest(r.client_id, r.scan_date));
-  (rmrRes.data  || []).forEach(r => updateLatest(r.client_id, r.test_date));
-  (bloodRes.data|| []).forEach(r => updateLatest(r.client_id, r.panel_date));
+  const bump = (clientId, type) => {
+    if (!scanCount[clientId]) scanCount[clientId] = { dexa:0, rmr:0, blood:0, hormone:0 };
+    scanCount[clientId][type]++;
+  };
 
-  clients = (profilesRes.data || []).map(c => ({ ...c, lastScan: latestMap[c.id] || null }));
+  (dexaRes.data||[]).forEach(r => {
+    updateLatest(r.client_id, r.scan_date);
+    bump(r.client_id, 'dexa');
+    if (!latestDexa[r.client_id]) latestDexa[r.client_id] = { fat_pct: r.fat_pct, weight_kg: r.weight_kg, lean_g: r.lean_g };
+  });
+  (rmrRes.data||[]).forEach(r => { updateLatest(r.client_id, r.test_date); bump(r.client_id, 'rmr'); });
+  (bloodRes.data||[]).forEach(r => { updateLatest(r.client_id, r.panel_date); bump(r.client_id, 'blood'); });
+  (hormoneRes.data||[]).forEach(r => { updateLatest(r.client_id, r.panel_date); bump(r.client_id, 'hormone'); });
+
+  clients = (profilesRes.data||[]).map(c => ({
+    ...c,
+    lastScan: latestMap[c.id] || null,
+    scans: scanCount[c.id] || null,
+    latestDexa: latestDexa[c.id] || null,
+  }));
   renderClientList();
   populateClientSelects();
 }
@@ -1491,87 +1537,171 @@ async function searchClients() {
       pagEl.innerHTML = '';
       return;
     }
-    const fmtDate = d => d ? new Date(d + 'T00:00:00').toLocaleDateString('en-AU', { day:'numeric', month:'short', year:'numeric' }) : null;
-    const levelColour = { Platinum: 'var(--teal)', Gold: 'var(--gold)', Standard: 'var(--muted2)' };
-    el.innerHTML = data.map(c => {
-      const fn = c.full_name?.split(' ')[0] || '';
-      const ln = c.full_name?.split(' ').slice(1).join(' ') || '';
-      return `
-      <div class="client-card" onclick="viewClientProfile('${c.id}','${fn}','${ln}')">
-        <div class="client-avatar">${c.initials || '??'}</div>
-        <div class="client-info">
-          <div class="client-name">${c.full_name}</div>
-          <div class="client-meta" style="color:${levelColour[c.member_level]||'var(--muted2)'};">${c.member_level || 'Standard'} Member</div>
+    // Merge search results with any cached scan data
+    const enriched = data.map(c => ({
+      ...c,
+      scans: clients.find(x => x.id === c.id)?.scans || null,
+      latestDexa: clients.find(x => x.id === c.id)?.latestDexa || null,
+      lastScan: clients.find(x => x.id === c.id)?.lastScan || null,
+    }));
+    // Temporarily override clients for rendering
+    const prev = clients;
+    clients = enriched;
+    clientSearch = '';
+    clientPage = 0;
+    el.innerHTML = '';
+    clients = prev;
+    // Just render search results directly using same card template
+    const fmtDate = d => d ? new Date(d+'T00:00:00').toLocaleDateString('en-AU',{day:'numeric',month:'short',year:'numeric'}) : null;
+    el.innerHTML = `<div class="client-grid">${enriched.map(c => {
+      const fn = c.full_name?.split(' ')[0]||'', ln = c.full_name?.split(' ').slice(1).join(' ')||'';
+      const lm = levelMeta[c.member_level]||levelMeta.Standard;
+      const fat = c.latestDexa?.fat_pct, sc = c.scans||{};
+      const scanBadges = [sc.dexa?`<span class="client-scan-badge dexa">DEXA ×${sc.dexa}</span>`:'',sc.rmr?`<span class="client-scan-badge rmr">RMR ×${sc.rmr}</span>`:'',sc.blood?`<span class="client-scan-badge blood">Blood ×${sc.blood}</span>`:''].filter(Boolean).join('');
+      return `<div class="client-card" onclick="viewClientProfile('${c.id}','${fn}','${ln}')">
+        <div class="client-card-top">
+          <div class="client-avatar" style="background:linear-gradient(${lm.gradient});border-color:${lm.border};">${c.initials||'??'}</div>
+          <div class="client-info"><div class="client-name">${c.full_name||'Unknown'}</div><div class="client-meta" style="color:${lm.color};font-weight:600;">${c.member_level||'Standard'}</div></div>
         </div>
-        <div class="client-actions">
-          <button class="btn btn-outline btn-sm" onclick="event.stopPropagation();viewClientProfile('${c.id}','${fn}','${ln}')">View Profile</button>
-        </div>
-      </div>`;
-    }).join('');
-    pagEl.innerHTML = `<div style="font-size:12px;color:var(--muted2);">${data.length} result${data.length!==1?'s':''} for "${q}"</div>`;
+        <div class="client-card-body">
+          ${fat!=null?`<div class="client-fat-bar"><div style="display:flex;justify-content:space-between;"><span style="font-size:10px;color:var(--muted2);">Body Fat</span><span style="font-size:13px;font-weight:700;color:${fatColor(fat)};">${fat.toFixed(1)}%</span></div><div class="client-fat-bar-track"><div class="client-fat-bar-fill" style="width:${Math.min(fat,50)*2}%;background:${fatColor(fat)};"></div></div></div>`:c.lastScan?`<div style="font-size:11px;color:var(--muted2);">Last scan: ${fmtDate(c.lastScan)}</div>`:`<div style="font-size:11px;color:var(--muted2);">No scans yet</div>`}
+          ${scanBadges?`<div class="client-scan-badges">${scanBadges}</div>`:''}
+        </div></div>`;
+    }).join('')}</div>`;
+    pagEl.innerHTML = `<div style="font-size:12px;color:var(--muted2);">${enriched.length} result${enriched.length!==1?'s':''} for "${q}"</div>`;
   }, 250);
 }
 
+function setClientFilter(f, btn) {
+  clientFilter = f;
+  clientPage = 0;
+  document.querySelectorAll('.client-filter-btn').forEach(b => b.classList.remove('active'));
+  btn.classList.add('active');
+  renderClientList();
+}
+
+const levelMeta = {
+  Platinum: { color:'var(--teal)',   border:'rgba(45,212,191,0.4)',  gradient:'135deg,#2dd4bf,#4da6ff' },
+  Gold:     { color:'var(--gold)',   border:'rgba(245,200,66,0.4)',  gradient:'135deg,#f5c842,#e8a020' },
+  Silver:   { color:'#b0b0b0',       border:'rgba(176,176,176,0.4)', gradient:'135deg,#b0b0b0,#888' },
+  Bronze:   { color:'#cd7f32',       border:'rgba(205,127,50,0.4)',  gradient:'135deg,#cd7f32,#a0622a' },
+  Standard: { color:'var(--muted2)', border:'rgba(90,98,114,0.3)',   gradient:'135deg,var(--blue),var(--teal)' },
+};
+
+function fatColor(f) {
+  if (f == null) return 'var(--muted2)';
+  if (f < 18) return 'var(--blue)';
+  if (f < 25) return 'var(--green)';
+  if (f < 32) return 'var(--gold)';
+  return 'var(--red)';
+}
+
 function renderClientList() {
-  const el = document.getElementById('clients-list');
+  const el    = document.getElementById('clients-list');
   const pagEl = document.getElementById('clients-pagination');
+  const statsEl = document.getElementById('clients-stats');
+
   if (!clients.length) {
     el.innerHTML = '<div style="color:var(--muted2);font-size:13px;">No clients yet.</div>';
     pagEl.innerHTML = '';
     return;
   }
 
-  const q = clientSearch.toLowerCase();
+  // Stats
+  const withScans = clients.filter(c => c.scans).length;
+  const noScans   = clients.length - withScans;
+  const males     = clients.filter(c => c.sex === 'male').length;
+  const females   = clients.filter(c => c.sex === 'female').length;
+  if (statsEl) statsEl.innerHTML = [
+    { label:'Total', value: clients.length, color:'var(--text)' },
+    { label:'Has Scans', value: withScans, color:'var(--green)' },
+    { label:'No Scans', value: noScans, color:'var(--muted2)' },
+    { label:'Male', value: males, color:'var(--blue)' },
+    { label:'Female', value: females, color:'var(--gold)' },
+  ].map(s => `
+    <div style="background:var(--surface);border:1px solid var(--border);border-radius:10px;padding:10px 18px;display:flex;align-items:center;gap:10px;">
+      <div style="font-family:'Bebas Neue',sans-serif;font-size:26px;color:${s.color};line-height:1;">${s.value}</div>
+      <div style="font-size:10px;color:var(--muted2);text-transform:uppercase;letter-spacing:0.8px;">${s.label}</div>
+    </div>`).join('');
+
+  const q = clientSearch.trim().toLowerCase();
   let filtered = q ? clients.filter(c => c.full_name?.toLowerCase().includes(q)) : [...clients];
 
+  // Apply filter
+  if (clientFilter === 'scans')   filtered = filtered.filter(c => c.scans);
+  if (clientFilter === 'noscans') filtered = filtered.filter(c => !c.scans);
+  if (clientFilter === 'male')    filtered = filtered.filter(c => c.sex === 'male');
+  if (clientFilter === 'female')  filtered = filtered.filter(c => c.sex === 'female');
+
+  // Sort
   if (clientSort === 'date') {
-    filtered.sort((a, b) => {
-      if (!a.lastScan && !b.lastScan) return 0;
-      if (!a.lastScan) return 1;
-      if (!b.lastScan) return -1;
-      return b.lastScan.localeCompare(a.lastScan);
-    });
+    filtered.sort((a,b) => (!a.lastScan && !b.lastScan) ? 0 : !a.lastScan ? 1 : !b.lastScan ? -1 : b.lastScan.localeCompare(a.lastScan));
   } else if (clientSort === 'name') {
-    filtered.sort((a, b) => (a.full_name || '').localeCompare(b.full_name || ''));
+    filtered.sort((a,b) => (a.full_name||'').localeCompare(b.full_name||''));
   } else if (clientSort === 'level') {
-    const order = { Platinum: 0, Gold: 1, Standard: 2 };
-    filtered.sort((a, b) => (order[a.member_level] ?? 3) - (order[b.member_level] ?? 3));
+    const order = { Platinum:0, Gold:1, Silver:2, Bronze:3, Standard:4 };
+    filtered.sort((a,b) => (order[a.member_level]??5) - (order[b.member_level]??5));
+  } else if (clientSort === 'fat') {
+    filtered.sort((a,b) => {
+      const af = a.latestDexa?.fat_pct ?? 999, bf = b.latestDexa?.fat_pct ?? 999;
+      return af - bf;
+    });
   }
 
   const totalPages = Math.ceil(filtered.length / CLIENT_PAGE_SIZE);
   if (clientPage >= totalPages) clientPage = Math.max(0, totalPages - 1);
   const page = filtered.slice(clientPage * CLIENT_PAGE_SIZE, (clientPage + 1) * CLIENT_PAGE_SIZE);
 
-  const fmtDate = d => d ? new Date(d + 'T00:00:00').toLocaleDateString('en-AU', { day:'numeric', month:'short', year:'numeric' }) : null;
-  const levelColour = { Platinum: 'var(--teal)', Gold: 'var(--gold)', Standard: 'var(--muted2)' };
+  const fmtDate = d => d ? new Date(d+'T00:00:00').toLocaleDateString('en-AU',{day:'numeric',month:'short',year:'numeric'}) : null;
 
-  el.innerHTML = page.map(c => {
-    const fn = c.full_name?.split(' ')[0] || '';
-    const ln = c.full_name?.split(' ').slice(1).join(' ') || '';
-    const lastScanText = c.lastScan ? `Last scan: ${fmtDate(c.lastScan)}` : 'No scans yet';
+  el.innerHTML = `<div class="client-grid">${page.map(c => {
+    const fn   = c.full_name?.split(' ')[0] || '';
+    const ln   = c.full_name?.split(' ').slice(1).join(' ') || '';
+    const lm   = levelMeta[c.member_level] || levelMeta.Standard;
+    const fat  = c.latestDexa?.fat_pct;
+    const sc   = c.scans || {};
+    const memberSince = c.created_at ? new Date(c.created_at).toLocaleDateString('en-AU',{month:'short',year:'numeric'}) : '';
+
+    const scanBadges = [
+      sc.dexa   ? `<span class="client-scan-badge dexa">DEXA ×${sc.dexa}</span>` : '',
+      sc.rmr    ? `<span class="client-scan-badge rmr">RMR ×${sc.rmr}</span>` : '',
+      sc.blood  ? `<span class="client-scan-badge blood">Blood ×${sc.blood}</span>` : '',
+      sc.hormone? `<span class="client-scan-badge hormone">Hormones ×${sc.hormone}</span>` : '',
+    ].filter(Boolean).join('');
+
     return `
     <div class="client-card" onclick="viewClientProfile('${c.id}','${fn}','${ln}')">
-      <div class="client-avatar">${c.initials || '??'}</div>
-      <div class="client-info">
-        <div class="client-name">${c.full_name}</div>
-        <div class="client-meta" style="color:${levelColour[c.member_level]||'var(--muted2)'};">${c.member_level} Member</div>
-        <div class="client-meta">${lastScanText}</div>
+      <div class="client-card-top">
+        <div class="client-avatar" style="background:linear-gradient(${lm.gradient});border-color:${lm.border};">${c.initials||'??'}</div>
+        <div class="client-info">
+          <div class="client-name">${c.full_name||'Unknown'}</div>
+          <div class="client-meta" style="color:${lm.color};font-weight:600;">${c.member_level||'Standard'}</div>
+          <div class="client-meta">${c.sex ? c.sex.charAt(0).toUpperCase()+c.sex.slice(1) : ''}${memberSince ? (c.sex ? ' · ' : '') + 'Since ' + memberSince : ''}</div>
+        </div>
       </div>
-      <div class="client-actions">
-        <button class="btn btn-outline btn-sm" onclick="event.stopPropagation();viewClientProfile('${c.id}','${fn}','${ln}')">View Profile</button>
+      <div class="client-card-body">
+        ${fat != null ? `
+          <div class="client-fat-bar">
+            <div style="display:flex;justify-content:space-between;align-items:center;">
+              <span style="font-size:10px;color:var(--muted2);text-transform:uppercase;letter-spacing:0.8px;">Body Fat</span>
+              <span style="font-size:13px;font-weight:700;color:${fatColor(fat)};">${fat.toFixed(1)}%</span>
+            </div>
+            <div class="client-fat-bar-track">
+              <div class="client-fat-bar-fill" style="width:${Math.min(fat,50)*2}%;background:${fatColor(fat)};"></div>
+            </div>
+          </div>` : `<div style="font-size:11px;color:var(--muted2);padding:4px 0;">${c.lastScan ? 'Last scan: '+fmtDate(c.lastScan) : 'No scans yet'}</div>`}
+        ${scanBadges ? `<div class="client-scan-badges">${scanBadges}</div>` : ''}
+        ${c.lastScan && fat != null ? `<div style="font-size:11px;color:var(--muted);margin-top:8px;">Last scan: ${fmtDate(c.lastScan)}</div>` : ''}
       </div>
     </div>`;
-  }).join('');
+  }).join('')}</div>`;
 
   // Pagination
-  if (totalPages <= 1) {
-    pagEl.innerHTML = `<div style="font-size:12px;color:var(--muted2);">${filtered.length} client${filtered.length!==1?'s':''}</div>`;
-  } else {
-    pagEl.innerHTML = `
-      <button class="week-nav-btn" onclick="clientPage--;renderClientList()" ${clientPage===0?'disabled style="opacity:0.4"':''}>◀ Prev</button>
-      <div style="font-size:12px;color:var(--muted2);">Page ${clientPage+1} of ${totalPages} &nbsp;·&nbsp; ${filtered.length} clients</div>
-      <button class="week-nav-btn" onclick="clientPage++;renderClientList()" ${clientPage>=totalPages-1?'disabled style="opacity:0.4"':''}>Next ▶</button>`;
-  }
+  pagEl.innerHTML = totalPages <= 1
+    ? `<div style="font-size:12px;color:var(--muted2);">${filtered.length} client${filtered.length!==1?'s':''}</div>`
+    : `<button class="week-nav-btn" onclick="clientPage--;renderClientList()" ${clientPage===0?'disabled style="opacity:0.4"':''}>◀ Prev</button>
+       <div style="font-size:12px;color:var(--muted2);">Page ${clientPage+1} of ${totalPages} · ${filtered.length} clients</div>
+       <button class="week-nav-btn" onclick="clientPage++;renderClientList()" ${clientPage>=totalPages-1?'disabled style="opacity:0.4"':''}>Next ▶</button>`;
 }
 
 function populateClientSelects() {
