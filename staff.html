@@ -2664,20 +2664,22 @@ async function loadAnalytics() {
     return age;
   }
 
-  const ageBuckets = {'Under 20':0,'20s':0,'30s':0,'40s':0,'50s':0,'60s':0,'70+':0};
+  const ageRanges = ['15–20','20–25','25–30','30–35','35–40','40–45','45–50','50–55','55–60','60–65','65–70','70+'];
+  const ageBuckets = Object.fromEntries(ageRanges.map(r => [r, 0]));
+  function ageToRange(age) {
+    if (age < 15) return null;
+    if (age >= 70) return '70+';
+    const low = Math.floor(age / 5) * 5;
+    return `${low}–${low + 5}`;
+  }
   // Use latest scan per client to avoid double-counting
   const latestAgeByClient = {};
   (dexaRaw||[]).forEach(s => {
     if (s.patient_age != null) latestAgeByClient[s.client_id] = s.patient_age;
   });
   Object.values(latestAgeByClient).forEach(age => {
-    if (age < 20)      ageBuckets['Under 20']++;
-    else if (age < 30) ageBuckets['20s']++;
-    else if (age < 40) ageBuckets['30s']++;
-    else if (age < 50) ageBuckets['40s']++;
-    else if (age < 60) ageBuckets['50s']++;
-    else if (age < 70) ageBuckets['60s']++;
-    else               ageBuckets['70+']++;
+    const r = ageToRange(age);
+    if (r) ageBuckets[r]++;
   });
   const ageTotal = Object.values(ageBuckets).reduce((a,b) => a+b, 0);
 
@@ -2848,17 +2850,12 @@ async function loadAnalytics() {
     </div>`;
 
   /* Lead age groups */
-  const lAgeBuckets = {'Under 20':0,'20s':0,'30s':0,'40s':0,'50s':0,'60s':0,'70+':0};
+  const lAgeBuckets = Object.fromEntries(ageRanges.map(r => [r, 0]));
   allLeads.forEach(l => {
     const age = calcAge(l.dob);
     if (age === null) return;
-    if (age < 20)      lAgeBuckets['Under 20']++;
-    else if (age < 30) lAgeBuckets['20s']++;
-    else if (age < 40) lAgeBuckets['30s']++;
-    else if (age < 50) lAgeBuckets['40s']++;
-    else if (age < 60) lAgeBuckets['50s']++;
-    else if (age < 70) lAgeBuckets['60s']++;
-    else               lAgeBuckets['70+']++;
+    const r = ageToRange(age);
+    if (r) lAgeBuckets[r]++;
   });
   document.getElementById('an-lead-age').innerHTML = anBarChart(
     Object.entries(lAgeBuckets).filter(([,v]) => v > 0),
