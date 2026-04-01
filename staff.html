@@ -2561,10 +2561,33 @@ async function loadAnalytics() {
   analyticsLoaded = true;
 
   // Fetch profiles (non-staff) and dexa scans in parallel
-  const [{ data: profiles }, { data: dexaRaw }] = await Promise.all([
-    sb.from('profiles').select('id,sex,dob,member_level,created_at').or('is_staff.is.null,is_staff.eq.false').limit(2000),
+  const [{ data: profilesRaw }, { data: dexaRaw }] = await Promise.all([
+    sb.from('profiles').select('id,full_name,sex,dob,member_level,created_at').or('is_staff.is.null,is_staff.eq.false').limit(2000),
     sb.from('dexa_scans').select('client_id,scan_date,fat_pct,sex,patient_age').order('scan_date').limit(5000),
   ]);
+
+  // Infer sex from first name for profiles missing it
+  const profiles = profilesRaw || [];
+  const nullSexProfiles = profiles.filter(p => !p.sex);
+  if (nullSexProfiles.length) {
+    const firstNames = [...new Set(nullSexProfiles.map(p => p.full_name?.split(' ')[0]).filter(Boolean))];
+    const profNameGenderMap = {};
+    for (let i = 0; i < firstNames.length; i += 10) {
+      const batch = firstNames.slice(i, i + 10);
+      try {
+        const params = batch.map(n => `name[]=${encodeURIComponent(n)}`).join('&');
+        const res = await fetch(`https://api.genderize.io?${params}&country_id=AU`);
+        const data = await res.json();
+        (Array.isArray(data) ? data : [data]).forEach(d => {
+          if (d.gender && d.probability >= 0.7) profNameGenderMap[d.name.toLowerCase()] = d.gender;
+        });
+      } catch { /* skip */ }
+    }
+    nullSexProfiles.forEach(p => {
+      const fn = p.full_name?.split(' ')[0]?.toLowerCase();
+      if (fn && profNameGenderMap[fn]) p.sex = profNameGenderMap[fn];
+    });
+  }
 
   const now = new Date();
 
@@ -2727,6 +2750,40 @@ async function loadAnalytics() {
     .limit(5000);
 
   const allLeads = leads || [];
+
+  // Infer sex from first name for records missing it
+  const nullSexLeads = allLeads.filter(l => !l.sex);
+  if (nullSexLeads.length) {
+    const firstNames = [...new Set(nullSexLeads.map(l => l.full_name?.split(' ')[0]).filter(Boolean))];
+    const nameGenderMap = {};
+    // Batch 10 names at a time (genderize.io limit)
+    for (let i = 0; i < firstNames.length; i += 10) {
+      const batch = firstNames.slice(i, i + 10);
+      try {
+        const params = batch.map(n => `name[]=${encodeURIComponent(n)}`).join('&');
+        const res = await fetch(`https://api.genderize.io?${params}&country_id=AU`);
+        const data = await res.json();
+        (Array.isArray(data) ? data : [data]).forEach(d => {
+          if (d.gender && d.probability >= 0.7) nameGenderMap[d.name.toLowerCase()] = d.gender;
+        });
+      } catch { /* skip on error */ }
+    }
+    // Apply inferred genders and update DB
+    const updates = [];
+    allLeads.forEach(l => {
+      if (!l.sex) {
+        const firstName = l.full_name?.split(' ')[0]?.toLowerCase();
+        const inferred = firstName ? nameGenderMap[firstName] : null;
+        if (inferred) {
+          l.sex = inferred;
+          if (l.email) updates.push({ email: l.email, sex: inferred });
+        }
+      }
+    });
+    // Fire-and-forget DB updates so future loads have the data
+    updates.forEach(u => sb.from('zoho_intake_pending').update({ sex: u.sex }).eq('email', u.email));
+  }
+
   const totalLeads = allLeads.length;
 
   // Conversion: how many lead emails match a profile email
