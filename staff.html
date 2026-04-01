@@ -527,7 +527,7 @@ html, body { height: 100%; background: var(--bg); color: var(--text); font-famil
 
     <!-- Row 3: Scan volume over time -->
     <div class="card" style="margin-bottom:20px;">
-      <div class="card-title">Scan Volume — Last 12 Months</div>
+      <div class="card-title">Scan Volume — All Time <span style="font-size:10px;color:var(--muted2);font-weight:400;text-transform:none;letter-spacing:0;">(gold bar = current month, in progress)</span></div>
       <div id="an-volume-chart"></div>
     </div>
 
@@ -2687,23 +2687,30 @@ async function loadAnalytics() {
     ? anBarChart(Object.entries(ageBuckets).filter(([,v]) => v > 0), 'var(--blue)', ageTotal)
     : '<p style="color:var(--muted2);font-size:13px;">No age data available yet — upload DEXA scans to populate.</p>';
 
-  /* ── SCAN VOLUME LAST 12 MONTHS ── */
+  /* ── SCAN VOLUME ALL TIME ── */
+  const currentMonthKey = `${now.getFullYear()}-${String(now.getMonth()+1).padStart(2,'0')}`;
   const monthBuckets = {};
-  for (let i = 11; i >= 0; i--) {
-    const d = new Date(now.getFullYear(), now.getMonth() - i, 1);
-    const key = `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}`;
-    const label = d.toLocaleString('en', {month:'short', year:'2-digit'});
-    monthBuckets[key] = { label, count: 0 };
-  }
   (dexaRaw||[]).forEach(s => {
     const key = s.scan_date?.slice(0,7);
-    if (key && monthBuckets[key]) monthBuckets[key].count++;
+    if (!key) return;
+    if (!monthBuckets[key]) {
+      const [y, m] = key.split('-').map(Number);
+      const label = new Date(y, m-1, 1).toLocaleString('en', {month:'short', year:'2-digit'});
+      monthBuckets[key] = { label, count: 0, key };
+    }
+    monthBuckets[key].count++;
   });
-
-  const volEntries = Object.values(monthBuckets);
+  // Ensure current month always shows even if no scans yet
+  if (!monthBuckets[currentMonthKey]) {
+    monthBuckets[currentMonthKey] = {
+      label: now.toLocaleString('en', {month:'short', year:'2-digit'}),
+      count: 0, key: currentMonthKey
+    };
+  }
+  const volEntries = Object.values(monthBuckets).sort((a,b) => a.key.localeCompare(b.key));
   const maxVol = Math.max(...volEntries.map(m => m.count), 1);
   document.getElementById('an-volume-chart').innerHTML = anColumnChart(
-    volEntries.map(m => [m.label, m.count]),
+    volEntries.map(m => [m.label, m.count, m.key === currentMonthKey]),
     'var(--teal)', maxVol
   );
 
@@ -3018,17 +3025,20 @@ function anBarChart(entries, color, total, colors) {
 }
 
 function anColumnChart(entries, color, maxVal) {
-  const barW = Math.max(24, Math.floor(560 / entries.length) - 6);
-  return `<div style="display:flex;align-items:flex-end;gap:4px;height:140px;padding-bottom:24px;position:relative;">
-    ${entries.map(([label, val]) => {
-      const h = Math.round((val / maxVal) * 110);
-      return `<div style="display:flex;flex-direction:column;align-items:center;flex:1;gap:3px;">
-        <div style="font-size:10px;color:var(--muted2);margin-bottom:2px;">${val || ''}</div>
-        <div style="width:100%;height:${h}px;background:${color};border-radius:3px 3px 0 0;min-height:2px;transition:height 0.5s;"></div>
-        <div style="font-size:9px;color:var(--muted2);white-space:nowrap;transform:rotate(-35deg);transform-origin:top center;margin-top:2px;position:absolute;bottom:0;">${label}</div>
+  return `<div style="overflow-x:auto;"><div style="display:flex;align-items:flex-end;gap:3px;height:160px;padding-bottom:28px;position:relative;min-width:${entries.length * 28}px;">
+    ${entries.map(([label, val, isCurrent]) => {
+      const h = Math.round((val / maxVal) * 120);
+      const barColor = isCurrent ? 'var(--gold)' : color;
+      const barStyle = isCurrent
+        ? `background:transparent;border:2px dashed var(--gold);border-bottom:none;`
+        : `background:${barColor};`;
+      return `<div style="display:flex;flex-direction:column;align-items:center;flex:1;min-width:24px;gap:2px;">
+        <div style="font-size:9px;color:${isCurrent?'var(--gold)':'var(--muted2)'};margin-bottom:2px;font-weight:${isCurrent?'600':'400'};">${val || (isCurrent ? '…' : '')}</div>
+        <div style="width:100%;height:${Math.max(h,2)}px;${barStyle}border-radius:3px 3px 0 0;transition:height 0.5s;"></div>
+        <div style="font-size:9px;color:${isCurrent?'var(--gold)':'var(--muted2)'};white-space:nowrap;transform:rotate(-40deg);transform-origin:top center;margin-top:2px;position:absolute;bottom:0;">${label}</div>
       </div>`;
     }).join('')}
-  </div>`;
+  </div></div>`;
 }
 
 </script>
