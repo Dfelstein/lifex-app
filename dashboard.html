@@ -537,7 +537,9 @@ function mapScan(s) {
     date: s.scan_date, scan_number: s.scan_number,
     fat_pct: s.fat_pct, fat_g: s.fat_g, lean_g: s.lean_g, total_g: s.total_g,
     bmd: s.bmd, t_score: s.t_score, z_score: s.z_score, pr_pct: s.pr_pct,
-    vat_g: s.vat_g, android: s.android_fat_pct, gynoid: s.gynoid_fat_pct, ag_ratio: s.ag_ratio,
+    vat_g: s.vat_g, vat_area_cm2: s.vat_area_cm2,
+    android: s.android_fat_pct, gynoid: s.gynoid_fat_pct, ag_ratio: s.ag_ratio,
+    trunk_fat_pct: s.trunk_fat_pct, ffmi: s.ffmi, almi: s.almi, fmi: s.fmi,
   };
 }
 
@@ -761,28 +763,143 @@ function renderScore() {
     return;
   }
   const score = lifexScore;
+  const scoreLabel = score>=90?'Exceptional':score>=76?'Good':score>=60?'Fair':'Needs Attention';
+  const scoreColor = score>=90?'var(--green)':score>=76?'var(--gold)':score>=60?'var(--orange)':'var(--red)';
+
+  // Component scores + driver detail
   const dexaScore  = scan2 ? (() => { const fp=scan2.fat_pct; if(fp<=12)return 95; if(fp<=17)return 85; if(fp<=22)return 74; if(fp<=27)return 58; return 42; })() : null;
   const bloodScore = blood.length ? Math.round(((blood.filter(m=>m.status==='optimal').length + blood.filter(m=>m.status==='normal').length*0.75)/blood.length)*100) : null;
   const rmrScore   = rmr ? (rmr.fat_pct>=80?90:rmr.fat_pct>=75?76:rmr.fat_pct>=65?60:45) : null;
 
+  // DEXA driver text
+  let dexaDriver = '';
+  if (scan2) {
+    const fp = scan2.fat_pct;
+    const fatCat = fp<=12?'Athletic':fp<=17?'Fit':fp<=22?'Average':fp<=27?'Above average':'High body fat';
+    dexaDriver = `${fp}% body fat — ${fatCat}`;
+    if (scan2.ffmi != null) dexaDriver += ` · FFMI ${scan2.ffmi}`;
+    if (scan2.vat_g != null) dexaDriver += ` · VAT ${(scan2.vat_g/1000).toFixed(2)} kg`;
+  }
+
+  // Blood driver text
+  const optimalCount = blood.filter(m=>m.status==='optimal').length;
+  const normalCount  = blood.filter(m=>m.status==='normal').length;
+  const highCount    = blood.filter(m=>m.status==='high').length;
+  const lowCount     = blood.filter(m=>m.status==='low').length;
+  const outsideCount = highCount + lowCount;
+  const bloodDriver  = blood.length ? `${optimalCount} optimal · ${normalCount} normal${outsideCount>0?' · '+outsideCount+' outside range':''}` : '';
+
+  // RMR driver text
+  const rmrDriver = rmr ? `${rmr.fat_pct ?? '—'}% fat burning at rest${rmr.kcal ? ' · '+rmr.kcal.toLocaleString()+' kcal/day RMR' : ''}` : '';
+
+  // Wins and focus areas
+  const wins = [];
+  const focus = [];
+
+  if (scan2) {
+    if (scan2.fat_pct <= 17) wins.push(`Body fat ${scan2.fat_pct}% — in the fit range`);
+    else if (scan2.fat_pct <= 22) wins.push(`Body fat ${scan2.fat_pct}% — within average range`);
+    else focus.push(`Body fat ${scan2.fat_pct}% — target below 20% for optimal health`);
+
+    if (scan2.ffmi != null) {
+      if (scan2.ffmi >= 20) wins.push(`FFMI ${scan2.ffmi} — strong lean mass relative to height`);
+      else focus.push(`FFMI ${scan2.ffmi} — build lean mass through progressive resistance training`);
+    }
+    if (scan2.vat_g != null) {
+      if (scan2.vat_g < 1000) wins.push(`Low visceral fat (VAT ${(scan2.vat_g/1000).toFixed(2)} kg) — good organ health marker`);
+      else focus.push(`Elevated VAT (${(scan2.vat_g/1000).toFixed(2)} kg) — target <1 kg through diet and cardio`);
+    }
+    if (scan2.t_score != null) {
+      if (scan2.t_score >= -1) wins.push(`T-score ${scan2.t_score} — bone density in normal range`);
+      else focus.push(`T-score ${scan2.t_score} — below normal, load-bearing exercise + D3/K2 recommended`);
+    }
+    if (scan1 && scan2.lean_g >= scan1.lean_g) wins.push(`Lean mass maintained or gained between scans`);
+    else if (scan1 && scan2.lean_g < scan1.lean_g - 500) focus.push(`Lean mass dropped ${fmt(scan1.lean_g - scan2.lean_g)}g — prioritise protein & resistance training`);
+  }
+
+  if (rmr) {
+    if ((rmr.fat_pct||0) >= 80) wins.push(`Fat burning at ${rmr.fat_pct}% — metabolically flexible`);
+    else focus.push(`Fat burning at ${rmr.fat_pct}% (goal: 80%+) — improve with fasted cardio & sleep`);
+  }
+
+  const badOutside = blood.filter(m => m.status === 'high' || m.status === 'low');
+  if (optimalCount >= 3) wins.push(`${optimalCount} blood markers in optimal range`);
+  if (badOutside.length > 0) focus.push(`${badOutside.map(m=>m.name).join(', ')} outside reference range — review with your clinician`);
+
+  const circumference = 2 * Math.PI * 60;
+  const offset = circumference - (score / 100) * circumference;
+
   el.innerHTML = `
     <div class="page-header"><div class="page-title">Life X Score</div><div class="page-subtitle">Composite health score across DEXA, Blood &amp; Metabolism</div></div>
-    <div class="card mb20" style="text-align:center;padding:32px;">
-      <div style="font-family:'Bebas Neue',sans-serif;font-size:96px;color:var(--gold);line-height:1;letter-spacing:4px;">${score}</div>
-      <div style="font-size:14px;color:var(--muted2);margin-bottom:8px;">/100 — <strong style="color:var(--text)">${score>=90?'Exceptional':score>=76?'Good':score>=60?'Fair':'Needs Attention'}</strong></div>
-      <div style="display:flex;justify-content:center;gap:12px;flex-wrap:wrap;">
-        ${dexaScore  !== null ? `<span class="badge blue">DEXA ${dexaScore}/100</span>` : ''}
-        ${bloodScore !== null ? `<span class="badge green">Blood ${bloodScore}/100</span>` : ''}
-        ${rmrScore   !== null ? `<span class="badge gold">RMR ${rmrScore}/100</span>` : ''}
+
+    <div class="card mb20">
+      <div style="display:flex;align-items:center;gap:24px;flex-wrap:wrap;">
+        <div style="position:relative;width:140px;height:140px;flex-shrink:0;">
+          <svg width="140" height="140" viewBox="0 0 140 140" style="transform:rotate(-90deg)">
+            <circle cx="70" cy="70" r="60" fill="none" stroke="var(--surface3)" stroke-width="10"/>
+            <circle cx="70" cy="70" r="60" fill="none" stroke="${scoreColor}" stroke-width="10"
+              stroke-dasharray="${circumference.toFixed(1)}" stroke-dashoffset="${offset.toFixed(1)}" stroke-linecap="round"/>
+          </svg>
+          <div style="position:absolute;inset:0;display:flex;flex-direction:column;align-items:center;justify-content:center;">
+            <div style="font-family:'Bebas Neue',sans-serif;font-size:52px;line-height:1;color:${scoreColor};letter-spacing:2px;">${score}</div>
+            <div style="font-size:10px;color:var(--muted2);letter-spacing:0.5px;">/100</div>
+          </div>
+        </div>
+        <div style="flex:1;min-width:180px;">
+          <div style="font-family:'Bebas Neue',sans-serif;font-size:28px;color:${scoreColor};letter-spacing:1px;margin-bottom:4px;">${scoreLabel}</div>
+          <div style="font-size:12px;color:var(--muted2);line-height:1.5;margin-bottom:16px;">Calculated from your DEXA body composition, blood panel, and metabolic rate.</div>
+          <div style="display:flex;gap:0;border-radius:6px;overflow:hidden;font-size:10px;">
+            <div style="flex:1;background:var(--red);opacity:0.7;padding:5px 8px;font-weight:600;color:#fff;text-align:center;">&lt;60<br>Needs Work</div>
+            <div style="flex:1;background:var(--orange);opacity:0.8;padding:5px 8px;font-weight:600;color:#fff;text-align:center;">60–75<br>Fair</div>
+            <div style="flex:1;background:var(--gold);opacity:${score>=76&&score<=89?1:0.7};padding:5px 8px;font-weight:${score>=76&&score<=89?700:600};color:#000;text-align:center;border:${score>=76&&score<=89?'2px solid #fff':'none'};">76–89<br>${score>=76&&score<=89?'← YOU':'Good'}</div>
+            <div style="flex:1;background:var(--green);opacity:${score>=90?1:0.6};padding:5px 8px;font-weight:${score>=90?700:600};color:#000;text-align:center;border:${score>=90?'2px solid #fff':'none'};">90–100<br>${score>=90?'← YOU':'Elite'}</div>
+          </div>
+        </div>
       </div>
     </div>
+
+    <div class="card mb20">
+      <div class="card-title">Score Breakdown</div>
+      ${[
+        dexaScore  !== null ? { label:'DEXA Body Composition', score:dexaScore,  color:'var(--blue)',   driver:dexaDriver,  icon:'🫀' } : null,
+        bloodScore !== null ? { label:'Blood Panel',           score:bloodScore, color:'var(--green)',  driver:bloodDriver, icon:'🩸' } : null,
+        rmrScore   !== null ? { label:'Metabolic Rate (RMR)',  score:rmrScore,   color:'var(--orange)', driver:rmrDriver,   icon:'🔥' } : null,
+      ].filter(Boolean).map(c => `
+        <div style="margin-bottom:16px;">
+          <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:6px;">
+            <div style="font-size:13px;font-weight:600;">${c.icon} ${c.label}</div>
+            <div style="font-family:'Bebas Neue',sans-serif;font-size:22px;color:${c.color};letter-spacing:1px;">${c.score}<span style="font-family:'Outfit',sans-serif;font-size:12px;color:var(--muted2);">/100</span></div>
+          </div>
+          <div style="height:8px;background:var(--surface3);border-radius:4px;overflow:hidden;margin-bottom:5px;">
+            <div style="width:${c.score}%;height:100%;background:${c.color};border-radius:4px;transition:width 0.8s ease;"></div>
+          </div>
+          <div style="font-size:11px;color:var(--muted2);">${c.driver}</div>
+        </div>`).join('')}
+    </div>
+
+    ${wins.length ? `
+    <div class="card mb20">
+      <div class="card-title">What's Working</div>
+      <div class="insight-list">
+        ${wins.map(w => `<div class="insight-item"><span class="icon">✅</span><span>${w}</span></div>`).join('')}
+      </div>
+    </div>` : ''}
+
+    ${focus.length ? `
+    <div class="card mb20">
+      <div class="card-title">Focus Areas</div>
+      <div class="insight-list">
+        ${focus.map(f => `<div class="insight-item"><span class="icon">⚡</span><span>${f}</span></div>`).join('')}
+      </div>
+    </div>` : ''}
+
     <div class="card">
-      <div class="card-title">Score Scale</div>
-      <div style="display:flex;gap:0;border-radius:8px;overflow:hidden;">
-        <div style="flex:1;background:var(--red);opacity:0.7;padding:8px 12px;font-size:11px;font-weight:600;color:#fff;">&lt;60<br><span style="font-weight:400;opacity:0.8">Needs Attention</span></div>
-        <div style="flex:1;background:var(--orange);opacity:0.7;padding:8px 12px;font-size:11px;font-weight:600;color:#fff;">60–75<br><span style="font-weight:400;opacity:0.8">Fair</span></div>
-        <div style="flex:${score>=76&&score<=89?3:1};background:var(--gold);opacity:0.9;padding:8px 12px;font-size:11px;font-weight:700;color:#000;">76–89${score>=76&&score<=89?' ← YOU':''}<br><span style="font-weight:400;opacity:0.7">Good</span></div>
-        <div style="flex:${score>=90?3:1};background:var(--green);opacity:0.7;padding:8px 12px;font-size:11px;font-weight:600;color:#000;">90–100${score>=90?' ← YOU':''}<br><span style="font-weight:400;opacity:0.6">Exceptional</span></div>
+      <div class="card-title">How It's Calculated</div>
+      <div class="insight-list">
+        <div class="insight-item"><span class="icon">🫀</span><span><strong>DEXA (body comp):</strong> Based on body fat %. ≤12% = 95, ≤17% = 85, ≤22% = 74, ≤27% = 58, above = 42.</span></div>
+        <div class="insight-item"><span class="icon">🩸</span><span><strong>Blood panel:</strong> Optimal markers score 100%, normal markers score 75%, outside range scores 0%. Averaged across all markers.</span></div>
+        <div class="insight-item"><span class="icon">🔥</span><span><strong>RMR metabolism:</strong> Based on fat burning % at rest. ≥80% = 90, ≥75% = 76, ≥65% = 60, below = 45.</span></div>
+        <div class="insight-item"><span class="icon">📊</span><span><strong>Composite score:</strong> Simple average of whichever components you have data for. Add more scans to improve accuracy.</span></div>
       </div>
     </div>`;
 }
