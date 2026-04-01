@@ -778,7 +778,7 @@ function renderScore() {
     const fatCat = fp<=12?'Athletic':fp<=17?'Fit':fp<=22?'Average':fp<=27?'Above average':'High body fat';
     dexaDriver = `${fp}% body fat — ${fatCat}`;
     if (scan2.ffmi != null) dexaDriver += ` · FFMI ${scan2.ffmi}`;
-    if (scan2.vat_g != null) dexaDriver += ` · VAT ${(scan2.vat_g/1000).toFixed(2)} kg`;
+    if (scan2.vat_area_cm2 != null) dexaDriver += ` · VAT ${scan2.vat_area_cm2} cm²`;
   }
 
   // Blood driver text
@@ -805,9 +805,10 @@ function renderScore() {
       if (scan2.ffmi >= 20) wins.push(`FFMI ${scan2.ffmi} — strong lean mass relative to height`);
       else focus.push(`FFMI ${scan2.ffmi} — build lean mass through progressive resistance training`);
     }
-    if (scan2.vat_g != null) {
-      if (scan2.vat_g < 1000) wins.push(`Low visceral fat (VAT ${(scan2.vat_g/1000).toFixed(2)} kg) — good organ health marker`);
-      else focus.push(`Elevated VAT (${(scan2.vat_g/1000).toFixed(2)} kg) — target <1 kg through diet and cardio`);
+    if (scan2.vat_area_cm2 != null) {
+      if (scan2.vat_area_cm2 < 100) wins.push(`Low visceral fat — VAT ${scan2.vat_area_cm2} cm² (Hologic: normal < 100 cm²)`);
+      else if (scan2.vat_area_cm2 < 160) focus.push(`Borderline VAT — ${scan2.vat_area_cm2} cm² (target < 100 cm²) — reduce through calorie deficit and cardio`);
+      else focus.push(`High visceral fat — VAT ${scan2.vat_area_cm2} cm² (Hologic high risk > 160 cm²) — priority to address through diet and training`);
     }
     if (scan2.t_score != null) {
       if (scan2.t_score >= -1) wins.push(`T-score ${scan2.t_score} — bone density in normal range`);
@@ -912,13 +913,13 @@ function renderBodyComp() {
   if (!scan2) { el.innerHTML = noData('🫀','No Scan Data','Body composition data will appear here after your DEXA scan.'); return; }
   const fatDiff  = scan1 ? (scan2.fat_g  - scan1.fat_g)  : null;
   const leanDiff = scan1 ? (scan2.lean_g - scan1.lean_g) : null;
-  const vatDiff  = scan1 ? (scan2.vat_g  - scan1.vat_g)  : null;
+  const vatDiff  = (scan1?.vat_area_cm2 != null && scan2.vat_area_cm2 != null) ? (scan2.vat_area_cm2 - scan1.vat_area_cm2) : null;
   el.innerHTML = `
     <div class="stats-row mb20">
       <div class="stat-tile blue"><div class="tile-label">Total Body Fat</div><div class="tile-value">${scan2.fat_pct}<span class="tile-unit">%</span></div>${fatDiff!==null?`<div class="tile-delta ${fatDiff<0?'down':'up'}">${fatDiff<0?'▼':'▲'} ${fatDiff<0?'-':'+'}${fmt(Math.abs(fatDiff))}g vs last scan</div>`:''}</div>
       <div class="stat-tile green"><div class="tile-label">Lean Mass</div><div class="tile-value">${(scan2.lean_g/1000).toFixed(1)}<span class="tile-unit">kg</span></div>${leanDiff!==null?`<div class="tile-delta ${leanDiff>=0?'down':'up'}">${leanDiff>=0?'▲ +':'▼ '}${fmt(Math.abs(leanDiff))}g ${leanDiff<-500?'⚠️':''}</div>`:''}</div>
       <div class="stat-tile red"><div class="tile-label">Fat Mass</div><div class="tile-value">${(scan2.fat_g/1000).toFixed(2)}<span class="tile-unit">kg</span></div></div>
-      ${scan2.vat_g!=null?`<div class="stat-tile orange"><div class="tile-label">Est. VAT</div><div class="tile-value">${fmt(scan2.vat_g)}<span class="tile-unit">g</span></div>${vatDiff!==null?`<div class="tile-delta ${vatDiff<0?'down':'up'}">${vatDiff<0?'▼ '+fmt(Math.abs(vatDiff))+'g excellent':'▲ +'+fmt(vatDiff)+'g'}</div>`:''}</div>`:''}
+      ${scan2.vat_area_cm2!=null?`<div class="stat-tile ${scan2.vat_area_cm2<100?'green':scan2.vat_area_cm2<160?'gold':'red'}"><div class="tile-label">VAT Area</div><div class="tile-value">${scan2.vat_area_cm2}<span class="tile-unit">cm²</span></div><div class="tile-delta ${scan2.vat_area_cm2<100?'good':scan2.vat_area_cm2<160?'neutral':'up'}">${scan2.vat_area_cm2<100?'✓ Normal (<100)':scan2.vat_area_cm2<160?'⚠️ Borderline':'🔴 High Risk (>160)'}${vatDiff!==null?' · '+(vatDiff<0?'▼ '+Math.abs(vatDiff):'▲ +'+vatDiff)+' cm²':''}</div></div>`:''}
     </div>
     ${scan2.android!=null?`<div class="card mb20"><div class="card-title">Regional Fat Distribution</div><div style="display:flex;gap:20px;flex-wrap:wrap;">
       <div style="flex:1;min-width:140px;text-align:center;padding:16px;background:var(--surface2);border-radius:8px;"><div style="font-size:11px;color:var(--muted2);text-transform:uppercase;letter-spacing:0.8px;margin-bottom:6px;">Android (Belly)</div><div style="font-family:'Bebas Neue',sans-serif;font-size:36px;color:var(--orange)">${scan2.android}%</div></div>
@@ -998,7 +999,7 @@ function renderBeforeAfter() {
     ['Total Mass',   fmt(scan1.total_g)+'g', fmt(scan2.total_g)+'g', (scan2.total_g-scan1.total_g<0?'−':'+')+''+fmt(Math.abs(scan2.total_g-scan1.total_g))+'g', 'neutral'],
     ...(scan1.bmd&&scan2.bmd ? [['BMD (g/cm²)', scan1.bmd, scan2.bmd, (scan2.bmd-scan1.bmd>0?'+':'')+((scan2.bmd-scan1.bmd)).toFixed(3), scan2.bmd>scan1.bmd?'good':'bad']] : []),
     ...(scan1.t_score!=null&&scan2.t_score!=null ? [['T-Score', scan1.t_score, scan2.t_score, (scan2.t_score-scan1.t_score>0?'+':'')+((scan2.t_score-scan1.t_score)).toFixed(1), scan2.t_score>scan1.t_score?'good':'neutral']] : []),
-    ...(scan1.vat_g&&scan2.vat_g ? [['VAT (g)', fmt(scan1.vat_g)+'g', fmt(scan2.vat_g)+'g', (scan2.vat_g-scan1.vat_g<0?'−':'+')+''+fmt(Math.abs(scan2.vat_g-scan1.vat_g))+'g', scan2.vat_g<scan1.vat_g?'good':'bad']] : []),
+    ...(scan1.vat_area_cm2&&scan2.vat_area_cm2 ? [['VAT Area (cm²)', scan1.vat_area_cm2+' cm²', scan2.vat_area_cm2+' cm²', (scan2.vat_area_cm2-scan1.vat_area_cm2<0?'−':'+')+''+Math.abs(scan2.vat_area_cm2-scan1.vat_area_cm2)+' cm²', scan2.vat_area_cm2<scan1.vat_area_cm2?'good':'bad']] : []),
     ...(scan1.ag_ratio&&scan2.ag_ratio ? [['A:G Ratio', scan1.ag_ratio, scan2.ag_ratio, (scan2.ag_ratio-scan1.ag_ratio>0?'+':'')+((scan2.ag_ratio-scan1.ag_ratio)).toFixed(2), scan2.ag_ratio<scan1.ag_ratio?'good':'neutral']] : []),
   ];
   const colorMap = { good:'var(--green)', bad:'var(--red)', neutral:'var(--muted2)' };
@@ -1051,8 +1052,7 @@ function showScanDetail(i) {
     ...(s.t_score != null ? [['T-Score', s.t_score]] : []),
     ...(s.z_score != null ? [['Z-Score', s.z_score >= 0 ? '+'+s.z_score : String(s.z_score)]] : []),
     ...(s.pr_pct  != null ? [['PR %', s.pr_pct+'%']] : []),
-    ...(s.vat_g   != null ? [['VAT', (s.vat_g/1000).toFixed(2)+' kg']] : []),
-    ...(s.vat_area_cm2 != null ? [['VAT Area', s.vat_area_cm2+' cm²']] : []),
+    ...(s.vat_area_cm2 != null ? [['VAT Area', `${s.vat_area_cm2} cm² ${s.vat_area_cm2<100?'(✓ Normal)':s.vat_area_cm2<160?'(⚠️ Borderline)':'(🔴 High Risk)'}`]] : []),
     ...(s.android != null ? [['Android Fat', s.android+'%']] : []),
     ...(s.gynoid  != null ? [['Gynoid Fat',  s.gynoid+'%']] : []),
     ...(s.ag_ratio!= null ? [['A:G Ratio', s.ag_ratio]] : []),
@@ -1255,7 +1255,7 @@ const quizBank = [
   // ── VAT (Visceral Adipose Tissue) ──
   { q:'What does VAT stand for and why does it matter?', a:'Visceral Adipose Tissue — fat around organs, highest metabolic risk', wrong:['Vascular Adipose Tissue — fat in blood vessels','Volumetric Adipose Tracking — total fat volume','Variable Abdominal Tissue — abdominal wall fat'] },
   { q:'What is the average VAT area (cm²) seen in Life X clients on a DEXA scan?', a:'80–130 cm²', wrong:['10–30 cm²','200–300 cm²','150–180 cm²'] },
-  { q:'At what VAT area (cm²) does metabolic and cardiovascular risk significantly increase?', a:'Above 160 cm²', wrong:['Above 50 cm²','Above 300 cm²','Above 100 cm²'] },
+  { q:'According to the Hologic DEXA interpretation guide, at what VAT area does high risk begin?', a:'Above 160 cm²', wrong:['Above 50 cm²','Above 300 cm²','Above 100 cm²'] },
   { q:'What is the BEST proven strategy to reduce visceral fat (VAT)?', a:'Calorie deficit + high-intensity cardio + resistance training', wrong:['Spot reduction ab exercises','High-fat ketogenic diet only','Increasing daily steps alone'] },
 
   // ── RMR & Metabolism ──
