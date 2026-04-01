@@ -1240,13 +1240,36 @@ function updateStepsTDEE(rmrKcal) {
    SPIN & WIN
 ══════════════════════════ */
 const quizBank = [
+  // ── DEXA & Body Composition ──
   { q:'What does DEXA stand for?', a:'Dual-Energy X-ray Absorptiometry', wrong:['Direct Energy X-ray Analysis','Dual Emission X-ray Assessment','Dense Energy X-ray Anatomy'] },
+  { q:'What is the average body fat % for an active male aged 30–45 seen at Life X?', a:'18–22%', wrong:['8–12%','28–32%','10–14%'] },
+  { q:'What is the average body fat % for an active female aged 30–45 seen at Life X?', a:'26–32%', wrong:['15–19%','38–42%','20–24%'] },
+  { q:'What is considered a "fit" body fat range for males on a DEXA scan?', a:'8–17%', wrong:['4–7%','18–24%','25–29%'] },
+  { q:'What is considered a "fit" body fat range for females on a DEXA scan?', a:'18–27%', wrong:['10–15%','28–34%','35–40%'] },
+  { q:'What is the average lean mass (muscle + bone) for a male Life X client?', a:'60–70 kg', wrong:['45–50 kg','75–85 kg','30–40 kg'] },
+  { q:'What is Fat Mass Index (FMI) and what is a healthy male value?', a:'Fat mass divided by height² — healthy is below 6 kg/m²', wrong:['Fat percentage × weight — healthy is below 20','Total fat grams ÷ lean grams — healthy is below 0.3','Fat mass × BMI — healthy is below 25'] },
+  { q:'What does FFMI (Fat-Free Mass Index) measure?', a:'Lean mass relative to height — a score above 20 indicates good muscle development', wrong:['Fat mass relative to body weight','Bone mineral density relative to age','Metabolic rate per unit of lean tissue'] },
+  { q:'On a DEXA scan, what does the A:G (Android:Gynoid) ratio tell you?', a:'The ratio of belly fat to hip fat — above 1.0 indicates elevated metabolic risk', wrong:['The ratio of muscle to fat in the abdomen','How fat is distributed between upper and lower limbs','The ratio of bone density to body mass'] },
   { q:'During a calorie deficit, which is the BEST way to preserve muscle mass?', a:'High protein intake + resistance training', wrong:['Low-intensity cardio only','Eating at maintenance','Fasting for 24 hours weekly'] },
+
+  // ── VAT (Visceral Adipose Tissue) ──
   { q:'What does VAT stand for and why does it matter?', a:'Visceral Adipose Tissue — fat around organs, highest metabolic risk', wrong:['Vascular Adipose Tissue — fat in blood vessels','Volumetric Adipose Tracking — total fat volume','Variable Abdominal Tissue — abdominal wall fat'] },
-  { q:'What RMR fat burning % is considered optimal?', a:'80% fat burning at rest', wrong:['50% fat burning at rest','95% fat burning at rest','60% fat burning at rest'] },
+  { q:'What is the average VAT area (cm²) seen in Life X clients on a DEXA scan?', a:'80–130 cm²', wrong:['10–30 cm²','200–300 cm²','150–180 cm²'] },
+  { q:'At what VAT area (cm²) does metabolic and cardiovascular risk significantly increase?', a:'Above 160 cm²', wrong:['Above 50 cm²','Above 300 cm²','Above 100 cm²'] },
+  { q:'What is the BEST proven strategy to reduce visceral fat (VAT)?', a:'Calorie deficit + high-intensity cardio + resistance training', wrong:['Spot reduction ab exercises','High-fat ketogenic diet only','Increasing daily steps alone'] },
+
+  // ── RMR & Metabolism ──
+  { q:'What RMR fat burning % is considered optimal at Life X?', a:'80% fat burning at rest', wrong:['50% fat burning at rest','95% fat burning at rest','60% fat burning at rest'] },
+  { q:'What is the average RMR (resting metabolic rate) for a male Life X client?', a:'1,800–2,100 kcal/day', wrong:['1,000–1,200 kcal/day','2,500–2,800 kcal/day','800–1,000 kcal/day'] },
+  { q:'What does a low fat burning % on your RMR test most likely indicate?', a:'Poor metabolic flexibility — the body over-relies on glucose at rest', wrong:['An overactive thyroid gland','Too much muscle mass reducing fat access','Dehydration on the day of testing'] },
+
+  // ── Bone Density ──
   { q:'A T-score of −1.0 to −2.5 on a bone density scan indicates:', a:'Osteopenia — low bone density, not yet osteoporosis', wrong:['Osteoporosis — severe bone loss','Normal bone density','Hyperdensity — too much bone mineral'] },
   { q:'Which training type is MOST effective for maintaining bone density?', a:'Heavy compound resistance training (squats, deadlifts)', wrong:['Swimming and cycling','High-rep light weight training','Stretching and yoga'] },
+
+  // ── Blood & Hormones ──
   { q:'SHBG affects testosterone availability. Low SHBG means:', a:'More free (bioavailable) testosterone', wrong:['Less testosterone produced','Higher total testosterone','Lower metabolic rate'] },
+  { q:'Which blood marker is the strongest indicator of long-term cardiovascular risk?', a:'ApoB (Apolipoprotein B) — counts all atherogenic particles', wrong:['Total cholesterol','LDL particle size only','Triglycerides alone'] },
 ];
 let spinState = { phase:'quiz', quizIdx:0, quizAnswered:false, spinning:false };
 let wheelAngle=0, wheelVelocity=0, wheelAnim=null;
