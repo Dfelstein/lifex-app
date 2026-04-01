@@ -200,6 +200,54 @@ body { background: var(--bg); color: var(--text); font-family: 'Outfit', sans-se
   .service-cards { grid-template-columns: 1fr; }
   .page-title { font-size: 26px; }
 }
+
+/* SCAN DETAIL BOTTOM SHEET */
+.scan-sheet-overlay {
+  display: none; position: fixed; inset: 0; background: rgba(0,0,0,0.7);
+  z-index: 400; backdrop-filter: blur(4px);
+}
+.scan-sheet-overlay.open { display: block; }
+.scan-sheet {
+  position: fixed; bottom: 0; left: 0; right: 0; z-index: 401;
+  background: var(--surface); border-radius: 20px 20px 0 0;
+  border-top: 1px solid var(--border2);
+  max-height: 88vh; overflow-y: auto;
+  transform: translateY(100%); transition: transform 0.3s cubic-bezier(0.32,0.72,0,1);
+  padding-bottom: env(safe-area-inset-bottom, 24px);
+}
+.scan-sheet.open { transform: translateY(0); }
+.sheet-handle {
+  width: 40px; height: 4px; background: var(--surface3); border-radius: 2px;
+  margin: 12px auto 0; flex-shrink: 0;
+}
+.sheet-header {
+  display: flex; align-items: center; justify-content: space-between;
+  padding: 16px 20px; border-bottom: 1px solid var(--border);
+}
+.sheet-title { font-family: 'Bebas Neue', sans-serif; font-size: 22px; letter-spacing: 1px; }
+.sheet-close {
+  width: 32px; height: 32px; border-radius: 50%; background: var(--surface2);
+  border: 1px solid var(--border2); display: flex; align-items: center; justify-content: center;
+  cursor: pointer; font-size: 16px; color: var(--muted2); flex-shrink: 0;
+}
+.sheet-body { padding: 20px; }
+.sheet-stat-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 10px; margin-bottom: 16px; }
+@media (max-width: 640px) { .sheet-stat-grid { grid-template-columns: repeat(2, 1fr); } }
+.sheet-stat { background: var(--surface2); border-radius: 10px; padding: 12px; border-top: 2px solid var(--border); }
+.sheet-stat.gold { border-top-color: var(--gold); }
+.sheet-stat.green { border-top-color: var(--green); }
+.sheet-stat.blue { border-top-color: var(--blue); }
+.sheet-stat.orange { border-top-color: var(--orange); }
+.sheet-stat.red { border-top-color: var(--red); }
+.sheet-stat.teal { border-top-color: var(--teal); }
+.sheet-stat-label { font-size: 9px; font-weight: 600; letter-spacing: 0.8px; text-transform: uppercase; color: var(--muted2); margin-bottom: 4px; }
+.sheet-stat-value { font-family: 'Bebas Neue', sans-serif; font-size: 28px; line-height: 1; letter-spacing: 1px; }
+.sheet-stat-unit { font-family: 'Outfit', sans-serif; font-size: 12px; color: var(--muted2); }
+.sheet-section-title { font-size: 10px; font-weight: 600; letter-spacing: 1px; text-transform: uppercase; color: var(--muted2); margin: 16px 0 10px; }
+.sheet-row { display: flex; justify-content: space-between; align-items: center; padding: 8px 0; border-bottom: 1px solid var(--border); font-size: 13px; }
+.sheet-row:last-child { border-bottom: none; }
+.sheet-row-label { color: var(--muted2); }
+.sheet-row-val { font-weight: 600; }
 </style>
 </head>
 <body>
@@ -357,14 +405,14 @@ body { background: var(--bg); color: var(--text); font-family: 'Outfit', sans-se
         <div class="service-name">DEXA Scan</div>
         <div class="service-price">$149</div>
         <div class="service-desc">Full body composition analysis. Fat mass, lean mass, bone density &amp; regional breakdown.</div>
-        <div style="margin-top:16px;"><a href="https://lifexclinic.square.site" target="_blank" class="btn btn-gold" style="width:100%;justify-content:center;">Book Now →</a></div>
+        <div style="margin-top:16px;"><a href="https://xgym.com.au/dexa-scan/" target="_blank" class="btn btn-gold" style="width:100%;justify-content:center;">Book Now →</a></div>
       </div>
       <div class="service-card">
         <div class="service-icon">🔥</div>
         <div class="service-name">RMR Test</div>
         <div class="service-price">$160</div>
         <div class="service-desc">Resting metabolic rate via indirect calorimetry. Discover your true calorie burn &amp; fuel mix.</div>
-        <div style="margin-top:16px;"><a href="https://lifexclinic.square.site" target="_blank" class="btn btn-gold" style="width:100%;justify-content:center;">Book Now →</a></div>
+        <div style="margin-top:16px;"><a href="https://xgym.com.au/metabolic-testing/" target="_blank" class="btn btn-gold" style="width:100%;justify-content:center;">Book Now →</a></div>
       </div>
       <div class="service-card">
         <div class="service-icon">🩸</div>
@@ -400,6 +448,7 @@ const sb = window.supabase.createClient(SUPABASE_URL, SUPABASE_KEY);
 // Module-level data
 let profile = null;
 let scan1 = null, scan2 = null;
+let allScans = [];
 let blood = [], hormones = [], rmr = null;
 let bloodPanelDate = '', hormonePanelDate = '', rmrDate = '';
 let lifexScore = null;
@@ -435,6 +484,7 @@ async function init() {
 
   // Map DEXA scans
   const scans = scansRes.data || [];
+  allScans = scans.map(mapScan);
   if (scans.length >= 2) {
     scan1 = mapScan(scans[scans.length - 2]);
     scan2 = mapScan(scans[scans.length - 1]);
@@ -677,11 +727,20 @@ function renderDashboard() {
       </div>
       <div class="card">
         <div class="card-title">Your Scans</div>
-        ${scansRes_global.length ? scansRes_global.map((s,i) => `
-          <div style="display:flex;align-items:center;justify-content:space-between;padding:10px 0;border-bottom:1px solid var(--border);">
-            <div><div style="font-weight:500;font-size:13px;">Scan #${s.scan_number || (i+1)}</div><div style="font-size:11px;color:var(--muted2)">${fmtDate(s.scan_date)}</div></div>
-            <div style="font-family:'Bebas Neue',sans-serif;font-size:20px;color:var(--blue)">${s.fat_pct}%</div>
-          </div>`).join('') : '<div style="color:var(--muted2);font-size:13px;">No scans uploaded yet.</div>'}
+        ${allScans.length ? [...allScans].reverse().map((s, ri) => {
+          const i = allScans.length - 1 - ri;
+          const isLatest = i === allScans.length - 1;
+          return `
+          <div onclick="showScanDetail(${i})" style="display:flex;align-items:center;gap:12px;padding:10px 0;border-bottom:1px solid var(--border);cursor:pointer;transition:opacity 0.15s;" onmouseover="this.style.opacity='0.75'" onmouseout="this.style.opacity='1'">
+            <div style="width:32px;height:32px;border-radius:50%;background:${isLatest?'linear-gradient(135deg,var(--gold),var(--orange))':'var(--surface3)'};display:flex;align-items:center;justify-content:center;font-family:'Bebas Neue',sans-serif;font-size:14px;color:${isLatest?'#000':'var(--muted2)'};flex-shrink:0;">${s.scan_number||i+1}</div>
+            <div style="flex:1;">
+              <div style="font-weight:500;font-size:13px;">${fmtDate(s.date)}${isLatest?' <span style="font-size:9px;background:rgba(245,200,66,0.15);color:var(--gold);border-radius:8px;padding:1px 6px;font-weight:700;">LATEST</span>':''}</div>
+              <div style="font-size:11px;color:var(--muted2);">${s.fat_pct != null ? s.fat_pct+'% body fat' : ''}${s.total_g ? ' · '+(s.total_g/1000).toFixed(1)+' kg' : ''}</div>
+            </div>
+            <div style="font-family:'Bebas Neue',sans-serif;font-size:22px;color:${isLatest?'var(--gold)':'var(--blue)'};">${s.fat_pct != null ? s.fat_pct+'%' : '—'}</div>
+            <div style="color:var(--muted);font-size:14px;">›</div>
+          </div>`;
+        }).join('') : '<div style="color:var(--muted2);font-size:13px;">No scans uploaded yet.</div>'}
       </div>
     </div>`;
 }
@@ -774,11 +833,37 @@ function renderBone() {
 ══════════════════════════ */
 function renderBeforeAfter() {
   const el = document.getElementById('before-after-content');
+
+  // Scan history list — always shown if any scans exist
+  const historyHtml = allScans.length ? `
+    <div class="card mb20">
+      <div class="card-title">Scan History — ${allScans.length} Scan${allScans.length!==1?'s':''}</div>
+      <div style="display:flex;flex-direction:column;gap:8px;">
+        ${[...allScans].reverse().map((s, ri) => {
+          const i = allScans.length - 1 - ri;
+          const isLatest = i === allScans.length - 1;
+          const fat = s.fat_pct != null ? s.fat_pct + '%' : '—';
+          const weight = s.total_g ? (s.total_g/1000).toFixed(1) + ' kg' : '—';
+          const lean = s.lean_g ? (s.lean_g/1000).toFixed(1) + ' kg lean' : '';
+          return `
+          <div onclick="showScanDetail(${i})" style="display:flex;align-items:center;gap:14px;padding:14px 16px;background:var(--surface2);border:1px solid ${isLatest?'rgba(245,200,66,0.3)':'var(--border)'};border-radius:12px;cursor:pointer;transition:border-color 0.15s;" onmouseover="this.style.borderColor='var(--blue)'" onmouseout="this.style.borderColor='${isLatest?'rgba(245,200,66,0.3)':'var(--border)'}'">
+            <div style="width:40px;height:40px;border-radius:50%;background:${isLatest?'linear-gradient(135deg,var(--gold),var(--orange))':'var(--surface3)'};display:flex;align-items:center;justify-content:center;font-family:'Bebas Neue',sans-serif;font-size:18px;color:${isLatest?'#000':'var(--muted2)'};flex-shrink:0;">${s.scan_number||i+1}</div>
+            <div style="flex:1;">
+              <div style="font-weight:600;font-size:14px;">${fmtDate(s.date)} ${isLatest?'<span style="font-size:10px;background:rgba(245,200,66,0.15);color:var(--gold);border-radius:10px;padding:2px 8px;font-weight:700;letter-spacing:0.5px;">LATEST</span>':''}</div>
+              <div style="font-size:12px;color:var(--muted2);margin-top:2px;">${fat} body fat${lean?' · '+lean:''} ${weight?'· '+weight:''}</div>
+            </div>
+            <div style="color:var(--muted2);font-size:16px;">›</div>
+          </div>`;
+        }).join('')}
+      </div>
+    </div>` : '';
+
   if (!scan1 || !scan2) {
-    el.innerHTML = noData('📈', 'Need 2 Scans', 'Before vs After comparison will appear once you have completed a second scan.');
+    el.innerHTML = historyHtml + noData('📈', 'Need 2 Scans', 'Comparison will appear once you have a second scan.');
     return;
   }
   document.getElementById('ba-subtitle').textContent = `Scan #${scan1.scan_number||1} (${fmtDate(scan1.date)}) vs Scan #${scan2.scan_number||2} (${fmtDate(scan2.date)})`;
+  el.innerHTML = historyHtml;
   const rows = [
     ['Body Fat %',   scan1.fat_pct+'%',      scan2.fat_pct+'%',      ((scan2.fat_pct-scan1.fat_pct)>0?'+':'')+( scan2.fat_pct-scan1.fat_pct).toFixed(1)+'%', scan2.fat_pct<scan1.fat_pct?'good':'bad'],
     ['Fat Mass',     fmt(scan1.fat_g)+'g',   fmt(scan2.fat_g)+'g',   (scan2.fat_g-scan1.fat_g<0?'−':'+')+''+fmt(Math.abs(scan2.fat_g-scan1.fat_g))+'g', scan2.fat_g<scan1.fat_g?'good':'bad'],
@@ -790,7 +875,7 @@ function renderBeforeAfter() {
     ...(scan1.ag_ratio&&scan2.ag_ratio ? [['A:G Ratio', scan1.ag_ratio, scan2.ag_ratio, (scan2.ag_ratio-scan1.ag_ratio>0?'+':'')+((scan2.ag_ratio-scan1.ag_ratio)).toFixed(2), scan2.ag_ratio<scan1.ag_ratio?'good':'neutral']] : []),
   ];
   const colorMap = { good:'var(--green)', bad:'var(--red)', neutral:'var(--muted2)' };
-  el.innerHTML = `
+  const compHtml = `
     <div class="card mb20">
       <div class="card-title">Full Comparison</div>
       <table style="width:100%;border-collapse:collapse;font-size:13px;">
@@ -809,6 +894,74 @@ function renderBeforeAfter() {
           </tr>`).join('')}</tbody>
       </table>
     </div>`;
+  el.innerHTML = historyHtml + compHtml;
+}
+
+/* ══════════════════════════
+   SCAN DETAIL SHEET
+══════════════════════════ */
+function showScanDetail(i) {
+  const s = allScans[i];
+  if (!s) return;
+  const isLatest = i === allScans.length - 1;
+  document.getElementById('sheetTitle').textContent = `Scan #${s.scan_number || i+1}  ·  ${fmtDate(s.date)}`;
+
+  const weightKg = s.total_g ? (s.total_g/1000).toFixed(1) : null;
+  const fatKg    = s.fat_g  ? (s.fat_g/1000).toFixed(1)   : null;
+  const leanKg   = s.lean_g ? (s.lean_g/1000).toFixed(1)  : null;
+
+  const mainStats = [
+    { label:'Body Fat', value: s.fat_pct != null ? s.fat_pct+'%' : '—', color:'orange' },
+    { label:'Fat Mass',  value: fatKg  ? fatKg+' kg' : '—', color:'red' },
+    { label:'Lean Mass', value: leanKg ? leanKg+' kg' : '—', color:'green' },
+    { label:'Total Mass',value: weightKg ? weightKg+' kg' : '—', color:'blue' },
+    ...(s.ffmi != null ? [{ label:'FFMI', value: s.ffmi, color:'teal' }] : []),
+    ...(s.fmi  != null ? [{ label:'FMI',  value: s.fmi,  color:'orange' }] : []),
+  ];
+
+  const extraRows = [
+    ...(s.bmd   != null ? [['BMD (g/cm²)', s.bmd]] : []),
+    ...(s.t_score != null ? [['T-Score', s.t_score]] : []),
+    ...(s.z_score != null ? [['Z-Score', s.z_score >= 0 ? '+'+s.z_score : String(s.z_score)]] : []),
+    ...(s.pr_pct  != null ? [['PR %', s.pr_pct+'%']] : []),
+    ...(s.vat_g   != null ? [['VAT', (s.vat_g/1000).toFixed(2)+' kg']] : []),
+    ...(s.vat_area_cm2 != null ? [['VAT Area', s.vat_area_cm2+' cm²']] : []),
+    ...(s.android != null ? [['Android Fat', s.android+'%']] : []),
+    ...(s.gynoid  != null ? [['Gynoid Fat',  s.gynoid+'%']] : []),
+    ...(s.ag_ratio!= null ? [['A:G Ratio', s.ag_ratio]] : []),
+    ...(s.trunk_fat_pct != null ? [['Trunk Fat', s.trunk_fat_pct+'%']] : []),
+    ...(s.almi    != null ? [['ALMI', s.almi]] : []),
+  ];
+
+  document.getElementById('sheetBody').innerHTML = `
+    ${isLatest ? '<div style="margin-bottom:12px;"><span style="font-size:11px;background:rgba(245,200,66,0.12);color:var(--gold);border-radius:10px;padding:3px 12px;font-weight:700;letter-spacing:0.5px;">LATEST SCAN</span></div>' : ''}
+    <div class="sheet-stat-grid">
+      ${mainStats.map(st => `
+        <div class="sheet-stat ${st.color}">
+          <div class="sheet-stat-label">${st.label}</div>
+          <div class="sheet-stat-value">${String(st.value).replace(/([a-z%]+)$/i,'<span class="sheet-stat-unit">$1</span>')}</div>
+        </div>`).join('')}
+    </div>
+    ${extraRows.length ? `
+      <div class="sheet-section-title">Full Metrics</div>
+      <div style="background:var(--surface2);border-radius:10px;padding:4px 14px;">
+        ${extraRows.map(([label,val]) => `
+          <div class="sheet-row">
+            <span class="sheet-row-label">${label}</span>
+            <span class="sheet-row-val">${val}</span>
+          </div>`).join('')}
+      </div>` : ''}
+  `;
+
+  document.getElementById('scanSheetOverlay').classList.add('open');
+  document.getElementById('scanSheet').classList.add('open');
+  document.body.style.overflow = 'hidden';
+}
+
+function closeScanDetail() {
+  document.getElementById('scanSheetOverlay').classList.remove('open');
+  document.getElementById('scanSheet').classList.remove('open');
+  document.body.style.overflow = '';
 }
 
 /* ══════════════════════════
@@ -1092,6 +1245,7 @@ window.init = async function() {
   }
   scansRes_global = scansRes.data || [];
   const scans = scansRes_global;
+  allScans = scans.map(mapScan);
   if (scans.length>=2) { scan1=mapScan(scans[scans.length-2]); scan2=mapScan(scans[scans.length-1]); }
   else if (scans.length===1) { scan2=mapScan(scans[0]); }
   const bp=(bloodRes.data||[])[0];
@@ -1108,5 +1262,16 @@ window.init = async function() {
 
 init();
 </script>
+
+<!-- SCAN DETAIL BOTTOM SHEET -->
+<div class="scan-sheet-overlay" id="scanSheetOverlay" onclick="closeScanDetail()"></div>
+<div class="scan-sheet" id="scanSheet">
+  <div class="sheet-handle"></div>
+  <div class="sheet-header">
+    <div class="sheet-title" id="sheetTitle">Scan Detail</div>
+    <div class="sheet-close" onclick="closeScanDetail()">✕</div>
+  </div>
+  <div class="sheet-body" id="sheetBody"></div>
+</div>
 </body>
 </html>
