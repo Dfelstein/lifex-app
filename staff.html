@@ -12,6 +12,8 @@
 <link rel="apple-touch-icon" href="icons/icon-192.png">
 <link href="https://fonts.googleapis.com/css2?family=Bebas+Neue&family=Outfit:wght@300;400;500;600;700&display=swap" rel="stylesheet">
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+<link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css"/>
+<script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
 <style>
 :root {
   --bg: #08090b; --surface: #0f1114; --surface2: #161a1f; --surface3: #1c2128;
@@ -556,6 +558,12 @@ html, body { height: 100%; background: var(--bg); color: var(--text); font-famil
       <div id="an-suburbs"></div>
     </div>
 
+    <div class="card" style="margin-bottom:20px;">
+      <div class="card-title">Client Origin Map</div>
+      <div style="font-size:12px;color:var(--muted2);margin-bottom:12px;">Circle size = number of clients from that suburb</div>
+      <div id="an-map" style="height:420px;border-radius:8px;overflow:hidden;background:var(--surface3);"></div>
+    </div>
+
     <div class="card">
       <div class="card-title">Conversion: Leads → Clients</div>
       <div id="an-conversion"></div>
@@ -589,6 +597,10 @@ async function init() {
 
   document.getElementById('loading').style.display = 'none';
   document.getElementById('app').style.display = 'flex';
+
+  // Pre-warm this week's appointment data in background so Previous Appointments loads fast
+  const prewarmDays = getWeekDates(0);
+  prewarmDays.forEach(d => fetchAppts(dateToStr(d)));
 }
 
 /* ══ TODAY'S APPOINTMENTS ══ */
@@ -798,6 +810,18 @@ function expandApptCard(apptId) {
 
 let weekOffset = 0;
 let selectedDate = null;
+const apptCache = new Map(); // key: date string → {data, ts}
+const APPT_CACHE_TTL = 5 * 60 * 1000; // 5 minutes
+
+async function fetchAppts(date) {
+  const cached = apptCache.get(date);
+  if (cached && Date.now() - cached.ts < APPT_CACHE_TTL) return cached.data;
+  const res = await fetch(`${SUPABASE_URL}/functions/v1/get-appointments?date=${date}`, {
+    headers: { 'Authorization': `Bearer ${SUPABASE_KEY}` }
+  }).then(r => r.json()).catch(() => ({ appointments: [] }));
+  apptCache.set(date, { data: res, ts: Date.now() });
+  return res;
+}
 const DAY_NAMES = ['Sun','Mon','Tue','Wed','Thu','Fri','Sat'];
 
 function getWeekDates(offset) {
@@ -870,12 +894,8 @@ async function loadWeekView() {
       <div id="week-col-${dateToStr(d)}" style="min-height:40px;"><div class="week-col-empty">…</div></div>
     </div>`).join('');
 
-  // Fetch all 7 days in parallel
-  const results = await Promise.all(days.map(d =>
-    fetch(`${SUPABASE_URL}/functions/v1/get-appointments?date=${dateToStr(d)}`, {
-      headers: { 'Authorization': `Bearer ${SUPABASE_KEY}` }
-    }).then(r => r.json()).catch(() => ({ appointments: [] }))
-  ));
+  // Fetch all 7 days in parallel (cached)
+  const results = await Promise.all(days.map(d => fetchAppts(dateToStr(d))));
 
   // Collect all clientIds to check who has scans
   const allAppts = results.flatMap(r => r.appointments || []);
@@ -951,10 +971,7 @@ async function loadPreviousAppointments(date) {
   grid.innerHTML = `<div class="no-acuity"><div class="no-acuity-icon">⏳</div><div>Loading…</div></div>`;
 
   try {
-    const res = await fetch(`${SUPABASE_URL}/functions/v1/get-appointments?date=${date}`, {
-      headers: { 'Authorization': `Bearer ${SUPABASE_KEY}` }
-    });
-    const data = await res.json();
+    const data = await fetchAppts(date);
     if (data.error) throw new Error(data.error);
 
     const appts = data.appointments || [];
@@ -2520,7 +2537,7 @@ async function loadAnalytics() {
   // Fetch profiles (non-staff) and dexa scans in parallel
   const [{ data: profiles }, { data: dexaRaw }] = await Promise.all([
     sb.from('profiles').select('id,sex,dob,member_level,created_at').or('is_staff.is.null,is_staff.eq.false').limit(2000),
-    sb.from('dexa_scans').select('client_id,scan_date,fat_pct,sex').order('scan_date').limit(5000),
+    sb.from('dexa_scans').select('client_id,scan_date,fat_pct,sex,patient_age').order('scan_date').limit(5000),
   ]);
 
   const now = new Date();
@@ -2589,7 +2606,7 @@ async function loadAnalytics() {
         </div>`).join('')}
     </div>`;
 
-  /* ── AGE DISTRIBUTION ── */
+  /* ── AGE DISTRIBUTION (from DEXA patient_age) ── */
   function calcAge(dob) {
     if (!dob) return null;
     const d = new Date(dob);
@@ -2599,9 +2616,12 @@ async function loadAnalytics() {
   }
 
   const ageBuckets = {'Under 20':0,'20s':0,'30s':0,'40s':0,'50s':0,'60s':0,'70+':0};
-  (profiles||[]).forEach(p => {
-    const age = calcAge(p.dob);
-    if (age === null) return;
+  // Use latest scan per client to avoid double-counting
+  const latestAgeByClient = {};
+  (dexaRaw||[]).forEach(s => {
+    if (s.patient_age != null) latestAgeByClient[s.client_id] = s.patient_age;
+  });
+  Object.values(latestAgeByClient).forEach(age => {
     if (age < 20)      ageBuckets['Under 20']++;
     else if (age < 30) ageBuckets['20s']++;
     else if (age < 40) ageBuckets['30s']++;
@@ -2610,11 +2630,11 @@ async function loadAnalytics() {
     else if (age < 70) ageBuckets['60s']++;
     else               ageBuckets['70+']++;
   });
+  const ageTotal = Object.values(ageBuckets).reduce((a,b) => a+b, 0);
 
-  document.getElementById('an-age-chart').innerHTML = anBarChart(
-    Object.entries(ageBuckets).filter(([,v]) => v > 0),
-    'var(--blue)', totalClients
-  );
+  document.getElementById('an-age-chart').innerHTML = ageTotal > 0
+    ? anBarChart(Object.entries(ageBuckets).filter(([,v]) => v > 0), 'var(--blue)', ageTotal)
+    : '<p style="color:var(--muted2);font-size:13px;">No age data available yet — upload DEXA scans to populate.</p>';
 
   /* ── SCAN VOLUME LAST 12 MONTHS ── */
   const monthBuckets = {};
@@ -2637,7 +2657,7 @@ async function loadAnalytics() {
   );
 
   /* ── BODY FAT DISTRIBUTION ── */
-  const fatBuckets = {'<15%':0,'15–20%':0,'20–25%':0,'25–30%':0,'30–35%':0,'35%+':0};
+  const fatBuckets = {'<15%':0,'15–20%':0,'20–25%':0,'25–30%':0,'30–35%':0,'35–40%':0,'40–45%':0,'45–50%':0,'50%+':0};
   (dexaRaw||[]).forEach(s => {
     const f = s.fat_pct;
     if (f == null) return;
@@ -2646,7 +2666,10 @@ async function loadAnalytics() {
     else if (f < 25) fatBuckets['20–25%']++;
     else if (f < 30) fatBuckets['25–30%']++;
     else if (f < 35) fatBuckets['30–35%']++;
-    else             fatBuckets['35%+']++;
+    else if (f < 40) fatBuckets['35–40%']++;
+    else if (f < 45) fatBuckets['40–45%']++;
+    else if (f < 50) fatBuckets['45–50%']++;
+    else             fatBuckets['50%+']++;
   });
 
   document.getElementById('an-fat-chart').innerHTML = anBarChart(
@@ -2797,6 +2820,11 @@ async function loadAnalytics() {
     ? anBarChart(topSuburbs, 'var(--teal)', totalLeads)
     : '<p style="color:var(--muted2);font-size:13px;">No address data in intake submissions yet.</p>';
 
+  // Also combine with profile address data for map
+  const allSuburbCounts = { ...suburbCount };
+  // (profiles don't have address field currently, just use intake data)
+  renderSuburbMap(topSuburbs);
+
   /* Conversion visual */
   const convW = Math.max(conversionRate, 1);
   document.getElementById('an-conversion').innerHTML = `
@@ -2823,6 +2851,61 @@ async function loadAnalytics() {
         <div style="font-size:11px;color:var(--muted);margin-top:6px;">${converted} clients vs ${totalLeads} unmatched leads</div>
       </div>
     </div>`;
+}
+
+let anLeafletMap = null;
+
+async function renderSuburbMap(suburbs) {
+  const mapEl = document.getElementById('an-map');
+  if (!mapEl) return;
+
+  // Destroy previous map instance if any
+  if (anLeafletMap) { anLeafletMap.remove(); anLeafletMap = null; }
+
+  anLeafletMap = L.map('an-map', { zoomControl: true }).setView([-33.87, 151.21], 10);
+
+  L.tileLayer('https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png', {
+    attribution: '© OpenStreetMap © CARTO',
+    subdomains: 'abcd',
+    maxZoom: 18,
+  }).addTo(anLeafletMap);
+
+  if (!suburbs.length) return;
+
+  const maxCount = suburbs[0][1];
+  const bounds = [];
+
+  for (const [suburb, count] of suburbs) {
+    try {
+      const res = await fetch(
+        `https://nominatim.openstreetmap.org/search?q=${encodeURIComponent(suburb + ', Australia')}&format=json&limit=1`,
+        { headers: { 'Accept-Language': 'en' } }
+      );
+      const data = await res.json();
+      if (!data.length) continue;
+      const lat = parseFloat(data[0].lat);
+      const lng = parseFloat(data[0].lon);
+      const radius = 8 + (count / maxCount) * 28;
+
+      const circle = L.circleMarker([lat, lng], {
+        radius,
+        fillColor: '#f5c842',
+        color: '#e8a020',
+        weight: 1.5,
+        opacity: 0.9,
+        fillOpacity: 0.55,
+      }).addTo(anLeafletMap);
+
+      circle.bindPopup(`<b>${suburb}</b><br>${count} client${count !== 1 ? 's' : ''}`);
+      bounds.push([lat, lng]);
+
+      // Nominatim rate limit: 1 req/sec
+      await new Promise(r => setTimeout(r, 1100));
+    } catch { /* skip failed geocodes */ }
+  }
+
+  if (bounds.length > 1) anLeafletMap.fitBounds(bounds, { padding: [40, 40] });
+  else if (bounds.length === 1) anLeafletMap.setView(bounds[0], 11);
 }
 
 function anBarChart(entries, color, total, colors) {
