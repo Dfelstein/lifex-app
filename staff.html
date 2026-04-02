@@ -1606,7 +1606,7 @@ const CLIENT_PAGE_SIZE = 21;
 async function loadClients() {
   const [profilesRes, dexaRes, rmrRes, bloodRes, hormoneRes] = await Promise.all([
     sb.from('profiles').select('*').or('is_staff.is.null,is_staff.eq.false').order('created_at', { ascending: false }).limit(2000),
-    sb.from('dexa_scans').select('client_id,scan_date,fat_pct,weight_kg,lean_g').order('scan_date', { ascending: false }),
+    sb.from('dexa_scans').select('client_id,scan_date,fat_pct,weight_kg,lean_g').order('scan_date', { ascending: false }).limit(10000),
     sb.from('rmr_tests').select('client_id,test_date').order('test_date', { ascending: false }),
     sb.from('blood_panels').select('client_id,panel_date').order('panel_date', { ascending: false }),
     sb.from('hormone_panels').select('client_id,panel_date').order('panel_date', { ascending: false }),
