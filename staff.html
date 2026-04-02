@@ -1173,13 +1173,14 @@ async function viewClientProfile(clientId, firstName, lastName) {
 
   try {
     const [dexaRes, rmrRes, bloodRes, hormoneRes] = await Promise.all([
-      sb.from('dexa_scans').select('*').eq('client_id', clientId).order('scan_date', { ascending: false }).limit(1),
+      sb.from('dexa_scans').select('*').eq('client_id', clientId).order('scan_date', { ascending: true }),
       sb.from('rmr_tests').select('*').eq('client_id', clientId).order('test_date', { ascending: false }).limit(1),
       sb.from('blood_panels').select('*').eq('client_id', clientId).order('panel_date', { ascending: false }).limit(1),
       sb.from('hormone_panels').select('*').eq('client_id', clientId).order('panel_date', { ascending: false }).limit(1),
     ]);
 
-    const dexa = dexaRes.data?.[0] || null;
+    const dexaScans = dexaRes.data || [];
+    const dexa = dexaScans.length ? dexaScans[dexaScans.length - 1] : null; // latest
     const rmr  = rmrRes.data?.[0] || null;
     const bp   = bloodRes.data?.[0] || null;
     const hp   = hormoneRes.data?.[0] || null;
@@ -1277,6 +1278,57 @@ async function viewClientProfile(clientId, firstName, lastName) {
           ${dexa.gynoid_fat_pct != null ? `<div class="stat-chip blue"><div class="stat-chip-label">Gynoid Fat</div><div class="stat-chip-value">${dexa.gynoid_fat_pct}<span class="stat-chip-unit">%</span></div></div>` : ''}
           ${dexa.pr_pct != null ? `<div class="stat-chip ${dexa.pr_pct>=85?'green':'gold'}"><div class="stat-chip-label">PR %</div><div class="stat-chip-value">${dexa.pr_pct}<span class="stat-chip-unit">%</span></div></div>` : ''}
         </div>
+        ${(()=>{
+          const segs = [
+            {label:'Left Arm', fat_pct:dexa.left_arm_fat_pct},
+            {label:'Right Arm',fat_pct:dexa.right_arm_fat_pct},
+            {label:'Trunk',    fat_pct:dexa.trunk_fat_pct},
+            {label:'Left Leg', fat_pct:dexa.left_leg_fat_pct},
+            {label:'Right Leg',fat_pct:dexa.right_leg_fat_pct},
+          ].filter(s=>s.fat_pct!=null);
+          const limbs = [
+            {label:'Left Arm', fat_pct:dexa.left_arm_fat_pct, lean_g:dexa.left_arm_lean_g, fat_g:dexa.left_arm_fat_g},
+            {label:'Right Arm',fat_pct:dexa.right_arm_fat_pct,lean_g:dexa.right_arm_lean_g,fat_g:dexa.right_arm_fat_g},
+            {label:'Left Leg', fat_pct:dexa.left_leg_fat_pct, lean_g:dexa.left_leg_lean_g, fat_g:dexa.left_leg_fat_g},
+            {label:'Right Leg',fat_pct:dexa.right_leg_fat_pct,lean_g:dexa.right_leg_lean_g,fat_g:dexa.right_leg_fat_g},
+          ].filter(r=>r.fat_pct!=null||r.lean_g!=null);
+          let out = '';
+          if (segs.length>=2) out += `<div style="border-top:1px solid var(--border);padding-top:14px;margin-top:14px;">
+            <div style="font-size:11px;font-weight:600;letter-spacing:1px;text-transform:uppercase;color:var(--muted2);margin-bottom:12px;">Body Composition by Region</div>
+            ${segs.map(s=>`<div style="margin-bottom:11px;">
+              <div style="display:flex;justify-content:space-between;margin-bottom:4px;">
+                <span style="font-size:12px;font-weight:600;color:var(--text);">${s.label}</span>
+                <span style="font-size:11px;color:var(--muted2);">${s.fat_pct}% fat · ${(100-s.fat_pct).toFixed(1)}% lean</span>
+              </div>
+              <div style="height:8px;border-radius:5px;background:var(--surface3);overflow:hidden;display:flex;">
+                <div style="width:${s.fat_pct}%;background:linear-gradient(90deg,#c0392b,#e67e22);"></div>
+                <div style="flex:1;background:linear-gradient(90deg,#27ae60,#2ecc71);"></div>
+              </div>
+            </div>`).join('')}
+            <div style="display:flex;gap:14px;margin-top:4px;">
+              <div style="display:flex;align-items:center;gap:5px;font-size:10px;color:var(--muted2);"><div style="width:10px;height:10px;border-radius:2px;background:linear-gradient(90deg,#c0392b,#e67e22);"></div> Fat</div>
+              <div style="display:flex;align-items:center;gap:5px;font-size:10px;color:var(--muted2);"><div style="width:10px;height:10px;border-radius:2px;background:linear-gradient(90deg,#27ae60,#2ecc71);"></div> Lean</div>
+            </div>
+          </div>`;
+          if (limbs.length) out += `<div style="border-top:1px solid var(--border);padding-top:14px;margin-top:14px;">
+            <div style="font-size:11px;font-weight:600;letter-spacing:1px;text-transform:uppercase;color:var(--muted2);margin-bottom:10px;">Limb Breakdown</div>
+            <table style="width:100%;border-collapse:collapse;font-size:13px;">
+              <thead><tr style="border-bottom:1px solid var(--border);">
+                <th style="padding:6px 0;text-align:left;font-size:10px;color:var(--muted2);text-transform:uppercase;letter-spacing:0.8px;">Region</th>
+                <th style="padding:6px 8px;text-align:right;font-size:10px;color:var(--muted2);text-transform:uppercase;letter-spacing:0.8px;">Fat %</th>
+                <th style="padding:6px 8px;text-align:right;font-size:10px;color:var(--muted2);text-transform:uppercase;letter-spacing:0.8px;">Lean</th>
+                <th style="padding:6px 0;text-align:right;font-size:10px;color:var(--muted2);text-transform:uppercase;letter-spacing:0.8px;">Fat</th>
+              </tr></thead>
+              <tbody>${limbs.map(r=>`<tr style="border-bottom:1px solid var(--border);">
+                <td style="padding:8px 0;color:var(--text);font-weight:500;">${r.label}</td>
+                <td style="padding:8px 8px;text-align:right;">${r.fat_pct!=null?r.fat_pct+'%':'—'}</td>
+                <td style="padding:8px 8px;text-align:right;color:var(--muted2);">${r.lean_g!=null?(r.lean_g/1000).toFixed(2)+' kg':'—'}</td>
+                <td style="padding:8px 0;text-align:right;color:var(--muted2);">${r.fat_g!=null?(r.fat_g/1000).toFixed(2)+' kg':'—'}</td>
+              </tr>`).join('')}</tbody>
+            </table>
+          </div>`;
+          return out;
+        })()}
         <div id="cp-comparison-${clientId}" style="margin-top:16px;"><div style="font-size:12px;color:var(--muted2);">Loading comparison…</div></div>
       </div>`;
 
@@ -1304,6 +1356,79 @@ async function viewClientProfile(clientId, firstName, lastName) {
           const compEl = document.getElementById(`cp-comparison-${clientId}`);
           if (compEl) compEl.innerHTML = '';
         }, 0);
+      }
+
+      // ── Scan History + Before/After comparison ──
+      if (dexaScans.length > 1) {
+        const fmtD = d => d ? new Date(d+'T00:00:00').toLocaleDateString('en-AU',{day:'numeric',month:'short',year:'numeric'}) : '';
+        const oldest = dexaScans[0];
+        const latest = dexaScans[dexaScans.length - 1];
+        const colorMap = {good:'var(--green)',bad:'var(--red)',neutral:'var(--muted2)'};
+
+        // Scan history table
+        html += `<div class="card" style="margin-bottom:20px;">
+          <div class="card-title">Scan History — ${dexaScans.length} Scans</div>
+          <div style="overflow-x:auto;">
+            <table style="width:100%;border-collapse:collapse;font-size:13px;">
+              <thead><tr style="border-bottom:1px solid var(--border);">
+                <th style="padding:8px 0;text-align:left;font-size:10px;color:var(--muted2);text-transform:uppercase;letter-spacing:0.8px;">#</th>
+                <th style="padding:8px 8px;text-align:left;font-size:10px;color:var(--muted2);text-transform:uppercase;letter-spacing:0.8px;">Date</th>
+                <th style="padding:8px 8px;text-align:right;font-size:10px;color:var(--muted2);text-transform:uppercase;letter-spacing:0.8px;">Body Fat</th>
+                <th style="padding:8px 8px;text-align:right;font-size:10px;color:var(--muted2);text-transform:uppercase;letter-spacing:0.8px;">Lean</th>
+                <th style="padding:8px 8px;text-align:right;font-size:10px;color:var(--muted2);text-transform:uppercase;letter-spacing:0.8px;">VAT</th>
+                <th style="padding:8px 0;text-align:right;font-size:10px;color:var(--muted2);text-transform:uppercase;letter-spacing:0.8px;">Change</th>
+              </tr></thead>
+              <tbody>
+                ${[...dexaScans].reverse().map((s,ri) => {
+                  const prev = ri < dexaScans.length-1 ? dexaScans[dexaScans.length-2-ri] : null;
+                  const isLatest = ri === 0;
+                  const fatDelta = prev&&s.fat_pct!=null&&prev.fat_pct!=null ? (s.fat_pct-prev.fat_pct).toFixed(1) : null;
+                  return `<tr style="border-bottom:1px solid var(--border);${isLatest?'background:rgba(245,200,66,0.04);':''}">
+                    <td style="padding:10px 0;font-family:'Bebas Neue',sans-serif;font-size:16px;color:${isLatest?'var(--gold)':'var(--muted2)'};">${s.scan_number||dexaScans.length-ri}</td>
+                    <td style="padding:10px 8px;color:var(--text);font-weight:${isLatest?'600':'400'};">${fmtD(s.scan_date)}${isLatest?' <span style="font-size:9px;background:rgba(245,200,66,0.15);color:var(--gold);border-radius:8px;padding:1px 6px;font-weight:700;">LATEST</span>':''}</td>
+                    <td style="padding:10px 8px;text-align:right;font-weight:600;">${s.fat_pct!=null?s.fat_pct+'%':'—'}</td>
+                    <td style="padding:10px 8px;text-align:right;color:var(--muted2);">${s.lean_g!=null?(s.lean_g/1000).toFixed(1)+' kg':'—'}</td>
+                    <td style="padding:10px 8px;text-align:right;color:${s.vat_area_cm2==null?'var(--muted2)':s.vat_area_cm2<100?'var(--green)':s.vat_area_cm2<160?'var(--gold)':'var(--red)'};">${s.vat_area_cm2!=null?s.vat_area_cm2+' cm²':'—'}</td>
+                    <td style="padding:10px 0;text-align:right;color:${fatDelta===null?'var(--muted2)':parseFloat(fatDelta)<0?'var(--green)':'var(--red)'};">${fatDelta!==null?(parseFloat(fatDelta)>0?'+':'')+fatDelta+'%':'—'}</td>
+                  </tr>`;
+                }).join('')}
+              </tbody>
+            </table>
+          </div>
+        </div>`;
+
+        // Before / After comparison (first vs latest scan)
+        const compRows = [
+          ['Body Fat %',   oldest.fat_pct+'%',               latest.fat_pct+'%',               ((latest.fat_pct-oldest.fat_pct)>0?'+':'')+((latest.fat_pct-oldest.fat_pct)).toFixed(1)+'%',                  latest.fat_pct<oldest.fat_pct?'good':'bad'],
+          ['Fat Mass',     (oldest.fat_g/1000).toFixed(1)+'kg', (latest.fat_g/1000).toFixed(1)+'kg', (latest.fat_g<oldest.fat_g?'−':'+')+Math.abs(((latest.fat_g-oldest.fat_g)/1000)).toFixed(1)+'kg',       latest.fat_g<oldest.fat_g?'good':'bad'],
+          ['Lean Mass',    (oldest.lean_g/1000).toFixed(1)+'kg',(latest.lean_g/1000).toFixed(1)+'kg',(latest.lean_g>=oldest.lean_g?'+':'−')+Math.abs(((latest.lean_g-oldest.lean_g)/1000)).toFixed(1)+'kg',  latest.lean_g>=oldest.lean_g?'good':'bad'],
+          ['Total Mass',   (oldest.total_g/1000).toFixed(1)+'kg',(latest.total_g/1000).toFixed(1)+'kg',(latest.total_g>=oldest.total_g?'+':'−')+Math.abs(((latest.total_g-oldest.total_g)/1000)).toFixed(1)+'kg','neutral'],
+          ...(oldest.vat_area_cm2&&latest.vat_area_cm2?[['VAT Area',oldest.vat_area_cm2+' cm²',latest.vat_area_cm2+' cm²',(latest.vat_area_cm2<oldest.vat_area_cm2?'−':'+')+Math.abs(latest.vat_area_cm2-oldest.vat_area_cm2)+' cm²',latest.vat_area_cm2<oldest.vat_area_cm2?'good':'bad']]:[]),
+          ...(oldest.bmd&&latest.bmd?[['BMD (g/cm²)',oldest.bmd,latest.bmd,(latest.bmd>=oldest.bmd?'+':'')+((latest.bmd-oldest.bmd)).toFixed(3),latest.bmd>=oldest.bmd?'good':'bad']]:[]),
+          ...(oldest.t_score!=null&&latest.t_score!=null?[['T-Score',oldest.t_score,latest.t_score,(latest.t_score>=oldest.t_score?'+':'')+((latest.t_score-oldest.t_score)).toFixed(1),latest.t_score>=oldest.t_score?'good':'neutral']]:[]),
+          ...(oldest.ffmi&&latest.ffmi?[['FFMI',oldest.ffmi+' kg/m²',latest.ffmi+' kg/m²',(latest.ffmi>=oldest.ffmi?'+':'')+((latest.ffmi-oldest.ffmi)).toFixed(2),latest.ffmi>=oldest.ffmi?'good':'bad']]:[]),
+        ].filter(r=>r[1]!='undefinedkg'&&r[1]!='NaNkg');
+
+        html += `<div class="card" style="margin-bottom:20px;">
+          <div class="card-title">Before vs After — Scan #${oldest.scan_number||1} → Scan #${latest.scan_number||dexaScans.length}</div>
+          <div style="font-size:12px;color:var(--muted2);margin-bottom:14px;">${fmtD(oldest.scan_date)} → ${fmtD(latest.scan_date)}</div>
+          <table style="width:100%;border-collapse:collapse;font-size:13px;">
+            <thead><tr style="border-bottom:1px solid var(--border);">
+              <th style="padding:8px 0;text-align:left;font-size:10px;color:var(--muted2);text-transform:uppercase;letter-spacing:0.8px;">Metric</th>
+              <th style="padding:8px 10px;text-align:right;font-size:10px;color:var(--muted2);text-transform:uppercase;letter-spacing:0.8px;">Before</th>
+              <th style="padding:8px 10px;text-align:right;font-size:10px;color:var(--muted2);text-transform:uppercase;letter-spacing:0.8px;">Now</th>
+              <th style="padding:8px 0;text-align:right;font-size:10px;color:var(--muted2);text-transform:uppercase;letter-spacing:0.8px;">Change</th>
+            </tr></thead>
+            <tbody>${compRows.map(([label,v1,v2,delta,type])=>`
+              <tr style="border-bottom:1px solid var(--border);">
+                <td style="padding:10px 0;color:var(--text);font-weight:500;">${label}</td>
+                <td style="padding:10px 10px;text-align:right;color:var(--muted2);">${v1}</td>
+                <td style="padding:10px 10px;text-align:right;font-weight:600;">${v2}</td>
+                <td style="padding:10px 0;text-align:right;color:${colorMap[type]};font-weight:600;">${delta}</td>
+              </tr>`).join('')}
+            </tbody>
+          </table>
+        </div>`;
       }
     }
 
