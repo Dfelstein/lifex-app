@@ -463,6 +463,12 @@ html, body { height: 100%; background: var(--bg); color: var(--text); font-famil
           <span style="font-size:12px;color:var(--muted2);">or drag & drop your folder here</span>
           <input type="file" id="folder-input" webkitdirectory multiple style="display:none;" onchange="onFolderSelected(this.files)">
         </label>
+        <div id="add-folder-btn-wrap" style="display:none;margin-top:12px;">
+          <label style="display:inline-flex;align-items:center;gap:8px;padding:10px 18px;background:var(--surface2);border:1px solid var(--border2);border-radius:8px;cursor:pointer;font-size:13px;font-weight:600;color:var(--text);transition:border-color 0.15s;" onmouseover="this.style.borderColor='var(--blue)'" onmouseout="this.style.borderColor='var(--border2)'">
+            ➕ Add another folder
+            <input type="file" id="folder-input-extra" webkitdirectory multiple style="display:none;" onchange="onFolderSelected(this.files, true)">
+          </label>
+        </div>
         <div id="import-scan-status" style="margin-top:14px;font-size:13px;color:var(--muted2);display:none;"></div>
       </div>
 
@@ -2308,7 +2314,7 @@ function parseImportDate(raw) {
   return null;
 }
 
-function onFolderSelected(files) {
+function onFolderSelected(files, merge = false) {
   const pdfs = Array.from(files).filter(f => {
     const n = (f.name || '').toLowerCase();
     return n.endsWith('.pdf') || f.type === 'application/pdf' || n === 'report' || n === 'report.pdf';
@@ -2317,21 +2323,32 @@ function onFolderSelected(files) {
 
   if (!pdfs.length) {
     statusEl.style.display = 'block';
-    statusEl.textContent = 'No PDF files found in the selected folder.';
+    statusEl.textContent = merge ? 'No PDF files found in that folder — existing selection unchanged.' : 'No PDF files found in the selected folder.';
     return;
   }
 
-  statusEl.style.display = 'block';
-  statusEl.textContent = `Found ${pdfs.length} PDF files — analysing structure…`;
-
   // Parse paths: TopFolder/Date/ClientName/file.pdf
-  importQueue = pdfs.map(f => {
+  const newItems = pdfs.map(f => {
     const parts = f.webkitRelativePath.split('/');
-    // Expect at least 4 parts: root / date / client / file
     const date       = parts.length >= 4 ? parseImportDate(parts[parts.length - 3]) || parts[parts.length - 3] : null;
     const clientName = parts.length >= 3 ? parts[parts.length - 2] : 'Unknown';
     return { file: f, date, clientName: clientName.trim(), clientId: null, status: 'pending', error: null };
   });
+
+  if (merge && importQueue.length) {
+    // Deduplicate by webkitRelativePath
+    const existing = new Set(importQueue.map(i => i.file.webkitRelativePath));
+    const added = newItems.filter(i => !existing.has(i.file.webkitRelativePath));
+    importQueue = [...importQueue, ...added];
+    statusEl.style.display = 'block';
+    statusEl.textContent = `Added ${added.length} more PDFs — ${importQueue.length} total across all folders.`;
+  } else {
+    importQueue = newItems;
+    statusEl.style.display = 'block';
+    statusEl.textContent = `Found ${pdfs.length} PDF files — analysing structure…`;
+  }
+
+  document.getElementById('add-folder-btn-wrap').style.display = 'block';
 
   // Group by client for preview
   const byClient = {};
@@ -2341,10 +2358,11 @@ function onFolderSelected(files) {
   });
 
   const clientCount = Object.keys(byClient).length;
+  const totalPdfs = importQueue.length;
   document.getElementById('import-preview-summary').innerHTML = `
     <div style="display:grid;grid-template-columns:repeat(3,1fr);gap:12px;margin-bottom:4px;">
       <div style="background:var(--surface2);border-radius:8px;padding:12px;text-align:center;">
-        <div style="font-family:'Bebas Neue',sans-serif;font-size:28px;color:var(--blue)">${pdfs.length}</div>
+        <div style="font-family:'Bebas Neue',sans-serif;font-size:28px;color:var(--blue)">${totalPdfs}</div>
         <div style="font-size:11px;color:var(--muted2);">PDFs</div>
       </div>
       <div style="background:var(--surface2);border-radius:8px;padding:12px;text-align:center;">
@@ -2352,7 +2370,7 @@ function onFolderSelected(files) {
         <div style="font-size:11px;color:var(--muted2);">Clients</div>
       </div>
       <div style="background:var(--surface2);border-radius:8px;padding:12px;text-align:center;">
-        <div style="font-family:'Bebas Neue',sans-serif;font-size:28px;color:var(--orange)">~$${(pdfs.length * 0.04).toFixed(0)}</div>
+        <div style="font-family:'Bebas Neue',sans-serif;font-size:28px;color:var(--orange)">~$${(totalPdfs * 0.04).toFixed(0)}</div>
         <div style="font-size:11px;color:var(--muted2);">Est. API Cost</div>
       </div>
     </div>`;
@@ -2544,6 +2562,8 @@ function resetImport() {
   importQueue = [];
   importGhosts = [];
   document.getElementById('folder-input').value = '';
+  document.getElementById('folder-input-extra').value = '';
+  document.getElementById('add-folder-btn-wrap').style.display = 'none';
   document.getElementById('import-preview').style.display = 'none';
   document.getElementById('import-scan-status').style.display = 'none';
   document.getElementById('import-step-1').style.display = 'block';
@@ -2963,7 +2983,7 @@ async function loadAnalytics() {
 
   // Fetch profiles (non-staff) and dexa scans in parallel
   const [{ data: profilesRaw }, { data: dexaRaw }] = await Promise.all([
-    sb.from('profiles').select('id,full_name,sex,dob,member_level,created_at').or('is_staff.is.null,is_staff.eq.false').limit(2000),
+    sb.from('profiles').select('*').or('is_staff.is.null,is_staff.eq.false').limit(2000),
     sb.from('dexa_scans').select('client_id,scan_date,fat_pct,sex,patient_age').order('scan_date').limit(5000),
   ]);
 
@@ -3015,8 +3035,11 @@ async function loadAnalytics() {
     </div>`).join('');
 
   /* ── SEX SPLIT ── */
-  const males   = (profiles||[]).filter(p => p.sex === 'male').length;
-  const females = (profiles||[]).filter(p => p.sex === 'female').length;
+  // Build sex map from dexa scans (most recent scan per client wins; order is ascending so last write wins)
+  const clientSexFromScans = {};
+  (dexaRaw||[]).forEach(s => { if (s.sex) clientSexFromScans[s.client_id] = s.sex; });
+  const males   = (profiles||[]).filter(p => (p.sex || clientSexFromScans[p.id]) === 'male').length;
+  const females = (profiles||[]).filter(p => (p.sex || clientSexFromScans[p.id]) === 'female').length;
   const unknown = totalClients - males - females;
   const total   = totalClients || 1;
 
@@ -3427,45 +3450,21 @@ async function renderSuburbMap(suburbs) {
   if (!suburbs.length) return;
 
   const maxCount = suburbs[0].count;
-  const heatPoints = [];
-  const bounds = [];
+  const allBounds = [];
+  const allHeatPoints = [];
 
   const GEO_CACHE_KEY = 'lifex_geocache_v1';
   let geoCache = {};
   try { geoCache = JSON.parse(localStorage.getItem(GEO_CACHE_KEY) || '{}'); } catch {}
 
-  for (const { suburb, state, count } of suburbs) {
-    const cacheKey = `${suburb}||${state}`.toLowerCase();
-    let lat, lng;
-
-    if (geoCache[cacheKey]) {
-      ({ lat, lng } = geoCache[cacheKey]);
-    } else {
-      const query = [suburb, state, 'Australia'].filter(Boolean).join(', ');
-      try {
-        const res = await fetch(
-          `https://nominatim.openstreetmap.org/search?q=${encodeURIComponent(query)}&format=json&limit=1`,
-          { headers: { 'Accept-Language': 'en' } }
-        );
-        const data = await res.json();
-        if (!data.length) continue;
-        lat = parseFloat(data[0].lat);
-        lng = parseFloat(data[0].lon);
-        geoCache[cacheKey] = { lat, lng };
-        try { localStorage.setItem(GEO_CACHE_KEY, JSON.stringify(geoCache)); } catch {}
-        await new Promise(r => setTimeout(r, 1100)); // rate limit only for new lookups
-      } catch { continue; }
-    }
-
-    bounds.push([lat, lng]);
-    heatPoints.push([lat, lng, count / maxCount]);
-
+  const addToMap = (lat, lng, suburb, state, count) => {
+    allBounds.push([lat, lng]);
+    allHeatPoints.push([lat, lng, count / maxCount]);
     const { fill, border } = countToColor(count, maxCount);
     const radius = 10 + Math.round((count / maxCount) * 22);
     const circle = L.circleMarker([lat, lng], {
       radius, fillColor: fill, color: border, weight: 2, opacity: 1, fillOpacity: 0.75,
     }).addTo(anLeafletMap);
-
     if (count === maxCount || count >= Math.ceil(maxCount * 0.5)) {
       L.marker([lat, lng], {
         icon: L.divIcon({
@@ -3476,23 +3475,67 @@ async function renderSuburbMap(suburbs) {
         interactive: false,
       }).addTo(anLeafletMap);
     }
-
     circle.bindTooltip(`<b>${suburb}</b>${state ? ', '+state : ''}<br><span style="color:#f5c842;font-weight:600;">${count} lead${count !== 1 ? 's' : ''}</span>`, {
       permanent: false, direction: 'top', offset: [0, -radius],
     });
+  };
+
+  // Render cached suburbs immediately so the map appears straight away
+  const uncached = [];
+  for (const { suburb, state, count } of suburbs) {
+    const cacheKey = `${suburb}||${state}`.toLowerCase();
+    if (geoCache[cacheKey]) {
+      const { lat, lng } = geoCache[cacheKey];
+      addToMap(lat, lng, suburb, state, count);
+    } else {
+      uncached.push({ suburb, state, count });
+    }
   }
 
-  // Add heatmap layer underneath circles
-  if (heatPoints.length && typeof L.heatLayer !== 'undefined') {
-    L.heatLayer(heatPoints, {
-      radius: 35, blur: 25, maxZoom: 14,
-      gradient: { 0.2: '#2dd4bf', 0.5: '#f5c842', 1.0: '#ff7043' },
-    }).addTo(anLeafletMap);
-  }
+  // Fit bounds to cached results right away
+  if (allBounds.length > 1) anLeafletMap.fitBounds(allBounds, { padding: [60, 60] });
+  else if (allBounds.length === 1) anLeafletMap.setView(allBounds[0], 12);
 
-  // Zoom to where data actually is
-  if (bounds.length > 1) anLeafletMap.fitBounds(bounds, { padding: [60, 60] });
-  else if (bounds.length === 1) anLeafletMap.setView(bounds[0], 12);
+  // Geocode uncached suburbs in the background — 1 per second, Nominatim rate limit
+  if (uncached.length) {
+    (async () => {
+      for (const { suburb, state, count } of uncached) {
+        const cacheKey = `${suburb}||${state}`.toLowerCase();
+        const query = [suburb, state, 'Australia'].filter(Boolean).join(', ');
+        try {
+          const res = await fetch(
+            `https://nominatim.openstreetmap.org/search?q=${encodeURIComponent(query)}&format=json&limit=1`,
+            { headers: { 'Accept-Language': 'en' } }
+          );
+          const data = await res.json();
+          if (!data.length) { await new Promise(r => setTimeout(r, 1100)); continue; }
+          const lat = parseFloat(data[0].lat);
+          const lng = parseFloat(data[0].lon);
+          geoCache[cacheKey] = { lat, lng };
+          try { localStorage.setItem(GEO_CACHE_KEY, JSON.stringify(geoCache)); } catch {}
+          addToMap(lat, lng, suburb, state, count);
+          // Refit only if map is still visible
+          if (allBounds.length > 1 && anLeafletMap) anLeafletMap.fitBounds(allBounds, { padding: [60, 60] });
+        } catch { /* skip */ }
+        await new Promise(r => setTimeout(r, 1100));
+      }
+      // Add/refresh heatmap once all geocoding is done
+      if (allHeatPoints.length && typeof L.heatLayer !== 'undefined' && anLeafletMap) {
+        L.heatLayer(allHeatPoints, {
+          radius: 35, blur: 25, maxZoom: 14,
+          gradient: { 0.2: '#2dd4bf', 0.5: '#f5c842', 1.0: '#ff7043' },
+        }).addTo(anLeafletMap);
+      }
+    })();
+  } else {
+    // All cached — add heatmap immediately
+    if (allHeatPoints.length && typeof L.heatLayer !== 'undefined') {
+      L.heatLayer(allHeatPoints, {
+        radius: 35, blur: 25, maxZoom: 14,
+        gradient: { 0.2: '#2dd4bf', 0.5: '#f5c842', 1.0: '#ff7043' },
+      }).addTo(anLeafletMap);
+    }
+  }
 
   // Legend
   const legend = L.control({ position: 'bottomright' });
