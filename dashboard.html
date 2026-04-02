@@ -1060,6 +1060,23 @@ function showScanDetail(i) {
     ...(s.almi    != null ? [['ALMI', s.almi]] : []),
   ];
 
+  // Segmental chart: all regions that have fat_pct
+  const segments = [
+    { label: 'Left Arm',  fat_pct: s.left_arm_fat_pct },
+    { label: 'Right Arm', fat_pct: s.right_arm_fat_pct },
+    { label: 'Trunk',     fat_pct: s.trunk_fat_pct },
+    { label: 'Left Leg',  fat_pct: s.left_leg_fat_pct },
+    { label: 'Right Leg', fat_pct: s.right_leg_fat_pct },
+  ].filter(seg => seg.fat_pct != null);
+
+  // Limb breakdown table rows
+  const limbRows = [
+    { label: 'Left Arm',  fat_pct: s.left_arm_fat_pct,  lean_g: s.left_arm_lean_g,  fat_g: s.left_arm_fat_g  },
+    { label: 'Right Arm', fat_pct: s.right_arm_fat_pct, lean_g: s.right_arm_lean_g, fat_g: s.right_arm_fat_g },
+    { label: 'Left Leg',  fat_pct: s.left_leg_fat_pct,  lean_g: s.left_leg_lean_g,  fat_g: s.left_leg_fat_g  },
+    { label: 'Right Leg', fat_pct: s.right_leg_fat_pct, lean_g: s.right_leg_lean_g, fat_g: s.right_leg_fat_g },
+  ].filter(r => r.fat_pct != null || r.lean_g != null);
+
   document.getElementById('sheetBody').innerHTML = `
     ${isLatest ? '<div style="margin-bottom:12px;"><span style="font-size:11px;background:rgba(245,200,66,0.12);color:var(--gold);border-radius:10px;padding:3px 12px;font-weight:700;letter-spacing:0.5px;">LATEST SCAN</span></div>' : ''}
     <div class="sheet-stat-grid">
@@ -1069,6 +1086,55 @@ function showScanDetail(i) {
           <div class="sheet-stat-value">${String(st.value).replace(/([a-z%]+)$/i,'<span class="sheet-stat-unit">$1</span>')}</div>
         </div>`).join('')}
     </div>
+
+    ${segments.length >= 2 ? `
+    <div class="sheet-section-title">Body Composition by Region</div>
+    <div style="background:var(--surface2);border-radius:10px;padding:14px 14px 10px;">
+      ${segments.map(seg => `
+        <div style="margin-bottom:13px;">
+          <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:5px;">
+            <span style="font-size:12px;font-weight:600;color:var(--text);">${seg.label}</span>
+            <span style="font-size:11px;color:var(--muted2);">${seg.fat_pct}% fat &nbsp;·&nbsp; ${(100 - seg.fat_pct).toFixed(1)}% lean</span>
+          </div>
+          <div style="height:9px;border-radius:5px;background:var(--surface3);overflow:hidden;display:flex;">
+            <div style="width:${seg.fat_pct}%;background:linear-gradient(90deg,#c0392b,#e67e22);"></div>
+            <div style="flex:1;background:linear-gradient(90deg,#27ae60,#2ecc71);"></div>
+          </div>
+        </div>`).join('')}
+      <div style="display:flex;gap:16px;margin-top:2px;">
+        <div style="display:flex;align-items:center;gap:5px;font-size:10px;color:var(--muted2);">
+          <div style="width:10px;height:10px;border-radius:2px;background:linear-gradient(90deg,#c0392b,#e67e22);"></div> Fat
+        </div>
+        <div style="display:flex;align-items:center;gap:5px;font-size:10px;color:var(--muted2);">
+          <div style="width:10px;height:10px;border-radius:2px;background:linear-gradient(90deg,#27ae60,#2ecc71);"></div> Lean
+        </div>
+      </div>
+    </div>` : ''}
+
+    ${limbRows.length ? `
+    <div class="sheet-section-title">Limb Breakdown</div>
+    <div style="background:var(--surface2);border-radius:10px;overflow:hidden;">
+      <table style="width:100%;border-collapse:collapse;font-size:13px;">
+        <thead>
+          <tr style="border-bottom:1px solid var(--border);">
+            <th style="padding:8px 12px;text-align:left;font-size:10px;color:var(--muted2);text-transform:uppercase;letter-spacing:0.8px;font-weight:600;">Region</th>
+            <th style="padding:8px 12px;text-align:right;font-size:10px;color:var(--muted2);text-transform:uppercase;letter-spacing:0.8px;font-weight:600;">Fat %</th>
+            <th style="padding:8px 12px;text-align:right;font-size:10px;color:var(--muted2);text-transform:uppercase;letter-spacing:0.8px;font-weight:600;">Lean</th>
+            <th style="padding:8px 12px;text-align:right;font-size:10px;color:var(--muted2);text-transform:uppercase;letter-spacing:0.8px;font-weight:600;">Fat</th>
+          </tr>
+        </thead>
+        <tbody>
+          ${limbRows.map(r => `
+            <tr style="border-bottom:1px solid var(--border);">
+              <td style="padding:10px 12px;color:var(--text);font-weight:500;">${r.label}</td>
+              <td style="padding:10px 12px;text-align:right;color:var(--text);">${r.fat_pct != null ? r.fat_pct+'%' : '—'}</td>
+              <td style="padding:10px 12px;text-align:right;color:var(--muted2);">${r.lean_g != null ? (r.lean_g/1000).toFixed(2)+' kg' : '—'}</td>
+              <td style="padding:10px 12px;text-align:right;color:var(--muted2);">${r.fat_g != null ? (r.fat_g/1000).toFixed(2)+' kg' : '—'}</td>
+            </tr>`).join('')}
+        </tbody>
+      </table>
+    </div>` : ''}
+
     ${extraRows.length ? `
       <div class="sheet-section-title">Full Metrics</div>
       <div style="background:var(--surface2);border-radius:10px;padding:4px 14px;">

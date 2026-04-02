@@ -72,12 +72,13 @@ First, identify the scan type: DEXA, BLOOD, HORMONES, or RMR.
 Then extract all relevant data and return ONLY a valid JSON object with this structure:
 
 For DEXA:
-{"type":"DEXA","scan_date":"YYYY-MM-DD","scan_number":1,"dob":"YYYY-MM-DD","patient_age":0,"sex":"male","height_cm":0.0,"weight_kg":0.0,"fat_pct":0.0,"fat_g":0,"lean_g":0,"total_g":0,"bmd":0.0,"t_score":0.0,"z_score":0.0,"pr_pct":0.0,"vat_g":0,"vat_area_cm2":0.0,"android_fat_pct":0.0,"gynoid_fat_pct":0.0,"ag_ratio":0.0,"trunk_fat_pct":0.0,"ffmi":0.0,"almi":0.0,"fmi":0.0}
+{"type":"DEXA","scan_date":"YYYY-MM-DD","scan_number":1,"dob":"YYYY-MM-DD","patient_age":0,"sex":"male","height_cm":0.0,"weight_kg":0.0,"fat_pct":0.0,"fat_g":0,"lean_g":0,"total_g":0,"bmd":0.0,"t_score":0.0,"z_score":0.0,"pr_pct":0.0,"vat_g":0,"vat_area_cm2":0.0,"android_fat_pct":0.0,"gynoid_fat_pct":0.0,"ag_ratio":0.0,"trunk_fat_pct":0.0,"ffmi":0.0,"almi":0.0,"fmi":0.0,"left_arm_fat_pct":0.0,"right_arm_fat_pct":0.0,"left_leg_fat_pct":0.0,"right_leg_fat_pct":0.0,"left_arm_lean_g":0,"right_arm_lean_g":0,"left_leg_lean_g":0,"right_leg_lean_g":0,"left_arm_fat_g":0,"right_arm_fat_g":0,"left_leg_fat_g":0,"right_leg_fat_g":0}
 
 Extract from the patient info header: patient_age (integer years), sex ("male" or "female"), height_cm (numeric), weight_kg (numeric), dob (date of birth as YYYY-MM-DD).
 Extract from Adipose Indices: fmi = "Fat Mass/Height²", vat_area_cm2 = "Est. VAT Area (cm²)".
 Extract from Lean Indices: ffmi = "Lean/Height²", almi = "Appen. Lean/Height²".
 Extract trunk_fat_pct from the Trunk row % Fat in the Body Composition Results table.
+Extract segmental data from the Body Composition Results table: for the "L Arm" row extract % Fat → left_arm_fat_pct, Lean (g) → left_arm_lean_g, Fat (g) → left_arm_fat_g; for "R Arm" → right_arm_fat_pct, right_arm_lean_g, right_arm_fat_g; for "L Leg" → left_leg_fat_pct, left_leg_lean_g, left_leg_fat_g; for "R Leg" → right_leg_fat_pct, right_leg_lean_g, right_leg_fat_g.
 
 For RMR:
 {"type":"RMR","test_date":"YYYY-MM-DD","kcal":0,"kj":0,"fat_pct":0.0,"glucose_pct":0.0,"feo2":0.0,"pop_min":0,"pop_max":0}
@@ -163,6 +164,18 @@ Return ONLY the JSON, no other text.`,
         ffmi: toNum(parsed.ffmi),
         almi: toNum(parsed.almi),
         fmi: toNum(parsed.fmi),
+        left_arm_fat_pct: toNum(parsed.left_arm_fat_pct),
+        right_arm_fat_pct: toNum(parsed.right_arm_fat_pct),
+        left_leg_fat_pct: toNum(parsed.left_leg_fat_pct),
+        right_leg_fat_pct: toNum(parsed.right_leg_fat_pct),
+        left_arm_lean_g: toInt(parsed.left_arm_lean_g),
+        right_arm_lean_g: toInt(parsed.right_arm_lean_g),
+        left_leg_lean_g: toInt(parsed.left_leg_lean_g),
+        right_leg_lean_g: toInt(parsed.right_leg_lean_g),
+        left_arm_fat_g: toInt(parsed.left_arm_fat_g),
+        right_arm_fat_g: toInt(parsed.right_arm_fat_g),
+        left_leg_fat_g: toInt(parsed.left_leg_fat_g),
+        right_leg_fat_g: toInt(parsed.right_leg_fat_g),
         pdf_path: pdfPath,
       }, { onConflict: 'client_id,scan_date' });
       if (error) return cors(JSON.stringify({ error: error.message }), 500);
