@@ -704,6 +704,8 @@ async function init() {
   // Pre-warm this week's appointment data in background so Previous Appointments loads fast
   const prewarmDays = getWeekDates(0);
   prewarmDays.forEach(d => fetchAppts(dateToStr(d)));
+
+  initFolderPickerDrop();
 }
 
 /* ══ TODAY'S APPOINTMENTS ══ */
@@ -2314,49 +2316,32 @@ function parseImportDate(raw) {
   return null;
 }
 
-function onFolderSelected(files, merge = false) {
-  const pdfs = Array.from(files).filter(f => {
-    const n = (f.name || '').toLowerCase();
-    return n.endsWith('.pdf') || f.type === 'application/pdf' || n === 'report' || n === 'report.pdf';
-  });
-  const statusEl = document.getElementById('import-scan-status');
+function parsePdfPath(pathStr) {
+  // Works for both webkitRelativePath (root/date/client/file) and fullPath (/date/client/file)
+  const parts = pathStr.replace(/^\//, '').split('/');
+  const date       = parts.length >= 3 ? parseImportDate(parts[parts.length - 3]) || parts[parts.length - 3] : null;
+  const clientName = parts.length >= 2 ? parts[parts.length - 2] : 'Unknown';
+  return { date, clientName: clientName.trim() };
+}
 
-  if (!pdfs.length) {
-    statusEl.style.display = 'block';
-    statusEl.textContent = merge ? 'No PDF files found in that folder — existing selection unchanged.' : 'No PDF files found in the selected folder.';
-    return;
-  }
-
-  // Parse paths: TopFolder/Date/ClientName/file.pdf
-  const newItems = pdfs.map(f => {
-    const parts = f.webkitRelativePath.split('/');
-    const date       = parts.length >= 4 ? parseImportDate(parts[parts.length - 3]) || parts[parts.length - 3] : null;
-    const clientName = parts.length >= 3 ? parts[parts.length - 2] : 'Unknown';
-    return { file: f, date, clientName: clientName.trim(), clientId: null, status: 'pending', error: null };
-  });
-
+function mergeIntoQueue(newItems, merge) {
   if (merge && importQueue.length) {
-    // Deduplicate by webkitRelativePath
-    const existing = new Set(importQueue.map(i => i.file.webkitRelativePath));
-    const added = newItems.filter(i => !existing.has(i.file.webkitRelativePath));
+    const existing = new Set(importQueue.map(i => `${i.clientName}||${i.file.name}`));
+    const added = newItems.filter(i => !existing.has(`${i.clientName}||${i.file.name}`));
     importQueue = [...importQueue, ...added];
-    statusEl.style.display = 'block';
-    statusEl.textContent = `Added ${added.length} more PDFs — ${importQueue.length} total across all folders.`;
+    return added.length;
   } else {
     importQueue = newItems;
-    statusEl.style.display = 'block';
-    statusEl.textContent = `Found ${pdfs.length} PDF files — analysing structure…`;
+    return newItems.length;
   }
+}
 
-  document.getElementById('add-folder-btn-wrap').style.display = 'block';
-
-  // Group by client for preview
+function buildImportPreview() {
   const byClient = {};
   importQueue.forEach(item => {
     if (!byClient[item.clientName]) byClient[item.clientName] = [];
     byClient[item.clientName].push(item);
   });
-
   const clientCount = Object.keys(byClient).length;
   const totalPdfs = importQueue.length;
   document.getElementById('import-preview-summary').innerHTML = `
@@ -2374,16 +2359,97 @@ function onFolderSelected(files, merge = false) {
         <div style="font-size:11px;color:var(--muted2);">Est. API Cost</div>
       </div>
     </div>`;
-
-  const listEl = document.getElementById('import-preview-list');
-  listEl.innerHTML = Object.entries(byClient).map(([name, items]) =>
+  document.getElementById('import-preview-list').innerHTML = Object.entries(byClient).map(([name, items]) =>
     `<div style="display:flex;justify-content:space-between;align-items:center;padding:7px 0;border-bottom:1px solid var(--border);font-size:13px;">
       <span style="color:var(--text)">${name}</span>
       <span style="color:var(--muted2)">${items.length} PDF${items.length > 1 ? 's' : ''}</span>
     </div>`).join('');
-
   document.getElementById('import-preview').style.display = 'block';
-  statusEl.style.display = 'none';
+  document.getElementById('import-scan-status').style.display = 'none';
+  document.getElementById('add-folder-btn-wrap').style.display = 'block';
+}
+
+function onFolderSelected(files, merge = false) {
+  const pdfs = Array.from(files).filter(f => {
+    const n = (f.name || '').toLowerCase();
+    return n.endsWith('.pdf') || f.type === 'application/pdf';
+  });
+  const statusEl = document.getElementById('import-scan-status');
+  if (!pdfs.length) {
+    statusEl.style.display = 'block';
+    statusEl.textContent = merge ? 'No PDF files found in that folder — existing selection unchanged.' : 'No PDF files found in the selected folder.';
+    return;
+  }
+  const newItems = pdfs.map(f => {
+    const { date, clientName } = parsePdfPath(f.webkitRelativePath || f.name);
+    return { file: f, date, clientName, clientId: null, status: 'pending', error: null };
+  });
+  const added = mergeIntoQueue(newItems, merge);
+  statusEl.style.display = 'block';
+  statusEl.textContent = merge ? `Added ${added} more PDFs — ${importQueue.length} total.` : `Found ${pdfs.length} PDFs — analysing structure…`;
+  buildImportPreview();
+}
+
+// ── Drag & drop on the folder picker ──
+async function collectDirEntries(reader) {
+  return new Promise(resolve => {
+    const all = [];
+    const readBatch = () => reader.readEntries(entries => {
+      if (!entries.length) { resolve(all); return; }
+      all.push(...entries); readBatch();
+    });
+    readBatch();
+  });
+}
+
+async function collectFilesFromEntry(entry, results) {
+  if (entry.isFile) {
+    await new Promise(resolve => entry.file(f => { results.push({ file: f, path: entry.fullPath }); resolve(); }));
+  } else if (entry.isDirectory) {
+    const entries = await collectDirEntries(entry.createReader());
+    await Promise.all(entries.map(e => collectFilesFromEntry(e, results)));
+  }
+}
+
+async function handleFolderPickerDrop(e, merge = false) {
+  e.preventDefault(); e.stopPropagation();
+  const label = document.getElementById('folder-picker-label');
+  label.style.borderColor = '';
+  const statusEl = document.getElementById('import-scan-status');
+  statusEl.style.display = 'block';
+  statusEl.textContent = 'Reading dropped folder…';
+
+  const items = [...(e.dataTransfer.items || [])];
+  const allFound = [];
+  await Promise.all(items.map(item => {
+    const entry = item.webkitGetAsEntry?.();
+    return entry ? collectFilesFromEntry(entry, allFound) : Promise.resolve();
+  }));
+
+  const pdfs = allFound.filter(({ file }) => file.name.toLowerCase().endsWith('.pdf'));
+  if (!pdfs.length) {
+    statusEl.textContent = merge ? 'No PDFs found — existing selection unchanged.' : 'No PDF files found in the dropped folder.';
+    return;
+  }
+  const newItems = pdfs.map(({ file, path }) => {
+    const { date, clientName } = parsePdfPath(path);
+    return { file, date, clientName, clientId: null, status: 'pending', error: null };
+  });
+  const added = mergeIntoQueue(newItems, merge);
+  statusEl.textContent = merge ? `Added ${added} PDFs — ${importQueue.length} total.` : `Found ${pdfs.length} PDFs — analysing structure…`;
+  buildImportPreview();
+}
+
+function initFolderPickerDrop() {
+  const label = document.getElementById('folder-picker-label');
+  if (!label) return;
+  label.addEventListener('dragover',  e => { e.preventDefault(); e.stopPropagation(); label.style.borderColor = 'var(--blue)'; });
+  label.addEventListener('dragenter', e => { e.preventDefault(); e.stopPropagation(); label.style.borderColor = 'var(--blue)'; });
+  label.addEventListener('dragleave', e => { e.stopPropagation(); label.style.borderColor = ''; });
+  label.addEventListener('drop',      e => handleFolderPickerDrop(e, importQueue.length > 0));
+  // Also block the page-level drop so Chrome doesn't open the PDF
+  document.addEventListener('dragover', e => e.preventDefault());
+  document.addEventListener('drop',     e => e.preventDefault());
 }
 
 async function startImport() {
