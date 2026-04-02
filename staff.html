@@ -263,6 +263,33 @@ html, body { height: 100%; background: var(--bg); color: var(--text); font-famil
 .no-acuity-icon { font-size:48px;opacity:0.3;margin-bottom:12px; }
 .date-header { display:flex;align-items:center;justify-content:space-between;margin-bottom:24px; }
 .date-pill { background:var(--surface);border:1px solid var(--border2);border-radius:8px;padding:6px 14px;font-size:13px;color:var(--muted2); }
+
+/* SCAN DETAIL SHEET */
+.scan-sheet-overlay { display:none;position:fixed;inset:0;background:rgba(0,0,0,0.7);z-index:400;backdrop-filter:blur(4px); }
+.scan-sheet-overlay.open { display:block; }
+.scan-sheet { position:fixed;bottom:0;left:0;right:0;z-index:401;background:var(--surface);border-radius:20px 20px 0 0;transform:translateY(100%);transition:transform 0.35s cubic-bezier(0.32,0.72,0,1);max-height:90vh;overflow-y:auto;padding-bottom:env(safe-area-inset-bottom,24px); }
+.scan-sheet.open { transform:translateY(0); }
+.sheet-handle { width:40px;height:4px;background:var(--surface3);border-radius:2px;margin:12px auto 0; }
+.sheet-header { display:flex;align-items:center;justify-content:space-between;padding:16px 20px 0; }
+.sheet-title { font-family:'Bebas Neue',sans-serif;font-size:22px;letter-spacing:1px; }
+.sheet-close { width:30px;height:30px;border-radius:50%;background:var(--surface2);display:flex;align-items:center;justify-content:center;cursor:pointer;font-size:16px;color:var(--muted2);flex-shrink:0; }
+.sheet-body { padding:20px; }
+.sheet-stat-grid { display:grid;grid-template-columns:repeat(3,1fr);gap:10px;margin-bottom:16px; }
+@media (max-width:640px) { .sheet-stat-grid { grid-template-columns:repeat(2,1fr); } }
+.sheet-stat { border-radius:10px;padding:12px;background:var(--surface2); }
+.sheet-stat.orange { border-top:2px solid var(--orange); }
+.sheet-stat.red    { border-top:2px solid var(--red); }
+.sheet-stat.green  { border-top:2px solid var(--green); }
+.sheet-stat.blue   { border-top:2px solid var(--blue); }
+.sheet-stat.teal   { border-top:2px solid var(--teal); }
+.sheet-stat-label { font-size:10px;color:var(--muted2);text-transform:uppercase;letter-spacing:0.8px;margin-bottom:4px; }
+.sheet-stat-value { font-family:'Bebas Neue',sans-serif;font-size:26px;letter-spacing:1px; }
+.sheet-stat-unit  { font-size:14px;letter-spacing:0; }
+.sheet-section-title { font-size:11px;font-weight:600;letter-spacing:1px;text-transform:uppercase;color:var(--muted2);margin:16px 0 8px; }
+.sheet-row { display:flex;justify-content:space-between;align-items:center;padding:10px 0;border-bottom:1px solid var(--border); }
+.sheet-row:last-child { border-bottom:none; }
+.sheet-row-label { font-size:13px;color:var(--muted2); }
+.sheet-row-val   { font-size:13px;font-weight:600;color:var(--text); }
 </style>
 </head>
 <body>
@@ -1383,13 +1410,15 @@ async function viewClientProfile(clientId, firstName, lastName) {
                   const prev = ri < dexaScans.length-1 ? dexaScans[dexaScans.length-2-ri] : null;
                   const isLatest = ri === 0;
                   const fatDelta = prev&&s.fat_pct!=null&&prev.fat_pct!=null ? (s.fat_pct-prev.fat_pct).toFixed(1) : null;
-                  return `<tr style="border-bottom:1px solid var(--border);${isLatest?'background:rgba(245,200,66,0.04);':''}">
-                    <td style="padding:10px 0;font-family:'Bebas Neue',sans-serif;font-size:16px;color:${isLatest?'var(--gold)':'var(--muted2)'};">${s.scan_number||dexaScans.length-ri}</td>
+                  const scanNum = s.scan_number || dexaScans.length-ri;
+                  return `<tr style="border-bottom:1px solid var(--border);${isLatest?'background:rgba(245,200,66,0.04);':''}cursor:pointer;" onclick='showStaffScanDetail(${JSON.stringify(s)},${scanNum})' onmouseover="this.style.background='rgba(77,166,255,0.05)'" onmouseout="this.style.background='${isLatest?'rgba(245,200,66,0.04)':''}'" title="Click to view full scan detail">
+                    <td style="padding:10px 0;font-family:'Bebas Neue',sans-serif;font-size:16px;color:${isLatest?'var(--gold)':'var(--muted2)'};">${scanNum}</td>
                     <td style="padding:10px 8px;color:var(--text);font-weight:${isLatest?'600':'400'};">${fmtD(s.scan_date)}${isLatest?' <span style="font-size:9px;background:rgba(245,200,66,0.15);color:var(--gold);border-radius:8px;padding:1px 6px;font-weight:700;">LATEST</span>':''}</td>
                     <td style="padding:10px 8px;text-align:right;font-weight:600;">${s.fat_pct!=null?s.fat_pct+'%':'—'}</td>
                     <td style="padding:10px 8px;text-align:right;color:var(--muted2);">${s.lean_g!=null?(s.lean_g/1000).toFixed(1)+' kg':'—'}</td>
                     <td style="padding:10px 8px;text-align:right;color:${s.vat_area_cm2==null?'var(--muted2)':s.vat_area_cm2<100?'var(--green)':s.vat_area_cm2<160?'var(--gold)':'var(--red)'};">${s.vat_area_cm2!=null?s.vat_area_cm2+' cm²':'—'}</td>
                     <td style="padding:10px 0;text-align:right;color:${fatDelta===null?'var(--muted2)':parseFloat(fatDelta)<0?'var(--green)':'var(--red)'};">${fatDelta!==null?(parseFloat(fatDelta)>0?'+':'')+fatDelta+'%':'—'}</td>
+                    <td style="padding:10px 0;text-align:right;color:var(--muted2);font-size:16px;">›</td>
                   </tr>`;
                 }).join('')}
               </tbody>
@@ -3514,6 +3543,142 @@ function anColumnChart(entries, color, maxVal) {
   </div></div>`;
 }
 
+/* ══════════════════════════
+   STAFF SCAN DETAIL SHEET
+══════════════════════════ */
+function showStaffScanDetail(s, scanNum) {
+  const fmtDate = d => d ? new Date(d+'T00:00:00').toLocaleDateString('en-AU',{day:'numeric',month:'short',year:'numeric'}) : '';
+  document.getElementById('staffSheetTitle').textContent = `Scan #${scanNum}  ·  ${fmtDate(s.scan_date)}`;
+
+  const weightKg = s.total_g ? (s.total_g/1000).toFixed(1) : null;
+  const fatKg    = s.fat_g   ? (s.fat_g/1000).toFixed(1)   : null;
+  const leanKg   = s.lean_g  ? (s.lean_g/1000).toFixed(1)  : null;
+
+  const mainStats = [
+    { label:'Body Fat',   value: s.fat_pct  != null ? s.fat_pct+'%'    : '—', color:'orange' },
+    { label:'Fat Mass',   value: fatKg       ? fatKg+' kg'              : '—', color:'red'    },
+    { label:'Lean Mass',  value: leanKg      ? leanKg+' kg'             : '—', color:'green'  },
+    { label:'Total Mass', value: weightKg    ? weightKg+' kg'           : '—', color:'blue'   },
+    ...(s.ffmi != null ? [{ label:'FFMI', value: s.ffmi, color:'teal'   }] : []),
+    ...(s.fmi  != null ? [{ label:'FMI',  value: s.fmi,  color:'orange' }] : []),
+  ];
+
+  const extraRows = [
+    ...(s.bmd       != null ? [['BMD (g/cm²)', s.bmd]] : []),
+    ...(s.t_score   != null ? [['T-Score', s.t_score]] : []),
+    ...(s.z_score   != null ? [['Z-Score', s.z_score >= 0 ? '+'+s.z_score : String(s.z_score)]] : []),
+    ...(s.pr_pct    != null ? [['PR %', s.pr_pct+'%']] : []),
+    ...(s.vat_area_cm2 != null ? [['VAT Area', `${s.vat_area_cm2} cm² ${s.vat_area_cm2<100?'(✓ Normal)':s.vat_area_cm2<160?'(⚠ Borderline)':'(🔴 High Risk)'}`]] : []),
+    ...(s.android_fat_pct != null ? [['Android Fat', s.android_fat_pct+'%']] : []),
+    ...(s.gynoid_fat_pct  != null ? [['Gynoid Fat',  s.gynoid_fat_pct+'%']]  : []),
+    ...(s.ag_ratio  != null ? [['A:G Ratio', s.ag_ratio]] : []),
+    ...(s.trunk_fat_pct != null ? [['Trunk Fat', s.trunk_fat_pct+'%']] : []),
+    ...(s.almi      != null ? [['ALMI', s.almi+' kg/m²']] : []),
+  ];
+
+  const segs = [
+    {label:'Left Arm',  fat_pct: s.left_arm_fat_pct},
+    {label:'Right Arm', fat_pct: s.right_arm_fat_pct},
+    {label:'Trunk',     fat_pct: s.trunk_fat_pct},
+    {label:'Left Leg',  fat_pct: s.left_leg_fat_pct},
+    {label:'Right Leg', fat_pct: s.right_leg_fat_pct},
+  ].filter(sg => sg.fat_pct != null);
+
+  const limbs = [
+    {label:'Left Arm',  fat_pct: s.left_arm_fat_pct,  lean_g: s.left_arm_lean_g,  fat_g: s.left_arm_fat_g},
+    {label:'Right Arm', fat_pct: s.right_arm_fat_pct, lean_g: s.right_arm_lean_g, fat_g: s.right_arm_fat_g},
+    {label:'Left Leg',  fat_pct: s.left_leg_fat_pct,  lean_g: s.left_leg_lean_g,  fat_g: s.left_leg_fat_g},
+    {label:'Right Leg', fat_pct: s.right_leg_fat_pct, lean_g: s.right_leg_lean_g, fat_g: s.right_leg_fat_g},
+  ].filter(r => r.fat_pct != null || r.lean_g != null);
+
+  document.getElementById('staffSheetBody').innerHTML = `
+    <div class="sheet-stat-grid">
+      ${mainStats.map(st => `
+        <div class="sheet-stat ${st.color}">
+          <div class="sheet-stat-label">${st.label}</div>
+          <div class="sheet-stat-value">${String(st.value).replace(/([a-z%²]+)$/i,'<span class="sheet-stat-unit">$1</span>')}</div>
+        </div>`).join('')}
+    </div>
+
+    ${segs.length >= 2 ? `
+    <div class="sheet-section-title">Body Composition by Region</div>
+    <div style="background:var(--surface2);border-radius:10px;padding:14px 14px 10px;">
+      ${segs.map(sg => `
+        <div style="margin-bottom:13px;">
+          <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:5px;">
+            <span style="font-size:12px;font-weight:600;color:var(--text);">${sg.label}</span>
+            <span style="font-size:11px;color:var(--muted2);">${sg.fat_pct}% fat · ${(100-sg.fat_pct).toFixed(1)}% lean</span>
+          </div>
+          <div style="height:9px;border-radius:5px;background:var(--surface3);overflow:hidden;display:flex;">
+            <div style="width:${sg.fat_pct}%;background:linear-gradient(90deg,#c0392b,#e67e22);"></div>
+            <div style="flex:1;background:linear-gradient(90deg,#27ae60,#2ecc71);"></div>
+          </div>
+        </div>`).join('')}
+      <div style="display:flex;gap:16px;margin-top:2px;">
+        <div style="display:flex;align-items:center;gap:5px;font-size:10px;color:var(--muted2);"><div style="width:10px;height:10px;border-radius:2px;background:linear-gradient(90deg,#c0392b,#e67e22);"></div> Fat</div>
+        <div style="display:flex;align-items:center;gap:5px;font-size:10px;color:var(--muted2);"><div style="width:10px;height:10px;border-radius:2px;background:linear-gradient(90deg,#27ae60,#2ecc71);"></div> Lean</div>
+      </div>
+    </div>` : ''}
+
+    ${limbs.length ? `
+    <div class="sheet-section-title">Limb Breakdown</div>
+    <div style="background:var(--surface2);border-radius:10px;overflow:hidden;">
+      <table style="width:100%;border-collapse:collapse;font-size:13px;">
+        <thead><tr style="border-bottom:1px solid var(--border);">
+          <th style="padding:8px 12px;text-align:left;font-size:10px;color:var(--muted2);text-transform:uppercase;letter-spacing:0.8px;">Region</th>
+          <th style="padding:8px 12px;text-align:right;font-size:10px;color:var(--muted2);text-transform:uppercase;letter-spacing:0.8px;">Fat %</th>
+          <th style="padding:8px 12px;text-align:right;font-size:10px;color:var(--muted2);text-transform:uppercase;letter-spacing:0.8px;">Lean</th>
+          <th style="padding:8px 12px;text-align:right;font-size:10px;color:var(--muted2);text-transform:uppercase;letter-spacing:0.8px;">Fat</th>
+        </tr></thead>
+        <tbody>${limbs.map(r => `
+          <tr style="border-bottom:1px solid var(--border);">
+            <td style="padding:10px 12px;color:var(--text);font-weight:500;">${r.label}</td>
+            <td style="padding:10px 12px;text-align:right;">${r.fat_pct != null ? r.fat_pct+'%' : '—'}</td>
+            <td style="padding:10px 12px;text-align:right;color:var(--muted2);">${r.lean_g != null ? (r.lean_g/1000).toFixed(2)+' kg' : '—'}</td>
+            <td style="padding:10px 12px;text-align:right;color:var(--muted2);">${r.fat_g != null ? (r.fat_g/1000).toFixed(2)+' kg' : '—'}</td>
+          </tr>`).join('')}
+        </tbody>
+      </table>
+    </div>` : ''}
+
+    ${extraRows.length ? `
+    <div class="sheet-section-title">Full Metrics</div>
+    <div style="background:var(--surface2);border-radius:10px;padding:4px 14px;">
+      ${extraRows.map(([label,val]) => `
+        <div class="sheet-row">
+          <span class="sheet-row-label">${label}</span>
+          <span class="sheet-row-val">${val}</span>
+        </div>`).join('')}
+    </div>` : ''}
+
+    ${s.pdf_path ? `
+    <div style="margin-top:20px;">
+      <button onclick="downloadScanPdf('${s.pdf_path}')" style="width:100%;padding:12px;background:var(--surface2);border:1px solid var(--border2);border-radius:10px;color:var(--muted2);font-family:'Outfit',sans-serif;font-size:13px;font-weight:600;cursor:pointer;">⬇ Download PDF</button>
+    </div>` : ''}
+  `;
+
+  document.getElementById('staffScanSheetOverlay').classList.add('open');
+  document.getElementById('staffScanSheet').classList.add('open');
+  document.body.style.overflow = 'hidden';
+}
+
+function closeStaffScanDetail() {
+  document.getElementById('staffScanSheetOverlay').classList.remove('open');
+  document.getElementById('staffScanSheet').classList.remove('open');
+  document.body.style.overflow = '';
+}
+
 </script>
+
+<!-- SCAN DETAIL BOTTOM SHEET -->
+<div class="scan-sheet-overlay" id="staffScanSheetOverlay" onclick="closeStaffScanDetail()"></div>
+<div class="scan-sheet" id="staffScanSheet">
+  <div class="sheet-handle"></div>
+  <div class="sheet-header">
+    <div class="sheet-title" id="staffSheetTitle">Scan Detail</div>
+    <div class="sheet-close" onclick="closeStaffScanDetail()">✕</div>
+  </div>
+  <div class="sheet-body" id="staffSheetBody"></div>
+</div>
 </body>
 </html>
