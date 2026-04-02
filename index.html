@@ -79,7 +79,7 @@ html, body {
     <div class="logo-sub">Body Intelligence</div>
   </div>
   <div class="card" id="reset-card">
-    <div class="card-title">Set New Password</div>
+    <div class="card-title" id="reset-title">Set New Password</div>
     <div class="field">
       <label>New Password</label>
       <input type="password" id="new-password" placeholder="••••••••">
@@ -118,11 +118,17 @@ const SUPABASE_URL = 'https://shvpwgrjqskccsdzajkj.supabase.co';
 const SUPABASE_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InNodnB3Z3JqcXNrY2NzZHphamtqIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzM5MDUzNTIsImV4cCI6MjA4OTQ4MTM1Mn0.2dL3J9XbzU8q8ogPPqhwR4w7_vSB0FxVKMzsAOxCgk4';
 const sb = window.supabase.createClient(SUPABASE_URL, SUPABASE_KEY);
 
-// Check for password recovery link immediately (before any redirect)
+// Check for password recovery or invite link immediately (before any redirect)
 const isRecovery = window.location.hash.includes('type=recovery');
-if (isRecovery) {
+const isInvite   = window.location.hash.includes('type=invite');
+if (isRecovery || isInvite) {
   document.getElementById('login-card').style.display = 'none';
   document.getElementById('reset-card').style.display = 'block';
+  if (isInvite) {
+    document.getElementById('reset-title').textContent = 'Welcome — Create Your Password';
+    document.getElementById('reset-btn').textContent   = 'Create Password';
+    document.getElementById('reset-success').textContent = '';
+  }
 }
 
 sb.auth.onAuthStateChange((event, session) => {
@@ -130,10 +136,15 @@ sb.auth.onAuthStateChange((event, session) => {
     document.getElementById('login-card').style.display = 'none';
     document.getElementById('reset-card').style.display = 'block';
   }
+  // Supabase fires SIGNED_IN when it processes an invite token
+  if (event === 'SIGNED_IN' && isInvite) {
+    document.getElementById('login-card').style.display = 'none';
+    document.getElementById('reset-card').style.display = 'block';
+  }
 });
 
 (async () => {
-  if (isRecovery) return; // skip auto-redirect for recovery links
+  if (isRecovery || isInvite) return; // skip auto-redirect for first-time setup
   const { data: { session } } = await sb.auth.getSession();
   if (session) await redirect(session.user.id);
 })();
@@ -184,7 +195,9 @@ async function setNewPassword() {
   // Ensure session is established before updating
   const { data: { session } } = await sb.auth.getSession();
   if (!session) {
-    errEl.textContent = 'Session expired — please request a new reset email.';
+    errEl.textContent = isInvite
+      ? 'Link expired — ask your clinic to resend the invite.'
+      : 'Session expired — please request a new reset email.';
     errEl.style.display = 'block';
     btn.disabled = false;
     btn.textContent = 'Update Password';
