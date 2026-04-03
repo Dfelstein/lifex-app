@@ -599,8 +599,8 @@ document.querySelectorAll('.nav-item').forEach(item => {
 ══════════════════════════ */
 function fmt(n) { return Number(n).toLocaleString(); }
 function fmtDate(d) { if (!d) return '—'; return new Date(d).toLocaleDateString('en-AU', { day:'numeric', month:'short', year:'numeric' }); }
-function noData(icon, title, sub) {
-  return `<div class="placeholder-screen"><div class="placeholder-icon">${icon}</div><div class="placeholder-title">${title}</div><div class="placeholder-sub">${sub}</div></div>`;
+function noData(icon, title, sub, cta) {
+  return `<div class="placeholder-screen"><div class="placeholder-icon">${icon}</div><div class="placeholder-title">${title}</div><div class="placeholder-sub">${sub}</div>${cta||''}</div>`;
 }
 
 /* ══════════════════════════
@@ -618,7 +618,11 @@ function renderDashboard() {
   if (!scan2 && !blood.length && !rmr) {
     el.innerHTML = `
       <div class="page-header"><div class="page-title">Dashboard</div><div class="page-subtitle">Welcome to Life X</div></div>
-      ${noData('🏥', 'Results Coming Soon', 'Your scan data will appear here once uploaded by the Life X team.')}`;
+      ${noData('🏥', 'Welcome to Life X', 'Your results will appear here after your first scan. Ready to get started?',
+        `<div style="display:flex;flex-direction:column;gap:10px;margin-top:8px;width:100%;max-width:280px;">
+          <a href="https://xgym.com.au/dexa-scan/" target="_blank" class="btn btn-gold" style="text-align:center;">📅 Book a DEXA Scan</a>
+          <a href="https://xgym.com.au/metabolic-testing/" target="_blank" class="btn btn-outline" style="text-align:center;">🔥 Book an RMR Test</a>
+        </div>`)}`;
     return;
   }
 
@@ -732,6 +736,7 @@ function renderDashboard() {
       </div>
       <div class="card">
         <div class="card-title">Your Scans</div>
+        ${allScans.length ? `<div style="font-size:11px;color:var(--muted2);margin-bottom:10px;">Tap a scan to see the full breakdown</div>` : ''}
         ${allScans.length ? [...allScans].reverse().map((s, ri) => {
           const i = allScans.length - 1 - ri;
           const isLatest = i === allScans.length - 1;
@@ -745,7 +750,7 @@ function renderDashboard() {
             <div style="font-family:'Bebas Neue',sans-serif;font-size:22px;color:${isLatest?'var(--gold)':'var(--blue)'};">${s.fat_pct != null ? s.fat_pct+'%' : '—'}</div>
             <div style="color:var(--muted);font-size:14px;">›</div>
           </div>`;
-        }).join('') : '<div style="color:var(--muted2);font-size:13px;">No scans uploaded yet.</div>'}
+        }).join('') : `<div style="text-align:center;padding:20px 0;"><div style="font-size:13px;color:var(--muted2);margin-bottom:12px;">No scans uploaded yet</div><a href="https://xgym.com.au/dexa-scan/" target="_blank" class="btn btn-gold" style="font-size:13px;padding:10px 20px;">📅 Book Your First Scan</a></div>`}
       </div>
     </div>`;
 }
@@ -759,7 +764,8 @@ let scansRes_global = [];
 function renderScore() {
   const el = document.getElementById('score-content');
   if (lifexScore === null) {
-    el.innerHTML = `<div class="page-header"><div class="page-title">Life X Score</div></div>${noData('⭐','No Score Yet','Your score will be calculated once your scan data is uploaded.')}`;
+    el.innerHTML = `<div class="page-header"><div class="page-title">Life X Score</div></div>${noData('⭐','No Score Yet','Your Life X Score combines your DEXA, blood, and RMR results into one number. It will appear here after your first scan.',
+      `<a href="https://xgym.com.au/dexa-scan/" target="_blank" class="btn btn-gold" style="margin-top:8px;">📅 Book Your First Scan</a>`)}`;
     return;
   }
   const score = lifexScore;
@@ -910,7 +916,7 @@ function renderScore() {
 ══════════════════════════ */
 function renderBodyComp() {
   const el = document.getElementById('body-comp-content');
-  if (!scan2) { el.innerHTML = noData('🫀','No Scan Data','Body composition data will appear here after your DEXA scan.'); return; }
+  if (!scan2) { el.innerHTML = noData('🫀','No Scan Data','Body composition data will appear here after your DEXA scan.',`<a href="https://xgym.com.au/dexa-scan/" target="_blank" class="btn btn-gold" style="margin-top:8px;">📅 Book a DEXA Scan</a>`); return; }
   const fatDiff  = scan1 ? (scan2.fat_g  - scan1.fat_g)  : null;
   const leanDiff = scan1 ? (scan2.lean_g - scan1.lean_g) : null;
   const vatDiff  = (scan1?.vat_area_cm2 != null && scan2.vat_area_cm2 != null) ? (scan2.vat_area_cm2 - scan1.vat_area_cm2) : null;
@@ -936,7 +942,7 @@ function renderBodyComp() {
 ══════════════════════════ */
 function renderBone() {
   const el = document.getElementById('bone-content');
-  if (!scan2?.bmd) { el.innerHTML = noData('🦴','No Bone Data','Bone density data will appear here after your DEXA scan.'); return; }
+  if (!scan2?.bmd) { el.innerHTML = noData('🦴','No Bone Data','Bone density data will appear here after your DEXA scan.',`<a href="https://xgym.com.au/dexa-scan/" target="_blank" class="btn btn-gold" style="margin-top:8px;">📅 Book a DEXA Scan</a>`); return; }
   const bmdDiff = scan1?.bmd ? ((scan2.bmd - scan1.bmd) * 100 / scan1.bmd).toFixed(1) : null;
   el.innerHTML = `
     <div class="stats-row mb20">
@@ -987,7 +993,7 @@ function renderBeforeAfter() {
     </div>` : '';
 
   if (!scan1 || !scan2) {
-    el.innerHTML = historyHtml + noData('📈', 'Need 2 Scans', 'Comparison will appear once you have a second scan.');
+    el.innerHTML = historyHtml + noData('📈', 'Need 2 Scans', 'Your before & after comparison will appear once you have a second scan. Book your next DEXA to track your progress.',`<a href="https://xgym.com.au/dexa-scan/" target="_blank" class="btn btn-gold" style="margin-top:8px;">📅 Book Next DEXA Scan</a>`);
     return;
   }
   document.getElementById('ba-subtitle').textContent = `Scan #${scan1.scan_number||1} (${fmtDate(scan1.date)}) vs Scan #${scan2.scan_number||2} (${fmtDate(scan2.date)})`;
@@ -1113,26 +1119,17 @@ function showScanDetail(i) {
 
     ${limbRows.length ? `
     <div class="sheet-section-title">Limb Breakdown</div>
-    <div style="background:var(--surface2);border-radius:10px;overflow:hidden;">
-      <table style="width:100%;border-collapse:collapse;font-size:13px;">
-        <thead>
-          <tr style="border-bottom:1px solid var(--border);">
-            <th style="padding:8px 12px;text-align:left;font-size:10px;color:var(--muted2);text-transform:uppercase;letter-spacing:0.8px;font-weight:600;">Region</th>
-            <th style="padding:8px 12px;text-align:right;font-size:10px;color:var(--muted2);text-transform:uppercase;letter-spacing:0.8px;font-weight:600;">Fat %</th>
-            <th style="padding:8px 12px;text-align:right;font-size:10px;color:var(--muted2);text-transform:uppercase;letter-spacing:0.8px;font-weight:600;">Lean</th>
-            <th style="padding:8px 12px;text-align:right;font-size:10px;color:var(--muted2);text-transform:uppercase;letter-spacing:0.8px;font-weight:600;">Fat</th>
-          </tr>
-        </thead>
-        <tbody>
-          ${limbRows.map(r => `
-            <tr style="border-bottom:1px solid var(--border);">
-              <td style="padding:10px 12px;color:var(--text);font-weight:500;">${r.label}</td>
-              <td style="padding:10px 12px;text-align:right;color:var(--text);">${r.fat_pct != null ? r.fat_pct+'%' : '—'}</td>
-              <td style="padding:10px 12px;text-align:right;color:var(--muted2);">${r.lean_g != null ? (r.lean_g/1000).toFixed(2)+' kg' : '—'}</td>
-              <td style="padding:10px 12px;text-align:right;color:var(--muted2);">${r.fat_g != null ? (r.fat_g/1000).toFixed(2)+' kg' : '—'}</td>
-            </tr>`).join('')}
-        </tbody>
-      </table>
+    <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;">
+      ${limbRows.map(r => `
+        <div style="background:var(--surface2);border-radius:10px;padding:12px;">
+          <div style="font-size:10px;color:var(--muted2);text-transform:uppercase;letter-spacing:0.8px;margin-bottom:6px;">${r.label}</div>
+          <div style="font-family:'Bebas Neue',sans-serif;font-size:22px;color:var(--text);line-height:1;">${r.fat_pct != null ? r.fat_pct+'%' : '—'}</div>
+          <div style="font-size:10px;color:var(--muted2);margin-top:2px;">body fat</div>
+          <div style="margin-top:8px;display:flex;flex-direction:column;gap:3px;">
+            <div style="display:flex;justify-content:space-between;font-size:11px;"><span style="color:var(--muted2);">Lean</span><span style="color:var(--text);font-weight:600;">${r.lean_g != null ? (r.lean_g/1000).toFixed(2)+' kg' : '—'}</span></div>
+            <div style="display:flex;justify-content:space-between;font-size:11px;"><span style="color:var(--muted2);">Fat</span><span style="color:var(--text);font-weight:600;">${r.fat_g != null ? (r.fat_g/1000).toFixed(2)+' kg' : '—'}</span></div>
+          </div>
+        </div>`).join('')}
     </div>` : ''}
 
     ${extraRows.length ? `
@@ -1163,7 +1160,7 @@ function closeScanDetail() {
 function renderBlood() {
   const el = document.getElementById('blood-panel-content');
   document.getElementById('blood-subtitle').textContent = bloodPanelDate ? fmtDate(bloodPanelDate) : '';
-  if (!blood.length) { el.innerHTML = noData('🩸','No Blood Panel','Blood panel data will appear here once uploaded.'); return; }
+  if (!blood.length) { el.innerHTML = noData('🩸','No Blood Panel','Blood panel results will appear here once uploaded by the Life X team.',`<a href="https://lifexclinic.square.site" target="_blank" class="btn btn-gold" style="margin-top:8px;">📅 Book a Blood Panel</a>`); return; }
   const cats = [...new Set(blood.map(m => m.category))];
   el.innerHTML = cats.map(cat => `
     <div class="card mb16">
@@ -1180,7 +1177,7 @@ function renderBlood() {
 function renderHormones() {
   const el = document.getElementById('hormones-content');
   document.getElementById('hormones-subtitle').textContent = hormonePanelDate ? fmtDate(hormonePanelDate) : '';
-  if (!hormones.length) { el.innerHTML = noData('⚗️','No Hormone Panel','Hormone data will appear here once uploaded.'); return; }
+  if (!hormones.length) { el.innerHTML = noData('⚗️','No Hormone Panel','Hormone panel results will appear here once uploaded by the Life X team.',`<a href="https://lifexclinic.square.site" target="_blank" class="btn btn-gold" style="margin-top:8px;">📅 Book a Hormone Panel</a>`); return; }
   el.innerHTML = `
     <div class="card mb16">
       <div class="card-title">Hormone Markers</div>
@@ -1227,7 +1224,7 @@ function markerBar(m) {
 function renderRMR() {
   const el = document.getElementById('rmr-content');
   document.getElementById('rmr-subtitle').textContent = rmrDate ? 'ECAL Indirect Calorimetry — ' + fmtDate(rmrDate) : '';
-  if (!rmr) { el.innerHTML = noData('🔥','No RMR Data','Metabolism data will appear here after your RMR test.'); return; }
+  if (!rmr) { el.innerHTML = noData('🔥','No RMR Data','Your metabolism and fat-burning rate will appear here after your RMR test.',`<a href="https://xgym.com.au/metabolic-testing/" target="_blank" class="btn btn-gold" style="margin-top:8px;">📅 Book an RMR Test</a>`); return; }
 
   const abovePop = rmr.pop_max ? ((rmr.kcal - rmr.pop_max) / rmr.pop_max * 100).toFixed(0) : null;
   el.innerHTML = `

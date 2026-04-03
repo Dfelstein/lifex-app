@@ -196,8 +196,8 @@ async function setNewPassword() {
   const { data: { session } } = await sb.auth.getSession();
   if (!session) {
     errEl.textContent = isInvite
-      ? 'Link expired — ask your clinic to resend the invite.'
-      : 'Session expired — please request a new reset email.';
+      ? 'Invite link expired (valid for 24 hours) — contact Life X to resend.'
+      : 'Reset link expired (valid for 24 hours) — please request a new one.';
     errEl.style.display = 'block';
     btn.disabled = false;
     btn.textContent = 'Update Password';

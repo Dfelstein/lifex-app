@@ -912,7 +912,7 @@ async function handleDrop(e, appt) {
     zone.classList.remove('uploading');
     zone.innerHTML = `<div class="drop-icon">❌</div><div>${err.message}</div>`;
     setTimeout(() => { zone.innerHTML = `<div class="drop-icon">📄</div><div>Drop PDF here or click to browse</div>`; }, 3000);
-    toast('Upload failed: ' + err.message, 'error');
+    toast('Upload failed: ' + friendlyError(err.message), 'error');
   }
 }
 
@@ -1883,10 +1883,22 @@ function showPanel(id) {
 }
 
 /* ══ TOAST ══ */
+function friendlyError(msg) {
+  if (!msg) return 'Something went wrong — please try again.';
+  if (msg.includes('Invalid login') || msg.includes('invalid_credentials')) return 'Incorrect email or password.';
+  if (msg.includes('Email not confirmed')) return 'Email not verified — check your inbox.';
+  if (msg.includes('User already registered') || msg.includes('already been registered')) return 'An account with that email already exists.';
+  if (msg.includes('Password should be')) return 'Password must be at least 6 characters.';
+  if (msg.includes('rate limit') || msg.includes('too many requests')) return 'Too many attempts — please wait a moment and try again.';
+  if (msg.includes('JWT') || msg.includes('token')) return 'Session expired — please refresh the page.';
+  if (msg.includes('network') || msg.includes('fetch')) return 'Connection error — check your internet and try again.';
+  return msg;
+}
+
 function toast(msg, type='success') {
   const el = document.getElementById('toast');
   el.textContent = msg; el.className = `toast ${type} show`;
-  setTimeout(() => el.classList.remove('show'), 3000);
+  setTimeout(() => el.classList.remove('show'), 4500);
 }
 
 /* ══ NEW CLIENT ══ */
