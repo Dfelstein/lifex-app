@@ -328,6 +328,7 @@ html, body { height: 100%; background: var(--bg); color: var(--text); font-famil
     <div class="nav-group-label" style="margin-top:8px;">Clients</div>
     <div class="nav-item" data-panel="client-profile" id="nav-client-profile" onclick="showPanel('client-profile')" style="display:none;"><span class="nav-icon">👤</span> <span id="nav-client-name">Client Profile</span></div>
     <div class="nav-item" data-panel="clients" onclick="showPanel('clients')"><span class="nav-icon">👥</span> All Clients</div>
+    <div class="nav-item" data-panel="all-scans" onclick="showPanel('all-scans')"><span class="nav-icon">🔬</span> All Scans</div>
     <div class="nav-item" data-panel="new-client" onclick="showPanel('new-client')"><span class="nav-icon">➕</span> New Client</div>
 
     <div class="nav-group-label" style="margin-top:8px;">Insights</div>
@@ -410,6 +411,10 @@ html, body { height: 100%; background: var(--bg); color: var(--text); font-famil
     <div style="display:flex;gap:10px;align-items:center;margin-bottom:12px;flex-wrap:wrap;">
       <input type="text" id="client-search" placeholder="Search by name…" oninput="clientSearch=this.value;clientPage=0;searchClients()"
         style="flex:1;min-width:180px;background:var(--surface2);border:1px solid var(--border2);border-radius:8px;padding:9px 14px;color:var(--text);font-family:'Outfit',sans-serif;font-size:13px;outline:none;">
+      <input type="date" id="client-scan-from" onchange="clientPage=0;renderClientList()" title="Scan date from"
+        style="background:var(--surface2);border:1px solid var(--border2);border-radius:8px;padding:9px 10px;color:var(--text);font-family:'Outfit',sans-serif;font-size:12px;outline:none;color-scheme:dark;">
+      <input type="date" id="client-scan-to" onchange="clientPage=0;renderClientList()" title="Scan date to"
+        style="background:var(--surface2);border:1px solid var(--border2);border-radius:8px;padding:9px 10px;color:var(--text);font-family:'Outfit',sans-serif;font-size:12px;outline:none;color-scheme:dark;">
       <select id="client-sort" onchange="clientSort=this.value;clientPage=0;renderClientList()"
         style="background:var(--surface2);border:1px solid var(--border2);border-radius:8px;padding:9px 12px;color:var(--text);font-family:'Outfit',sans-serif;font-size:13px;outline:none;">
         <option value="date">Latest Scan</option>
@@ -429,6 +434,47 @@ html, body { height: 100%; background: var(--bg); color: var(--text); font-famil
     <div id="clients-pagination" style="display:flex;align-items:center;justify-content:space-between;margin-top:20px;"></div>
   </div>
 
+  <!-- ── ALL SCANS ── -->
+  <div id="panel-all-scans" class="panel">
+    <div class="page-title">All Scans</div>
+    <div class="page-subtitle">Every DEXA scan in the system — including those without a linked account</div>
+    <div style="display:flex;gap:10px;align-items:center;margin-bottom:16px;flex-wrap:wrap;">
+      <input type="text" id="all-scans-search" placeholder="Search by name…" oninput="filterAllScans()"
+        style="flex:1;min-width:180px;background:var(--surface2);border:1px solid var(--border2);border-radius:8px;padding:9px 14px;color:var(--text);font-family:'Outfit',sans-serif;font-size:13px;outline:none;">
+      <input type="date" id="all-scans-from" onchange="filterAllScans()" title="From date"
+        style="background:var(--surface2);border:1px solid var(--border2);border-radius:8px;padding:9px 10px;color:var(--text);font-family:'Outfit',sans-serif;font-size:12px;outline:none;color-scheme:dark;">
+      <input type="date" id="all-scans-to" onchange="filterAllScans()" title="To date"
+        style="background:var(--surface2);border:1px solid var(--border2);border-radius:8px;padding:9px 10px;color:var(--text);font-family:'Outfit',sans-serif;font-size:12px;outline:none;color-scheme:dark;">
+      <select id="all-scans-filter" onchange="filterAllScans()"
+        style="background:var(--surface2);border:1px solid var(--border2);border-radius:8px;padding:9px 12px;color:var(--text);font-family:'Outfit',sans-serif;font-size:13px;outline:none;">
+        <option value="all">All Scans</option>
+        <option value="linked">Account Linked</option>
+        <option value="unlinked">No Account</option>
+      </select>
+      <button class="btn btn-sm btn-outline" onclick="loadAllScans()" style="white-space:nowrap;">↻ Refresh</button>
+    </div>
+    <div id="all-scans-stats" style="display:flex;gap:12px;margin-bottom:16px;flex-wrap:wrap;"></div>
+    <div id="all-scans-list"><div style="color:var(--muted2);font-size:13px;padding:20px 0;">Loading scans…</div></div>
+  </div>
+
+  <!-- Link Scan to Client Modal -->
+  <div id="link-scan-modal" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,0.7);z-index:300;align-items:center;justify-content:center;padding:20px;" onclick="if(event.target===this)closeLinkModal()">
+    <div style="background:var(--surface);border:1px solid var(--border2);border-radius:16px;padding:24px;max-width:440px;width:100%;">
+      <div style="font-family:'Bebas Neue',sans-serif;font-size:22px;letter-spacing:2px;margin-bottom:6px;" id="link-modal-title">Link Scan to Client</div>
+      <div style="font-size:13px;color:var(--muted2);margin-bottom:16px;" id="link-modal-subtitle"></div>
+      <div style="margin-bottom:16px;">
+        <label style="font-size:11px;font-weight:600;text-transform:uppercase;letter-spacing:0.8px;color:var(--muted2);display:block;margin-bottom:6px;">Search existing clients</label>
+        <input type="text" id="link-client-search" placeholder="Type a name…" oninput="searchLinkClients()"
+          style="width:100%;background:var(--surface2);border:1px solid var(--border2);border-radius:8px;padding:10px 14px;color:var(--text);font-family:'Outfit',sans-serif;font-size:13px;outline:none;">
+      </div>
+      <div id="link-client-results" style="max-height:200px;overflow-y:auto;margin-bottom:16px;display:flex;flex-direction:column;gap:6px;"></div>
+      <div style="display:flex;gap:10px;">
+        <button class="btn" style="flex:1;background:var(--surface2);color:var(--muted2);border:1px solid var(--border2);" onclick="closeLinkModal()">Cancel</button>
+        <button class="btn btn-blue" style="flex:1;" onclick="closeLinkModalToNewClient()">➕ Create New Client</button>
+      </div>
+    </div>
+  </div>
+
   <!-- ── NEW CLIENT ── -->
   <div id="panel-new-client" class="panel">
     <div class="page-title">New Client</div>
@@ -442,7 +488,7 @@ html, body { height: 100%; background: var(--bg); color: var(--text); font-famil
         <div class="field"><label>Email Address</label><input type="email" id="nc-email" placeholder="e.g. sarah@email.com"></div>
         <div class="field">
           <label>Member Level</label>
-          <select id="nc-level"><option>Standard</option><option>Gold</option><option>Platinum</option></select>
+          <select id="nc-level"><option>Bronze</option><option>Silver</option><option>Gold</option><option>Platinum</option></select>
         </div>
         <button class="btn btn-blue" onclick="createNewClient()" id="nc-btn">➕ Create Account &amp; Send Invite</button>
         <div id="nc-status" style="font-size:13px;text-align:center;"></div>
@@ -516,7 +562,10 @@ html, body { height: 100%; background: var(--bg); color: var(--text); font-famil
       <div class="card" style="margin-bottom:16px;">
         <div class="card-title">Import Complete</div>
         <div id="import-summary" style="margin-bottom:16px;"></div>
-        <button class="btn btn-blue" onclick="resetImport()">↩ Import Another Folder</button>
+        <div style="display:flex;gap:10px;flex-wrap:wrap;">
+          <button class="btn btn-blue" onclick="resetImport()">↩ Import Another Folder</button>
+          <button id="import-retry-btn" class="btn" style="background:var(--surface2);color:var(--orange);border:1px solid var(--orange);display:none;" onclick="retryFailedImports()">↺ Retry Failed</button>
+        </div>
       </div>
       <div id="import-flagged-section" style="display:none;">
         <div class="card">
@@ -807,6 +856,15 @@ function renderTodayRow(a, hasScansSet) {
   const sColor   = statusColor[status];
   const sLabel   = statusLabel[status];
   const esc      = s => (s||'').replace(/\\/g,'\\\\').replace(/'/g,"\\'");
+  const svcBadge = (() => {
+    const t = (a.type||'').toLowerCase();
+    if (t.includes('dexa'))  return '<span style="font-size:10px;padding:2px 6px;border-radius:4px;background:rgba(77,166,255,0.15);color:var(--blue);font-weight:700;">🦴 DEXA</span>';
+    if (t.includes('rmr') || t.includes('metabolic')) return '<span style="font-size:10px;padding:2px 6px;border-radius:4px;background:rgba(255,159,67,0.15);color:var(--orange);font-weight:700;">🔥 RMR</span>';
+    if (t.includes('blood')) return '<span style="font-size:10px;padding:2px 6px;border-radius:4px;background:rgba(255,85,85,0.15);color:var(--red);font-weight:700;">🩸 Blood</span>';
+    if (t.includes('hormone')) return '<span style="font-size:10px;padding:2px 6px;border-radius:4px;background:rgba(167,139,250,0.15);color:var(--purple);font-weight:700;">⚗️ Hormones</span>';
+    if (t.includes('bone'))  return '<span style="font-size:10px;padding:2px 6px;border-radius:4px;background:rgba(45,212,191,0.15);color:var(--teal);font-weight:700;">🦷 Bone</span>';
+    return '';
+  })();
 
   return `
   <div class="appt-row" id="row-${a.id}">
@@ -817,7 +875,7 @@ function renderTodayRow(a, hasScansSet) {
         <div class="appt-name ${a.clientId ? 'clickable' : ''}"
           ${a.clientId ? `onclick="event.stopPropagation();viewClientProfile('${a.clientId}','${esc(a.firstName)}','${esc(a.lastName)}')"` : ''}
         >${a.firstName} ${a.lastName}</div>
-        <div class="appt-meta" style="margin-top:2px;">${a.type || 'Appointment'} · <span style="color:${sColor};">${sLabel}</span></div>
+        <div class="appt-meta" style="margin-top:2px;display:flex;align-items:center;gap:6px;">${svcBadge}<span style="color:${sColor};">${sLabel}</span></div>
       </div>
       <div class="scan-badges" id="badges-${a.id}" style="justify-content:flex-end;"></div>
       <div style="color:var(--muted2);font-size:12px;padding-left:8px;" id="chevron-${a.id}">▼</div>
@@ -853,13 +911,21 @@ function renderApptCard(a) {
   const time = new Date(a.datetime).toLocaleTimeString('en-AU', { hour:'numeric', minute:'2-digit', hour12:true });
   const hasClient = !!a.clientId;
   const esc = s => (s||'').replace(/\\/g,'\\\\').replace(/'/g,"\\'");
+  const svcBadge2 = (() => {
+    const t = (a.type||'').toLowerCase();
+    if (t.includes('dexa'))  return '<span style="font-size:10px;padding:1px 6px;border-radius:4px;background:rgba(77,166,255,0.15);color:var(--blue);font-weight:700;">🦴 DEXA</span>';
+    if (t.includes('rmr') || t.includes('metabolic')) return '<span style="font-size:10px;padding:1px 6px;border-radius:4px;background:rgba(255,159,67,0.15);color:var(--orange);font-weight:700;">🔥 RMR</span>';
+    if (t.includes('blood')) return '<span style="font-size:10px;padding:1px 6px;border-radius:4px;background:rgba(255,85,85,0.15);color:var(--red);font-weight:700;">🩸 Blood</span>';
+    if (t.includes('hormone')) return '<span style="font-size:10px;padding:1px 6px;border-radius:4px;background:rgba(167,139,250,0.15);color:var(--purple);font-weight:700;">⚗️ Hormones</span>';
+    return '';
+  })();
   return `
   <div class="appt-card ${hasClient ? 'has-client' : 'no-client'}">
     <div class="appt-header">
       <div class="appt-avatar" style="background:linear-gradient(135deg,var(--blue),var(--teal));color:#000;">${initials}</div>
       <div style="flex:1">
         <div class="appt-name ${hasClient ? 'clickable' : ''}" ${hasClient ? `onclick="viewClientProfile('${a.clientId}','${esc(a.firstName)}','${esc(a.lastName)}')"` : ''}>${a.firstName} ${a.lastName}</div>
-        <div class="appt-meta">${time} · ${a.type || 'Appointment'}${!hasClient ? ' · <span style="color:var(--red)">No Life X account</span>' : ''}</div>
+        <div class="appt-meta" style="display:flex;align-items:center;gap:6px;">${svcBadge2}${!hasClient ? '<span style="color:var(--red);font-size:11px;">No account</span>' : ''}</div>
       </div>
       <button class="card-toggle-btn" id="toggle-${a.id}" onclick="toggleCardCollapse('${a.id}','${a.clientId||''}','${esc(a.firstName)}')">▼</button>
     </div>
@@ -1808,6 +1874,12 @@ function renderClientList() {
   if (clientFilter === 'male')    filtered = filtered.filter(c => c.sex === 'male');
   if (clientFilter === 'female')  filtered = filtered.filter(c => c.sex === 'female');
 
+  // Scan date range filter
+  const scanFrom = document.getElementById('client-scan-from')?.value;
+  const scanTo   = document.getElementById('client-scan-to')?.value;
+  if (scanFrom) filtered = filtered.filter(c => c.lastScan && c.lastScan >= scanFrom);
+  if (scanTo)   filtered = filtered.filter(c => c.lastScan && c.lastScan <= scanTo);
+
   // Sort
   if (clientSort === 'date') {
     filtered.sort((a,b) => (!a.lastScan && !b.lastScan) ? 0 : !a.lastScan ? 1 : !b.lastScan ? -1 : b.lastScan.localeCompare(a.lastScan));
@@ -1893,6 +1965,7 @@ function showPanel(id) {
   document.querySelector(`[data-panel="${id}"]`)?.classList.add('active');
   if (id === 'previous') setPrevView('week');
   if (id === 'analytics') loadAnalytics();
+  if (id === 'all-scans') loadAllScans();
 }
 
 /* ══ TOAST ══ */
@@ -1922,6 +1995,7 @@ async function createNewClient() {
   const level     = document.getElementById('nc-level').value;
 
   if (!firstName || !email) { toast('First name and email are required.', 'error'); return; }
+  if (!confirm(`Create account for ${firstName} ${lastName || ''} and send invite to ${email}?`)) return;
 
   const btn = document.getElementById('nc-btn');
   const statusEl = document.getElementById('nc-status');
@@ -2609,6 +2683,8 @@ async function startImport() {
     </div>
     ${failed > 0 ? `<div style="margin-top:10px;font-size:12px;color:var(--muted2);">Failed PDFs: ${importQueue.filter(i=>i.status==='failed').map(i=>`${i.clientName}/${i.file.name}`).join(', ')}</div>` : ''}`;
 
+  document.getElementById('import-retry-btn').style.display = failed > 0 ? 'inline-block' : 'none';
+
   // Render ghost clients that need emails
   if (importGhosts.length > 0) {
     document.getElementById('import-flagged-section').style.display = 'block';
@@ -2651,6 +2727,193 @@ async function activateGhost(id, firstName, lastName) {
     statusEl.style.color = 'var(--red)';
     emailEl.disabled = false;
   }
+}
+
+// ── ALL SCANS ──────────────────────────────────────────────────────────────
+let allScansData = [];   // raw from DB: dexa_scans joined with profile info
+let allScansProfiles = {}; // profileId → {full_name, email}
+
+async function loadAllScans() {
+  document.getElementById('all-scans-list').innerHTML = '<div style="color:var(--muted2);font-size:13px;padding:20px 0;">Loading…</div>';
+  document.getElementById('all-scans-stats').innerHTML = '';
+
+  // Fetch all dexa scans + all profiles in parallel
+  const [scansRes, profRes] = await Promise.all([
+    sb.from('dexa_scans').select('*').order('scan_date', { ascending: false }).limit(5000),
+    sb.from('profiles').select('id,full_name,email').limit(2000),
+  ]);
+
+  allScansProfiles = {};
+  (profRes.data || []).forEach(p => { allScansProfiles[p.id] = p; });
+  allScansData = (scansRes.data || []);
+
+  filterAllScans();
+}
+
+function filterAllScans() {
+  const q      = (document.getElementById('all-scans-search')?.value || '').toLowerCase().trim();
+  const from   = document.getElementById('all-scans-from')?.value || '';
+  const to     = document.getElementById('all-scans-to')?.value || '';
+  const filter = document.getElementById('all-scans-filter')?.value || 'all';
+
+  let rows = allScansData.map(s => ({
+    ...s,
+    profile: allScansProfiles[s.client_id] || null,
+  }));
+
+  if (q) rows = rows.filter(r => (r.profile?.full_name || '').toLowerCase().includes(q));
+  if (from) rows = rows.filter(r => r.scan_date >= from);
+  if (to)   rows = rows.filter(r => r.scan_date <= to);
+  if (filter === 'linked')   rows = rows.filter(r => r.profile?.email);
+  if (filter === 'unlinked') rows = rows.filter(r => !r.profile?.email);
+
+  renderAllScans(rows);
+}
+
+function renderAllScans(rows) {
+  const total    = allScansData.length;
+  const linked   = allScansData.filter(s => allScansProfiles[s.client_id]?.email).length;
+  const unlinked = total - linked;
+
+  document.getElementById('all-scans-stats').innerHTML = [
+    { label: 'Total Scans', val: total, color: 'var(--blue)' },
+    { label: 'Account Linked', val: linked, color: 'var(--green)' },
+    { label: 'No Account', val: unlinked, color: 'var(--orange)' },
+  ].map(k => `
+    <div style="background:var(--surface);border:1px solid var(--border);border-radius:10px;padding:12px 18px;text-align:center;min-width:100px;">
+      <div style="font-family:'Bebas Neue',sans-serif;font-size:26px;color:${k.color};">${k.val}</div>
+      <div style="font-size:11px;color:var(--muted2);">${k.label}</div>
+    </div>`).join('');
+
+  if (!rows.length) {
+    document.getElementById('all-scans-list').innerHTML = '<div style="color:var(--muted2);font-size:13px;padding:20px 0;">No scans found.</div>';
+    return;
+  }
+
+  document.getElementById('all-scans-list').innerHTML = `
+    <div style="display:grid;grid-template-columns:1fr 100px 80px 80px 80px auto;gap:0;background:var(--surface);border:1px solid var(--border);border-radius:12px;overflow:hidden;">
+      <div style="display:contents;font-size:11px;font-weight:600;text-transform:uppercase;letter-spacing:0.8px;color:var(--muted2);">
+        <div style="padding:10px 16px;border-bottom:1px solid var(--border);">Client</div>
+        <div style="padding:10px 16px;border-bottom:1px solid var(--border);">Date</div>
+        <div style="padding:10px 16px;border-bottom:1px solid var(--border);">Body Fat</div>
+        <div style="padding:10px 16px;border-bottom:1px solid var(--border);">Weight</div>
+        <div style="padding:10px 16px;border-bottom:1px solid var(--border);">Lean</div>
+        <div style="padding:10px 16px;border-bottom:1px solid var(--border);">Account</div>
+      </div>
+      ${rows.map((s, idx) => {
+        const name     = s.profile?.full_name || '—';
+        const hasEmail = !!s.profile?.email;
+        const isLast   = idx === rows.length - 1;
+        const border   = isLast ? '' : 'border-bottom:1px solid var(--border);';
+        const cellStyle = `padding:11px 16px;${border}font-size:13px;cursor:pointer;transition:background 0.12s;` ;
+        const clickRow = `openScanRow('${s.client_id}', '${(name).replace(/'/g,"\\'")}', ${hasEmail})`;
+        return `
+          <div style="${cellStyle}font-weight:600;" onclick="${clickRow}" onmouseover="this.parentElement.querySelectorAll('[data-row=&quot;r${idx}&quot;]').forEach(c=>c.style.background='var(--surface2)')" onmouseout="this.parentElement.querySelectorAll('[data-row=&quot;r${idx}&quot;]').forEach(c=>c.style.background='')" data-row="r${idx}">${name}</div>
+          <div style="${cellStyle}color:var(--muted2);" onclick="${clickRow}" data-row="r${idx}">${s.scan_date || '—'}</div>
+          <div style="${cellStyle}color:${s.fat_pct != null ? 'var(--text)' : 'var(--muted)'};" onclick="${clickRow}" data-row="r${idx}">${s.fat_pct != null ? s.fat_pct.toFixed(1)+'%' : '—'}</div>
+          <div style="${cellStyle}color:var(--muted2);" onclick="${clickRow}" data-row="r${idx}">${s.weight_kg != null ? s.weight_kg.toFixed(1)+'kg' : '—'}</div>
+          <div style="${cellStyle}color:var(--muted2);" onclick="${clickRow}" data-row="r${idx}">${s.lean_g != null ? (s.lean_g/1000).toFixed(1)+'kg' : '—'}</div>
+          <div style="${cellStyle}display:flex;align-items:center;gap:8px;" data-row="r${idx}">
+            ${hasEmail
+              ? `<span style="font-size:11px;padding:2px 8px;background:rgba(80,200,120,0.12);color:var(--green);border-radius:4px;font-weight:600;">Linked</span>`
+              : `<span style="font-size:11px;padding:2px 8px;background:rgba(255,170,50,0.12);color:var(--orange);border-radius:4px;font-weight:600;">No Account</span>
+                 <button onclick="event.stopPropagation();openLinkModal('${s.client_id}','${(name).replace(/'/g,"\\'")}','${s.scan_date||''}')" style="font-size:11px;padding:3px 8px;background:transparent;border:1px solid var(--border2);border-radius:4px;color:var(--muted2);cursor:pointer;font-family:'Outfit',sans-serif;" onmouseover="this.style.borderColor='var(--blue)';this.style.color='var(--blue)'" onmouseout="this.style.borderColor='var(--border2)';this.style.color='var(--muted2)'">Link</button>`
+            }
+          </div>`;
+      }).join('')}
+    </div>`;
+}
+
+function openScanRow(clientId, name, hasEmail) {
+  if (hasEmail) {
+    // Navigate to their client profile using existing viewer
+    const parts = name.trim().split(' ');
+    const first = parts[0] || name;
+    const last  = parts.slice(1).join(' ') || '';
+    viewClientProfile(clientId, first, last);
+  } else {
+    // Open link/create modal for ghost profiles
+    openLinkModal(clientId, name, '');
+  }
+}
+
+let linkModalScanClientId = null;
+
+function openLinkModal(clientId, name, scanDate) {
+  linkModalScanClientId = clientId;
+  document.getElementById('link-modal-title').textContent = 'Link Scan to Client';
+  document.getElementById('link-modal-subtitle').textContent = `Scan: ${name}${scanDate ? ' · ' + scanDate : ''} — choose an existing client to reassign this scan to, or create a new profile.`;
+  document.getElementById('link-client-search').value = '';
+  document.getElementById('link-client-results').innerHTML = '';
+  document.getElementById('link-scan-modal').style.display = 'flex';
+}
+
+function closeLinkModal() {
+  document.getElementById('link-scan-modal').style.display = 'none';
+  linkModalScanClientId = null;
+}
+
+function searchLinkClients() {
+  const q = document.getElementById('link-client-search').value.toLowerCase().trim();
+  const el = document.getElementById('link-client-results');
+  if (!q) { el.innerHTML = ''; return; }
+  const matches = clients.filter(c => (c.full_name||'').toLowerCase().includes(q) && c.email).slice(0, 8);
+  if (!matches.length) { el.innerHTML = '<div style="font-size:13px;color:var(--muted2);">No clients found.</div>'; return; }
+  const escName = s => (s||'').replace(/\\/g,'\\\\').replace(/'/g,"\\'");
+  el.innerHTML = matches.map(c => `
+    <div onclick="confirmLinkScan('${c.id}','${escName(c.full_name)}')"
+      style="padding:10px 12px;background:var(--surface2);border:1px solid var(--border2);border-radius:8px;cursor:pointer;font-size:13px;display:flex;justify-content:space-between;align-items:center;"
+      onmouseover="this.style.borderColor='var(--blue)'" onmouseout="this.style.borderColor='var(--border2)'">
+      <span style="font-weight:600;">${c.full_name}</span>
+      <span style="font-size:12px;color:var(--muted2);">${c.email}</span>
+    </div>`).join('');
+}
+
+async function confirmLinkScan(targetClientId, targetName) {
+  if (!linkModalScanClientId) return;
+  if (!confirm(`Reassign this scan to ${targetName}? Their existing scans will also be checked.`)) return;
+
+  // Update the scan's client_id to point to the target client
+  const { error } = await sb.from('dexa_scans').update({ client_id: targetClientId }).eq('client_id', linkModalScanClientId);
+  if (error) { alert('Error: ' + error.message); return; }
+
+  closeLinkModal();
+  await loadAllScans();
+  alert(`Scan linked to ${targetName}.`);
+}
+
+function closeLinkModalToNewClient() {
+  // Store the ghost client_id so after creating the client we can reassign
+  const ghostId = linkModalScanClientId;
+  closeLinkModal();
+  showPanel('new-client');
+  // Small hint in the status area
+  if (ghostId) {
+    document.getElementById('nc-status').textContent = 'After creating the account, the ghost scan will be linked automatically.';
+    document.getElementById('nc-status').style.color = 'var(--muted2)';
+  }
+}
+
+async function retryFailedImports() {
+  const failed = importQueue.filter(i => i.status === 'failed');
+  if (!failed.length) return;
+  failed.forEach(i => { i.status = 'pending'; });
+  document.getElementById('import-retry-btn').style.display = 'none';
+  document.getElementById('import-step-3').style.display = 'none';
+  document.getElementById('import-log').innerHTML = '';
+  document.getElementById('import-progress-bar').style.width = '0%';
+  document.getElementById('import-progress-bar').style.background = 'var(--blue)';
+  document.getElementById('import-progress-pct').textContent = '0%';
+  // Temporarily replace queue with only failed items, run import, then restore
+  const full = importQueue;
+  importQueue = failed;
+  await startImport();
+  // Merge results back
+  failed.forEach(retried => {
+    const orig = full.find(i => i.file.name === retried.file.name && i.clientName === retried.clientName);
+    if (orig) orig.status = retried.status;
+  });
+  importQueue = full;
 }
 
 function resetImport() {
