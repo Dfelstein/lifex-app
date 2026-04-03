@@ -3410,8 +3410,9 @@ async function loadAnalytics() {
     return arc;
   }).join('');
 
-  document.getElementById('an-lead-sex').innerHTML = `
-    <svg width="140" height="140" viewBox="0 0 140 140">
+  document.getElementById('an-lead-sex').innerHTML = totalLeads === 0
+    ? '<p style="color:var(--muted2);font-size:13px;">No intake submissions yet — import a Zoho CSV to populate.</p>'
+    : `<svg width="140" height="140" viewBox="0 0 140 140">
       <circle cx="${cx}" cy="${cy}" r="${r}" fill="none" stroke="var(--surface3)" stroke-width="${stroke}"/>
       ${lArcs}
     </svg>
@@ -3434,10 +3435,10 @@ async function loadAnalytics() {
     const r = ageToRange(age);
     if (r) lAgeBuckets[r]++;
   });
-  document.getElementById('an-lead-age').innerHTML = anBarChart(
-    Object.entries(lAgeBuckets).filter(([,v]) => v > 0),
-    'var(--orange)', totalLeads
-  );
+  const lAgeFiltered = Object.entries(lAgeBuckets).filter(([,v]) => v > 0);
+  document.getElementById('an-lead-age').innerHTML = lAgeFiltered.length
+    ? anBarChart(lAgeFiltered, 'var(--orange)', totalLeads)
+    : '<p style="color:var(--muted2);font-size:13px;">No age data in submissions yet — ensure DOB is captured in the intake form.</p>';
 
   /* Leads by service */
   const svcColors = { DEXA:'var(--blue)', RMR:'var(--orange)', 'Bone Density':'var(--teal)', Blood:'var(--red)', General:'var(--muted2)' };
