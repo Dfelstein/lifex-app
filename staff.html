@@ -640,8 +640,8 @@ html, body { height: 100%; background: var(--bg); color: var(--text); font-famil
     </div>
 
     <!-- MARKETING INSIGHTS (from Zoho intake) -->
-    <div class="page-title" style="margin-top:8px;margin-bottom:4px;">Marketing Insights</div>
-    <div class="page-subtitle" style="margin-bottom:20px;">Based on all Zoho intake form submissions</div>
+    <div class="page-title" style="margin-top:8px;margin-bottom:4px;">Intake Form Insights</div>
+    <div class="page-subtitle" style="margin-bottom:20px;">Based on Zoho pre-scan intake submissions — people who booked but may not yet have a client account. Not related to the free body estimate tool.</div>
 
     <div id="an-mkt-kpis" style="display:grid;grid-template-columns:repeat(4,1fr);gap:16px;margin-bottom:20px;"></div>
 
@@ -3081,14 +3081,15 @@ async function loadAnalytics() {
     sb.from('dexa_scans').select('client_id,scan_date,fat_pct,sex,patient_age').order('scan_date').limit(5000),
   ]);
 
-  // Infer sex from first name for profiles missing it
+  // Infer sex from first name for profiles missing it (all batches in parallel)
   const profiles = profilesRaw || [];
   const nullSexProfiles = profiles.filter(p => !p.sex);
   if (nullSexProfiles.length) {
     const firstNames = [...new Set(nullSexProfiles.map(p => p.full_name?.split(' ')[0]).filter(Boolean))];
     const profNameGenderMap = {};
-    for (let i = 0; i < firstNames.length; i += 10) {
-      const batch = firstNames.slice(i, i + 10);
+    const batches = [];
+    for (let i = 0; i < firstNames.length; i += 10) batches.push(firstNames.slice(i, i + 10));
+    await Promise.all(batches.map(async batch => {
       try {
         const params = batch.map(n => `name[]=${encodeURIComponent(n)}`).join('&');
         const res = await fetch(`https://api.genderize.io?${params}&country_id=AU`);
@@ -3097,7 +3098,7 @@ async function loadAnalytics() {
           if (d.gender && d.probability >= 0.7) profNameGenderMap[d.name.toLowerCase()] = d.gender;
         });
       } catch { /* skip */ }
-    }
+    }));
     nullSexProfiles.forEach(p => {
       const fn = p.full_name?.split(' ')[0]?.toLowerCase();
       if (fn && profNameGenderMap[fn]) p.sex = profNameGenderMap[fn];
@@ -3110,8 +3111,9 @@ async function loadAnalytics() {
   const totalClients = profiles?.length || 0;
   const totalScans   = dexaRaw?.length  || 0;
 
-  const monthStart = new Date(now.getFullYear(), now.getMonth(), 1).toISOString().slice(0,10);
-  const scansThisMonth = (dexaRaw || []).filter(s => s.scan_date >= monthStart).length;
+  const thirtyDaysAgo = new Date(now); thirtyDaysAgo.setDate(now.getDate() - 30);
+  const thirtyDaysAgoStr = thirtyDaysAgo.toISOString().slice(0,10);
+  const scansThisMonth = (dexaRaw || []).filter(s => s.scan_date >= thirtyDaysAgoStr).length;
 
   const fatVals = (dexaRaw || []).map(s => s.fat_pct).filter(v => v != null);
   const avgFat  = fatVals.length ? (fatVals.reduce((a,b) => a+b,0) / fatVals.length).toFixed(1) : '—';
@@ -3119,7 +3121,7 @@ async function loadAnalytics() {
   document.getElementById('an-kpis').innerHTML = [
     { label:'Total Clients',     value: totalClients, icon:'👥', color:'var(--blue)'   },
     { label:'DEXA Scans Total',  value: totalScans,   icon:'🦴', color:'var(--gold)'   },
-    { label:'Scans This Month',  value: scansThisMonth, icon:'📅', color:'var(--teal)' },
+    { label:'Scans — Last 30 Days', value: scansThisMonth, icon:'📅', color:'var(--teal)' },
     { label:'Avg Body Fat %',    value: avgFat + (avgFat !== '—' ? '%' : ''), icon:'💪', color:'var(--green)' },
   ].map(k => `
     <div class="card" style="margin-bottom:0;text-align:center;">
@@ -3335,9 +3337,10 @@ async function loadAnalytics() {
   if (nullSexLeads.length) {
     const firstNames = [...new Set(nullSexLeads.map(l => l.full_name?.split(' ')[0]).filter(Boolean))];
     const nameGenderMap = {};
-    // Batch 10 names at a time (genderize.io limit)
-    for (let i = 0; i < firstNames.length; i += 10) {
-      const batch = firstNames.slice(i, i + 10);
+    // All batches in parallel (much faster than sequential)
+    const leadBatches = [];
+    for (let i = 0; i < firstNames.length; i += 10) leadBatches.push(firstNames.slice(i, i + 10));
+    await Promise.all(leadBatches.map(async batch => {
       try {
         const params = batch.map(n => `name[]=${encodeURIComponent(n)}`).join('&');
         const res = await fetch(`https://api.genderize.io?${params}&country_id=AU`);
@@ -3346,7 +3349,7 @@ async function loadAnalytics() {
           if (d.gender && d.probability >= 0.7) nameGenderMap[d.name.toLowerCase()] = d.gender;
         });
       } catch { /* skip on error */ }
-    }
+    }));
     // Apply inferred genders and update DB
     const updates = [];
     allLeads.forEach(l => {
@@ -3376,11 +3379,12 @@ async function loadAnalytics() {
   const converted = totalClients; // all clients could have come via intake
   const conversionRate = totalLeads > 0 ? Math.round(converted / (converted + totalLeads) * 100) : 0;
 
+  const leadsLast30 = allLeads.filter(l => l.received_at?.slice(0,10) >= thirtyDaysAgoStr).length;
   document.getElementById('an-mkt-kpis').innerHTML = [
-    { label:'Total Leads (unmatched)', value: totalLeads, icon:'📋', color:'var(--orange)' },
-    { label:'Converted to Clients',   value: converted,  icon:'✅', color:'var(--green)'  },
-    { label:'Est. Conversion Rate',   value: conversionRate + '%', icon:'📈', color:'var(--teal)' },
-    { label:'Leads This Month',       value: allLeads.filter(l => l.received_at?.slice(0,7) === now.toISOString().slice(0,7)).length, icon:'🆕', color:'var(--blue)' },
+    { label:'Intake Forms (unmatched)', value: totalLeads,       icon:'📋', color:'var(--orange)' },
+    { label:'Active Clients',          value: converted,         icon:'✅', color:'var(--green)'  },
+    { label:'Est. Conversion Rate',    value: conversionRate + '%', icon:'📈', color:'var(--teal)' },
+    { label:'New Intakes — 30 Days',   value: leadsLast30,       icon:'🆕', color:'var(--blue)'  },
   ].map(k => `
     <div class="card" style="margin-bottom:0;text-align:center;">
       <div style="font-size:28px;margin-bottom:6px;">${k.icon}</div>
@@ -3499,14 +3503,14 @@ async function loadAnalytics() {
     <div style="display:grid;grid-template-columns:1fr 1fr;gap:32px;align-items:center;">
       <div>
         <div style="display:flex;justify-content:space-between;margin-bottom:6px;">
-          <span style="font-size:13px;color:var(--muted2);">Leads matched → Clients</span>
+          <span style="font-size:13px;color:var(--muted2);">Active client accounts</span>
           <span style="font-weight:600;">${converted}</span>
         </div>
         <div style="height:12px;background:var(--surface3);border-radius:6px;overflow:hidden;margin-bottom:12px;">
           <div style="height:100%;width:${convW}%;background:var(--green);border-radius:6px;transition:width 0.6s;"></div>
         </div>
         <div style="display:flex;justify-content:space-between;margin-bottom:6px;">
-          <span style="font-size:13px;color:var(--muted2);">Unmatched leads (pending)</span>
+          <span style="font-size:13px;color:var(--muted2);">Intake forms not yet matched</span>
           <span style="font-weight:600;">${totalLeads}</span>
         </div>
         <div style="height:12px;background:var(--surface3);border-radius:6px;overflow:hidden;">
@@ -3516,7 +3520,7 @@ async function loadAnalytics() {
       <div style="text-align:center;">
         <div style="font-size:64px;font-family:'Bebas Neue',sans-serif;color:var(--green);letter-spacing:2px;">${conversionRate}%</div>
         <div style="font-size:12px;color:var(--muted2);text-transform:uppercase;letter-spacing:1px;">Est. Conversion Rate</div>
-        <div style="font-size:11px;color:var(--muted);margin-top:6px;">${converted} clients vs ${totalLeads} unmatched leads</div>
+        <div style="font-size:11px;color:var(--muted);margin-top:6px;">${converted} client accounts vs ${totalLeads} unmatched intake forms</div>
       </div>
     </div>`;
 }
