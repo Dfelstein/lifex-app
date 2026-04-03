@@ -447,7 +447,7 @@ body { background: var(--bg); color: var(--text); font-family: 'Outfit', sans-se
       <div class="card-title">Refer a Friend — Earn 25 pts each</div>
       <div style="display:flex;align-items:center;gap:12px;margin-bottom:12px;">
         <div id="referral-code" style="flex:1;background:var(--surface2);border:1px solid var(--border2);border-radius:8px;padding:10px 14px;font-size:13px;color:var(--muted2);font-family:monospace;">lifex.app/ref/…</div>
-        <button class="btn btn-outline" onclick="copyReferral()">📋 Copy Link</button>
+        <button class="btn btn-outline" onclick="copyReferral(this)">📋 Copy Link</button>
       </div>
       <div style="font-size:12px;color:var(--muted2);">Share your link — earn <strong style="color:var(--gold)">25 pts</strong> for every friend who books a test.</div>
     </div>
@@ -1057,10 +1057,10 @@ function renderBeforeAfter() {
   document.getElementById('ba-subtitle').textContent = `Scan #${scan1.scan_number||1} (${fmtDate(scan1.date)}) vs Scan #${scan2.scan_number||2} (${fmtDate(scan2.date)})`;
   el.innerHTML = historyHtml;
   const rows = [
-    ['Body Fat %',   scan1.fat_pct+'%',      scan2.fat_pct+'%',      ((scan2.fat_pct-scan1.fat_pct)>0?'+':'')+( scan2.fat_pct-scan1.fat_pct).toFixed(1)+'%', scan2.fat_pct<scan1.fat_pct?'good':'bad'],
-    ['Fat Mass',     fmt(scan1.fat_g)+'g',   fmt(scan2.fat_g)+'g',   (scan2.fat_g-scan1.fat_g<0?'−':'+')+''+fmt(Math.abs(scan2.fat_g-scan1.fat_g))+'g', scan2.fat_g<scan1.fat_g?'good':'bad'],
-    ['Lean Mass',    fmt(scan1.lean_g)+'g',  fmt(scan2.lean_g)+'g',  (scan2.lean_g-scan1.lean_g<0?'−':'+')+''+fmt(Math.abs(scan2.lean_g-scan1.lean_g))+'g '+(scan2.lean_g<scan1.lean_g-500?'⚠️':''), scan2.lean_g>=scan1.lean_g?'good':'bad'],
-    ['Total Mass',   fmt(scan1.total_g)+'g', fmt(scan2.total_g)+'g', (scan2.total_g-scan1.total_g<0?'−':'+')+''+fmt(Math.abs(scan2.total_g-scan1.total_g))+'g', 'neutral'],
+    ...(scan1.fat_pct!=null&&scan2.fat_pct!=null ? [['Body Fat %', scan1.fat_pct+'%', scan2.fat_pct+'%', ((scan2.fat_pct-scan1.fat_pct)>0?'+':'')+(scan2.fat_pct-scan1.fat_pct).toFixed(1)+'%', scan2.fat_pct<scan1.fat_pct?'good':'bad']] : []),
+    ...(scan1.fat_g!=null&&scan2.fat_g!=null ? [['Fat Mass', fmt(scan1.fat_g)+'g', fmt(scan2.fat_g)+'g', (scan2.fat_g-scan1.fat_g<0?'−':'+')+''+fmt(Math.abs(scan2.fat_g-scan1.fat_g))+'g', scan2.fat_g<scan1.fat_g?'good':'bad']] : []),
+    ...(scan1.lean_g!=null&&scan2.lean_g!=null ? [['Lean Mass', fmt(scan1.lean_g)+'g', fmt(scan2.lean_g)+'g', (scan2.lean_g-scan1.lean_g<0?'−':'+')+''+fmt(Math.abs(scan2.lean_g-scan1.lean_g))+'g '+(scan2.lean_g<scan1.lean_g-500?'⚠️':''), scan2.lean_g>=scan1.lean_g?'good':'bad']] : []),
+    ...(scan1.total_g!=null&&scan2.total_g!=null ? [['Total Mass', fmt(scan1.total_g)+'g', fmt(scan2.total_g)+'g', (scan2.total_g-scan1.total_g<0?'−':'+')+''+fmt(Math.abs(scan2.total_g-scan1.total_g))+'g', 'neutral']] : []),
     ...(scan1.bmd&&scan2.bmd ? [['BMD (g/cm²)', scan1.bmd, scan2.bmd, (scan2.bmd-scan1.bmd>0?'+':'')+((scan2.bmd-scan1.bmd)).toFixed(3), scan2.bmd>scan1.bmd?'good':'bad']] : []),
     ...(scan1.t_score!=null&&scan2.t_score!=null ? [['T-Score', scan1.t_score, scan2.t_score, (scan2.t_score-scan1.t_score>0?'+':'')+((scan2.t_score-scan1.t_score)).toFixed(1), scan2.t_score>scan1.t_score?'good':'neutral']] : []),
     ...(scan1.vat_area_cm2&&scan2.vat_area_cm2 ? [['VAT Area (cm²)', scan1.vat_area_cm2+' cm²', scan2.vat_area_cm2+' cm²', (scan2.vat_area_cm2-scan1.vat_area_cm2<0?'−':'+')+''+Math.abs(scan2.vat_area_cm2-scan1.vat_area_cm2)+' cm²', scan2.vat_area_cm2<scan1.vat_area_cm2?'good':'bad']] : []),
@@ -1249,11 +1249,13 @@ function renderHormones() {
    MARKER BAR (shared)
 ══════════════════════════ */
 function markerBar(m) {
-  const pct       = Math.min(100, Math.max(0, ((m.value - m.min) / (m.max - m.min)) * 100));
-  const refMinPct = ((m.ref_min - m.min) / (m.max - m.min)) * 100;
-  const refMaxPct = ((m.ref_max - m.min) / (m.max - m.min)) * 100;
+  const range     = (m.max - m.min) || 1; // guard against division by zero
+  const pct       = Math.min(100, Math.max(0, ((m.value - m.min) / range) * 100));
+  const refMinPct = Math.min(100, Math.max(0, ((m.ref_min - m.min) / range) * 100));
+  const refMaxPct = Math.min(100, Math.max(0, ((m.ref_max - m.min) / range) * 100));
   const color     = m.status === 'optimal' ? 'var(--green)' : m.status === 'normal' ? 'var(--blue)' : 'var(--red)';
-  const label     = m.status === 'optimal' ? 'Optimal' : m.status === 'normal' ? 'Normal' : 'Outside Range';
+  const label     = m.status === 'optimal' ? 'Optimal' : m.status === 'normal' ? 'Normal' : m.status === 'high' ? 'High' : m.status === 'low' ? 'Low' : 'Outside Range';
+  const badgeCls  = m.status === 'optimal' ? 'green' : (m.status === 'normal') ? 'blue' : 'red';
   return `
     <div>
       <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:6px;">
@@ -1261,7 +1263,7 @@ function markerBar(m) {
         <div style="display:flex;align-items:center;gap:10px;">
           <span style="font-family:'Bebas Neue',sans-serif;font-size:20px;color:var(--text);letter-spacing:1px;">${m.value}</span>
           <span style="color:var(--muted2);font-size:12px;">${m.unit}</span>
-          <span class="badge ${m.status==='optimal'?'green':'blue'}">${label}</span>
+          <span class="badge ${badgeCls}">${label}</span>
         </div>
       </div>
       <div style="position:relative;height:8px;background:var(--surface3);border-radius:4px;margin-bottom:4px;">
@@ -1489,11 +1491,11 @@ function spinWheel() {
 
 function shuffleArr(arr) { return arr.sort(() => Math.random()-0.5); }
 
-function copyReferral() {
+function copyReferral(btn) {
   const code = document.getElementById('referral-code').textContent;
   navigator.clipboard.writeText(code).catch(()=>{});
-  event.target.textContent='✅ Copied!';
-  setTimeout(()=>event.target.textContent='📋 Copy Link',2000);
+  btn.textContent='✅ Copied!';
+  setTimeout(()=>btn.textContent='📋 Copy Link',2000);
 }
 
 // Patch init to keep scans list globally
