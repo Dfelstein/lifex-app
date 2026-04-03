@@ -248,6 +248,18 @@ body { background: var(--bg); color: var(--text); font-family: 'Outfit', sans-se
 .sheet-row:last-child { border-bottom: none; }
 .sheet-row-label { color: var(--muted2); }
 .sheet-row-val { font-weight: 600; }
+/* Hover states (CSS replaces inline JS handlers) */
+.scan-list-row:hover { opacity: 0.75; }
+.scan-card-row:hover { border-color: var(--blue) !important; }
+.quiz-opt:hover:not([data-answered]) { border-color: var(--gold) !important; }
+/* Member level tooltip */
+.level-info-btn { background:none;border:none;color:var(--muted);cursor:pointer;font-size:11px;padding:0 0 0 3px;line-height:1;vertical-align:middle; }
+.level-info-btn:hover { color:var(--text); }
+.user-level { position:relative; }
+.level-tooltip { position:absolute;bottom:calc(100% + 6px);left:0;width:210px;background:var(--surface2);border:1px solid var(--border2);border-radius:10px;padding:12px 14px;font-size:12px;z-index:60;display:none;line-height:1.5; }
+.level-tooltip.show { display:block; }
+.level-tooltip-row { display:flex;align-items:center;gap:8px;padding:4px 0; }
+.level-tooltip-dot { width:8px;height:8px;border-radius:50%;flex-shrink:0; }
 </style>
 </head>
 <body>
@@ -310,7 +322,16 @@ body { background: var(--bg); color: var(--text); font-family: 'Outfit', sans-se
         <div class="user-name js-name">Loading…</div>
         <div class="user-level">
           <span class="js-level">Member</span>
+          <button class="level-info-btn" onclick="toggleLevelTooltip(event)" title="What do levels mean?">ⓘ</button>
           <span class="pts-pill js-pts">0 pts</span>
+          <div class="level-tooltip" id="level-tooltip">
+            <div style="font-weight:700;font-size:11px;letter-spacing:0.5px;text-transform:uppercase;color:var(--text);margin-bottom:8px;">Member Levels</div>
+            <div class="level-tooltip-row"><div class="level-tooltip-dot" style="background:#cd7f32;"></div><span><b style="color:#cd7f32;">Bronze</b> — New member</span></div>
+            <div class="level-tooltip-row"><div class="level-tooltip-dot" style="background:#a0a0a0;"></div><span><b style="color:#a0a0a0;">Silver</b> — 100+ pts</span></div>
+            <div class="level-tooltip-row"><div class="level-tooltip-dot" style="background:var(--gold);"></div><span><b style="color:var(--gold);">Gold</b> — 250+ pts</span></div>
+            <div class="level-tooltip-row"><div class="level-tooltip-dot" style="background:var(--purple);"></div><span><b style="color:var(--purple);">Platinum</b> — 500+ pts</span></div>
+            <div style="margin-top:8px;font-size:11px;color:var(--muted2);">Earn points by completing scans, quizzes &amp; referrals.</div>
+          </div>
         </div>
       </div>
     </div>
@@ -485,6 +506,19 @@ async function init() {
   // Map DEXA scans
   const scans = scansRes.data || [];
   allScans = scans.map(mapScan);
+  // Grey out Before vs After nav if fewer than 2 scans
+  const baNav = document.querySelector('[data-screen="before-after"]');
+  if (baNav) {
+    if (allScans.length < 2) {
+      baNav.style.opacity = '0.4';
+      baNav.style.pointerEvents = 'none';
+      baNav.title = 'Requires 2+ DEXA scans';
+    } else {
+      baNav.style.opacity = '';
+      baNav.style.pointerEvents = '';
+      baNav.title = '';
+    }
+  }
   if (scans.length >= 2) {
     scan1 = mapScan(scans[scans.length - 2]);
     scan2 = mapScan(scans[scans.length - 1]);
@@ -577,13 +611,22 @@ function signOut() {
 /* ══════════════════════════
    ROUTER
 ══════════════════════════ */
+const scrollPositions = {};
 function navigate(id) {
+  // Save current screen scroll position
+  const cur = document.querySelector('.screen.active');
+  if (cur) scrollPositions[cur.id] = cur.scrollTop;
+
   document.querySelectorAll('.screen').forEach(s => s.classList.remove('active'));
   document.querySelectorAll('.nav-item').forEach(n => n.classList.remove('active'));
   const screen = document.getElementById('screen-' + id);
-  if (screen) screen.classList.add('active');
+  if (screen) {
+    screen.classList.add('active');
+    screen.scrollTop = scrollPositions['screen-' + id] || 0;
+  }
   const nav = document.querySelector(`[data-screen="${id}"]`);
   if (nav) nav.classList.add('active');
+  history.replaceState(null, '', '#' + id);
 }
 document.querySelectorAll('.nav-item').forEach(item => {
   item.addEventListener('click', () => {
@@ -593,10 +636,25 @@ document.querySelectorAll('.nav-item').forEach(item => {
     document.getElementById('overlay').classList.remove('open');
   });
 });
+// Restore screen from URL hash on load
+(function() {
+  const h = window.location.hash.slice(1);
+  if (h && document.getElementById('screen-' + h)) navigate(h);
+})();
 
 /* ══════════════════════════
    HELPERS
 ══════════════════════════ */
+function toggleLevelTooltip(e) {
+  e.stopPropagation();
+  const tip = document.getElementById('level-tooltip');
+  tip.classList.toggle('show');
+  // Close on next outside click
+  if (tip.classList.contains('show')) {
+    setTimeout(() => document.addEventListener('click', () => tip.classList.remove('show'), { once: true }), 0);
+  }
+}
+
 function fmt(n) { return Number(n).toLocaleString(); }
 function fmtDate(d) { if (!d) return '—'; return new Date(d).toLocaleDateString('en-AU', { day:'numeric', month:'short', year:'numeric' }); }
 function noData(icon, title, sub, cta) {
@@ -741,7 +799,7 @@ function renderDashboard() {
           const i = allScans.length - 1 - ri;
           const isLatest = i === allScans.length - 1;
           return `
-          <div onclick="showScanDetail(${i})" style="display:flex;align-items:center;gap:12px;padding:10px 0;border-bottom:1px solid var(--border);cursor:pointer;transition:opacity 0.15s;" onmouseover="this.style.opacity='0.75'" onmouseout="this.style.opacity='1'">
+          <div onclick="showScanDetail(${i})" class="scan-list-row" style="display:flex;align-items:center;gap:12px;padding:10px 0;border-bottom:1px solid var(--border);cursor:pointer;transition:opacity 0.15s;">
             <div style="width:32px;height:32px;border-radius:50%;background:${isLatest?'linear-gradient(135deg,var(--gold),var(--orange))':'var(--surface3)'};display:flex;align-items:center;justify-content:center;font-family:'Bebas Neue',sans-serif;font-size:14px;color:${isLatest?'#000':'var(--muted2)'};flex-shrink:0;">${s.scan_number||i+1}</div>
             <div style="flex:1;">
               <div style="font-weight:500;font-size:13px;">${fmtDate(s.date)}${isLatest?' <span style="font-size:9px;background:rgba(245,200,66,0.15);color:var(--gold);border-radius:8px;padding:1px 6px;font-weight:700;">LATEST</span>':''}</div>
@@ -980,7 +1038,7 @@ function renderBeforeAfter() {
           const weight = s.total_g ? (s.total_g/1000).toFixed(1) + ' kg' : '—';
           const lean = s.lean_g ? (s.lean_g/1000).toFixed(1) + ' kg lean' : '';
           return `
-          <div onclick="showScanDetail(${i})" style="display:flex;align-items:center;gap:14px;padding:14px 16px;background:var(--surface2);border:1px solid ${isLatest?'rgba(245,200,66,0.3)':'var(--border)'};border-radius:12px;cursor:pointer;transition:border-color 0.15s;" onmouseover="this.style.borderColor='var(--blue)'" onmouseout="this.style.borderColor='${isLatest?'rgba(245,200,66,0.3)':'var(--border)'}'">
+          <div onclick="showScanDetail(${i})" class="scan-card-row" style="display:flex;align-items:center;gap:14px;padding:14px 16px;background:var(--surface2);border:1px solid ${isLatest?'rgba(245,200,66,0.3)':'var(--border)'};border-radius:12px;cursor:pointer;transition:border-color 0.15s;">
             <div style="width:40px;height:40px;border-radius:50%;background:${isLatest?'linear-gradient(135deg,var(--gold),var(--orange))':'var(--surface3)'};display:flex;align-items:center;justify-content:center;font-family:'Bebas Neue',sans-serif;font-size:18px;color:${isLatest?'#000':'var(--muted2)'};flex-shrink:0;">${s.scan_number||i+1}</div>
             <div style="flex:1;">
               <div style="font-weight:600;font-size:14px;">${fmtDate(s.date)} ${isLatest?'<span style="font-size:10px;background:rgba(245,200,66,0.15);color:var(--gold);border-radius:10px;padding:2px 8px;font-weight:700;letter-spacing:0.5px;">LATEST</span>':''}</div>
@@ -1351,8 +1409,8 @@ function renderSpin() {
       <div style="font-size:15px;font-weight:500;color:var(--text);margin-bottom:20px;line-height:1.5;">${q.q}</div>
       <div style="display:flex;flex-direction:column;gap:10px;" id="quiz-options">
         ${opts.map(opt => `<button onclick="answerQuiz(this,'${opt.replace(/'/g,"\\'")}','${q.a.replace(/'/g,"\\'")}')"
-          style="text-align:left;padding:12px 16px;background:var(--surface2);border:1px solid var(--border2);border-radius:8px;color:var(--text);font-size:13px;cursor:pointer;font-family:'Outfit',sans-serif;transition:all 0.15s;"
-          onmouseover="this.style.borderColor='var(--gold)'" onmouseout="if(!this.dataset.answered)this.style.borderColor='var(--border2)'">${opt}</button>`).join('')}
+          class="quiz-opt"
+          style="text-align:left;padding:12px 16px;background:var(--surface2);border:1px solid var(--border2);border-radius:8px;color:var(--text);font-size:13px;cursor:pointer;font-family:'Outfit',sans-serif;transition:all 0.15s;">${opt}</button>`).join('')}
       </div>
       <div id="quiz-result" style="margin-top:14px;display:none;"></div>
     </div></div>`;
@@ -1372,7 +1430,7 @@ function answerQuiz(btn, selected, correct) {
   spinState.quizAnswered = true;
   const isCorrect = selected === correct;
   document.querySelectorAll('#quiz-options button').forEach(b => {
-    b.dataset.answered = '1'; b.style.cursor='default'; b.onmouseover=null; b.onmouseout=null;
+    b.dataset.answered = '1'; b.style.cursor='default';
     if (b.textContent.trim() === correct) { b.style.background='rgba(57,224,122,0.15)'; b.style.borderColor='var(--green)'; b.style.color='var(--green)'; }
   });
   if (!isCorrect) { btn.style.background='rgba(255,85,85,0.15)'; btn.style.borderColor='var(--red)'; btn.style.color='var(--red)'; }
