@@ -249,9 +249,21 @@ body { background: var(--bg); color: var(--text); font-family: 'Outfit', sans-se
 .sheet-row-label { color: var(--muted2); }
 .sheet-row-val { font-weight: 600; }
 /* Hover states (CSS replaces inline JS handlers) */
+.scan-list-row { min-height: 48px; }
 .scan-list-row:hover { opacity: 0.75; }
 .scan-card-row:hover { border-color: var(--blue) !important; }
 .quiz-opt:hover:not([data-answered]) { border-color: var(--gold) !important; }
+/* Score info modal */
+.score-info-btn { background:none;border:none;color:var(--muted);cursor:pointer;font-size:14px;padding:0 0 0 6px;vertical-align:middle;line-height:1; }
+.score-info-btn:hover { color:var(--text); }
+.info-modal { display:none;position:fixed;inset:0;background:rgba(0,0,0,0.65);z-index:200;align-items:center;justify-content:center;padding:20px; }
+.info-modal.show { display:flex; }
+.info-modal-box { background:var(--surface);border:1px solid var(--border2);border-radius:16px;padding:24px;max-width:380px;width:100%; }
+.info-modal-box h3 { font-family:'Bebas Neue',sans-serif;font-size:22px;letter-spacing:2px;margin-bottom:14px;color:var(--gold); }
+.info-modal-box p { font-size:13px;color:var(--muted2);line-height:1.7;margin-bottom:10px; }
+.info-modal-box ul { font-size:13px;color:var(--muted2);line-height:2;padding-left:18px;margin-bottom:14px; }
+.info-modal-close { width:100%;padding:10px;background:var(--surface2);border:1px solid var(--border2);border-radius:8px;color:var(--text);font-family:'Outfit',sans-serif;font-size:13px;cursor:pointer; }
+.info-modal-close:hover { border-color:var(--gold); }
 /* Member level tooltip */
 .level-info-btn { background:none;border:none;color:var(--muted);cursor:pointer;font-size:11px;padding:0 0 0 3px;line-height:1;vertical-align:middle; }
 .level-info-btn:hover { color:var(--text); }
@@ -260,6 +272,31 @@ body { background: var(--bg); color: var(--text); font-family: 'Outfit', sans-se
 .level-tooltip.show { display:block; }
 .level-tooltip-row { display:flex;align-items:center;gap:8px;padding:4px 0; }
 .level-tooltip-dot { width:8px;height:8px;border-radius:50%;flex-shrink:0; }
+/* DAYS COUNTER BANNER */
+.scan-countdown { display:flex;align-items:center;justify-content:space-between;gap:12px;border-radius:10px;padding:12px 16px;margin-bottom:20px;border:1px solid transparent;border-left-width:3px; }
+.scan-countdown.green  { background:rgba(57,224,122,0.06);  border-color:rgba(57,224,122,0.2);  border-left-color:var(--green);  }
+.scan-countdown.amber  { background:rgba(255,159,67,0.07);  border-color:rgba(255,159,67,0.22); border-left-color:var(--orange); }
+.scan-countdown.red    { background:rgba(255,85,85,0.08);   border-color:rgba(255,85,85,0.22);  border-left-color:var(--red);    }
+.scan-countdown-days { font-family:'Bebas Neue',sans-serif;font-size:26px;letter-spacing:1px;line-height:1; }
+/* FOR YOU CONTENT TILES */
+.for-you-grid { display:grid;grid-template-columns:repeat(3,1fr);gap:12px;margin-bottom:20px; }
+@media(max-width:900px){ .for-you-grid { grid-template-columns:repeat(2,1fr); } }
+@media(max-width:640px){ .for-you-grid { grid-template-columns:1fr; } }
+.for-you-card { background:var(--surface);border:1px solid var(--border);border-radius:12px;padding:16px 18px;border-top:3px solid var(--border); }
+.for-you-icon { font-size:24px;margin-bottom:8px; }
+.for-you-title { font-weight:700;font-size:13px;color:var(--text);margin-bottom:8px; }
+.for-you-list { list-style:none;display:flex;flex-direction:column;gap:5px; }
+.for-you-list li { font-size:12px;color:var(--muted2);line-height:1.5;padding-left:14px;position:relative; }
+.for-you-list li::before { content:'·';position:absolute;left:0;color:var(--muted); }
+/* PROGRESS TRACKER */
+.checkin-row { display:flex;align-items:center;gap:12px;padding:10px 0;border-bottom:1px solid var(--border); }
+.checkin-row:last-child { border-bottom:none; }
+.checkin-date { font-size:12px;color:var(--muted2);width:90px;flex-shrink:0; }
+.checkin-val  { font-family:'Bebas Neue',sans-serif;font-size:20px;letter-spacing:0.5px; }
+.checkin-unit { font-size:11px;color:var(--muted2);margin-left:2px; }
+.checkin-delta-good { font-size:11px;color:var(--green); }
+.checkin-delta-bad  { font-size:11px;color:var(--red); }
+.checkin-delta-neut { font-size:11px;color:var(--muted2); }
 </style>
 </head>
 <body>
@@ -268,6 +305,22 @@ body { background: var(--bg); color: var(--text); font-family: 'Outfit', sans-se
 <div id="loading">
   <div class="loading-mark">LX</div>
   <div class="loading-text">Loading your results…</div>
+</div>
+
+<!-- Score info modal -->
+<div class="info-modal" id="score-info-modal" onclick="if(event.target===this)this.classList.remove('show')">
+  <div class="info-modal-box">
+    <h3>Life X Score — How it works</h3>
+    <p>Your Life X Score is a single number (0–100) that combines three health pillars from your most recent scans:</p>
+    <ul>
+      <li><strong style="color:var(--blue)">DEXA Body Composition</strong> — body fat %, lean mass, VAT</li>
+      <li><strong style="color:var(--green)">Blood Panel</strong> — % of markers in optimal or normal range</li>
+      <li><strong style="color:var(--orange)">Metabolic Rate (RMR)</strong> — fat-burning % at rest</li>
+    </ul>
+    <p>Each pillar is scored out of 100 and averaged. Missing data (e.g. no blood panel yet) is excluded from the average — it won't penalise your score.</p>
+    <p style="color:var(--muted);">Score ranges: &lt;60 Needs Work · 60–75 Fair · 76–89 Good · 90–100 Elite</p>
+    <button class="info-modal-close" onclick="document.getElementById('score-info-modal').classList.remove('show')">Got it</button>
+  </div>
 </div>
 
 <!-- App (hidden until data loads) -->
@@ -307,6 +360,10 @@ body { background: var(--bg); color: var(--text); font-family: 'Outfit', sans-se
     <div class="nav-group">
       <div class="nav-group-label">Metabolism</div>
       <div class="nav-item" data-screen="rmr"><span class="nav-icon">🔥</span> RMR — Metabolism</div>
+    </div>
+    <div class="nav-group">
+      <div class="nav-group-label">Track</div>
+      <div class="nav-item" data-screen="progress"><span class="nav-icon">📝</span> Progress Log</div>
     </div>
     <div class="nav-group">
       <div class="nav-group-label">Earn &amp; Play</div>
@@ -414,6 +471,50 @@ body { background: var(--bg); color: var(--text); font-family: 'Outfit', sans-se
     <div id="spin-content"></div>
   </div>
 
+  <!-- PROGRESS LOG -->
+  <div id="screen-progress" class="screen">
+    <div class="page-header">
+      <div class="page-title">Progress Log</div>
+      <div class="page-subtitle">Track weight &amp; waist between scans — compare against your DEXA results</div>
+    </div>
+
+    <!-- Log form -->
+    <div class="card mb20" style="max-width:520px;">
+      <div class="card-title">Log Today's Check-In</div>
+      <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px;margin-bottom:12px;">
+        <div>
+          <label style="font-size:11px;font-weight:600;text-transform:uppercase;letter-spacing:0.8px;color:var(--muted2);display:block;margin-bottom:6px;">Weight (kg)</label>
+          <input type="number" id="ci-weight" placeholder="e.g. 82.5" step="0.1" min="30" max="300"
+            style="width:100%;background:var(--surface2);border:1px solid var(--border2);border-radius:8px;padding:11px 14px;color:var(--text);font-family:'Outfit',sans-serif;font-size:14px;outline:none;">
+        </div>
+        <div>
+          <label style="font-size:11px;font-weight:600;text-transform:uppercase;letter-spacing:0.8px;color:var(--muted2);display:block;margin-bottom:6px;">Waist (cm) <span style="font-weight:400;color:var(--muted);">optional</span></label>
+          <input type="number" id="ci-waist" placeholder="e.g. 88" step="0.5" min="50" max="200"
+            style="width:100%;background:var(--surface2);border:1px solid var(--border2);border-radius:8px;padding:11px 14px;color:var(--text);font-family:'Outfit',sans-serif;font-size:14px;outline:none;">
+        </div>
+      </div>
+      <div style="margin-bottom:12px;">
+        <label style="font-size:11px;font-weight:600;text-transform:uppercase;letter-spacing:0.8px;color:var(--muted2);display:block;margin-bottom:6px;">Note <span style="font-weight:400;color:var(--muted);">optional</span></label>
+        <input type="text" id="ci-note" placeholder="e.g. After gym, feeling great" maxlength="120"
+          style="width:100%;background:var(--surface2);border:1px solid var(--border2);border-radius:8px;padding:11px 14px;color:var(--text);font-family:'Outfit',sans-serif;font-size:14px;outline:none;">
+      </div>
+      <button class="btn btn-gold" id="ci-save-btn" onclick="saveCheckin()" style="width:100%;justify-content:center;font-size:15px;padding:12px;">➕ Save Check-In</button>
+      <div id="ci-status" style="font-size:13px;text-align:center;margin-top:8px;min-height:18px;"></div>
+    </div>
+
+    <!-- DEXA comparison callout -->
+    <div id="ci-dexa-compare" style="display:none;" class="mb20"></div>
+
+    <!-- History -->
+    <div class="card">
+      <div class="card-title" style="display:flex;justify-content:space-between;align-items:center;">
+        <span>Check-In History</span>
+        <span id="ci-count" style="font-size:11px;color:var(--muted2);font-weight:400;text-transform:none;letter-spacing:0;"></span>
+      </div>
+      <div id="ci-history"><div style="color:var(--muted2);font-size:13px;padding:10px 0;">No check-ins yet — log your first one above.</div></div>
+    </div>
+  </div>
+
   <!-- BOOK -->
   <div id="screen-book" class="screen">
     <div class="page-header">
@@ -447,7 +548,7 @@ body { background: var(--bg); color: var(--text); font-family: 'Outfit', sans-se
       <div class="card-title">Refer a Friend — Earn 25 pts each</div>
       <div style="display:flex;align-items:center;gap:12px;margin-bottom:12px;">
         <div id="referral-code" style="flex:1;background:var(--surface2);border:1px solid var(--border2);border-radius:8px;padding:10px 14px;font-size:13px;color:var(--muted2);font-family:monospace;">lifex.app/ref/…</div>
-        <button class="btn btn-outline" onclick="copyReferral(this)">📋 Copy Link</button>
+        <button class="btn btn-outline" onclick="copyReferral(this)">📋 Copy Code</button>
       </div>
       <div style="font-size:12px;color:var(--muted2);">Share your link — earn <strong style="color:var(--gold)">25 pts</strong> for every friend who books a test.</div>
     </div>
@@ -564,6 +665,7 @@ async function init() {
   renderHormones();
   renderRMR();
   renderSpin();
+  loadCheckins();
 }
 
 function mapScan(s) {
@@ -652,6 +754,25 @@ function toggleLevelTooltip(e) {
   // Close on next outside click
   if (tip.classList.contains('show')) {
     setTimeout(() => document.addEventListener('click', () => tip.classList.remove('show'), { once: true }), 0);
+  }
+}
+
+// Sex-appropriate body fat category (ACSM ranges)
+function fatCategory(fat_pct, sex) {
+  if (fat_pct == null) return null;
+  const isFemale = (sex||'').toLowerCase() === 'female';
+  if (isFemale) {
+    if (fat_pct <= 20) return 'Athletic';
+    if (fat_pct <= 28) return 'Fit';
+    if (fat_pct <= 32) return 'Average';
+    if (fat_pct <= 37) return 'Above Average';
+    return 'High Body Fat';
+  } else {
+    if (fat_pct <= 12) return 'Athletic';
+    if (fat_pct <= 17) return 'Fit';
+    if (fat_pct <= 22) return 'Average';
+    if (fat_pct <= 27) return 'Above Average';
+    return 'High Body Fat';
   }
 }
 
@@ -744,11 +865,99 @@ function renderDashboard() {
   if (hba1c) miniStats += `<div class="mini-stat"><div class="mini-stat-icon">🩺</div><div><div class="mini-stat-label">HbA1c (Blood Sugar)</div><div class="mini-stat-value">${hba1c.value} <span>% ${hba1c.status==='optimal'?'optimal':''}</span></div></div></div>`;
   if (rmr?.fat_pct) miniStats += `<div class="mini-stat"><div class="mini-stat-icon">🔥</div><div><div class="mini-stat-label">Fat Burning</div><div class="mini-stat-value">${rmr.fat_pct} <span>% (goal 80%)</span></div></div></div>`;
 
+  // Days since last scan counter
+  let daysBanner = '';
+  if (scan2?.date) {
+    const daysSince = Math.floor((Date.now() - new Date(scan2.date)) / 86400000);
+    const cls   = daysSince < 60 ? 'green' : daysSince < 90 ? 'amber' : 'red';
+    const color = daysSince < 60 ? 'var(--green)' : daysSince < 90 ? 'var(--orange)' : 'var(--red)';
+    const label = daysSince < 60 ? 'On track — next scan in ~'+(Math.max(0,90-daysSince))+' days'
+                : daysSince < 90 ? 'Rescan soon — optimal window is 90 days'
+                : 'Overdue — you\'re past the optimal 90-day window';
+    const ctaStyle = daysSince >= 60 ? 'class="btn btn-gold" style="white-space:nowrap;flex-shrink:0;font-size:13px;padding:9px 16px;"' : 'style="font-size:12px;color:var(--muted2);white-space:nowrap;flex-shrink:0;"';
+    daysBanner = `
+      <div class="scan-countdown ${cls}">
+        <div style="display:flex;align-items:center;gap:12px;">
+          <span style="font-size:22px;">🗓️</span>
+          <div>
+            <div class="scan-countdown-days" style="color:${color};">${daysSince} days since last DEXA</div>
+            <div style="font-size:11px;color:var(--muted2);">${label}</div>
+          </div>
+        </div>
+        <a href="https://xgym.com.au/dexa-scan/" target="_blank" ${ctaStyle}>${daysSince >= 60 ? 'Book Rescan →' : 'Book next →'}</a>
+      </div>`;
+  }
+
+  // Personalised "For You" content tiles based on their data
+  const forYouCards = [];
+  if (scan2?.vat_area_cm2 != null && scan2.vat_area_cm2 >= 100) {
+    forYouCards.push({ icon:'🫁', color:'var(--orange)', title:'Reducing Visceral Fat (VAT)', items:[
+      'VAT responds fastest to <strong>cardio + calorie deficit</strong> — even before visible fat changes',
+      'Aim for <strong>150+ min/week</strong> of moderate aerobic exercise (brisk walk counts)',
+      'Limit alcohol and refined carbs — both drive VAT storage directly',
+      'Your next DEXA will show VAT in cm² — the target is under 100 cm²',
+    ]});
+  }
+  if (scan2?.t_score != null && scan2.t_score < -1.0) {
+    forYouCards.push({ icon:'🦴', color:'var(--blue)', title:'Building Bone Density', items:[
+      'Heavy compound lifts (<strong>squats, deadlifts, rows</strong>) are the most effective stimulus',
+      'Ensure <strong>1,200mg calcium/day</strong> from food sources — dairy, leafy greens, fortified foods',
+      'Vitamin D3 + K2 supplementation supports calcium absorption into bone',
+      'Bone responds slowly — give it <strong>6–12 months</strong> before expecting measurable T-score change',
+    ]});
+  }
+  if (rmr?.fat_pct != null && rmr.fat_pct < 70) {
+    forYouCards.push({ icon:'🔥', color:'var(--red)', title:'Boosting Fat Burning at Rest', items:[
+      'Your RMR fat-burning is '+rmr.fat_pct+'% (goal is 80%+) — this means you\'re running on glucose',
+      '<strong>Fasted morning walks</strong> train your body to access fat as fuel',
+      'Reduce refined sugar and late-night eating to shift your fuel mix',
+      'Sleep quality directly impacts your metabolic flexibility — aim for 7–9 hours',
+    ]});
+  }
+  if (scan2?.fat_pct != null && scan2.fat_pct > 27 && (!scan2.vat_area_cm2 || scan2.vat_area_cm2 < 100)) {
+    forYouCards.push({ icon:'⚖️', color:'var(--gold)', title:'Body Composition Recomposition', items:[
+      'Your DEXA shows room to reduce fat while preserving lean mass — the ideal target',
+      '<strong>Protein at 2g/kg bodyweight</strong> is the #1 lever for protecting muscle during a deficit',
+      'A <strong>300–500 kcal daily deficit</strong> produces ~0.5kg fat loss/week without lean mass sacrifice',
+      'Resistance training 3x/week signals your body to hold muscle even in a deficit',
+    ]});
+  }
+  const elevatedCrp = blood.find(m => m.name.toLowerCase().includes('crp') && (m.status==='high' || m.value > 1));
+  if (elevatedCrp) {
+    forYouCards.push({ icon:'🔬', color:'var(--purple)', title:'Managing Inflammation (hsCRP)', items:[
+      'Elevated hsCRP ('+elevatedCrp.value+' '+elevatedCrp.unit+') is a cardiovascular risk marker',
+      '<strong>Omega-3 fatty acids</strong> (fish oil, 2–4g/day EPA+DHA) are one of the best-studied reducers',
+      'Processed foods, seed oils, and excess sugar all drive chronic inflammation',
+      'Retest in 3 months after dietary changes — it responds faster than most markers',
+    ]});
+  }
+  if (!scan2) {
+    forYouCards.push({ icon:'🫀', color:'var(--gold)', title:'Why a DEXA Scan Changes Everything', items:[
+      'Scale weight hides the truth — you can gain 2kg of muscle while losing 2kg of fat and see zero change',
+      'DEXA measures <strong>fat, lean mass, and bone density</strong> separately across every body region',
+      'Visceral fat (VAT) is invisible externally but the highest-risk fat — only DEXA measures it accurately',
+      'One scan gives you more data than years of guesswork',
+    ]});
+  }
+
+  const forYouSection = forYouCards.length ? `
+    <div style="margin-bottom:6px;font-size:10px;font-weight:600;letter-spacing:1.5px;text-transform:uppercase;color:var(--muted2);">For You — Personalised Insights</div>
+    <div class="for-you-grid mb20">
+      ${forYouCards.slice(0,3).map(c=>`
+        <div class="for-you-card" style="border-top-color:${c.color};">
+          <div class="for-you-icon">${c.icon}</div>
+          <div class="for-you-title" style="color:${c.color};">${c.title}</div>
+          <ul class="for-you-list">${c.items.map(i=>`<li>${i}</li>`).join('')}</ul>
+        </div>`).join('')}
+    </div>` : '';
+
   el.innerHTML = `
     <div class="page-header">
       <div class="page-title">Dashboard</div>
       <div class="page-subtitle">${parts.join(' &nbsp;·&nbsp; ')}</div>
     </div>
+
+    ${daysBanner}
 
     ${score !== null ? `
     <div class="card mb20">
@@ -777,6 +986,8 @@ function renderDashboard() {
 
     ${tiles ? `<div class="stats-row mb20">${tiles}</div>` : ''}
     ${miniStats ? `<div class="secondary-stats mb20">${miniStats}</div>` : ''}
+
+    ${forYouSection}
 
     <div class="grid-2">
       <div class="card">
@@ -831,7 +1042,12 @@ function renderScore() {
   const scoreColor = score>=90?'var(--green)':score>=76?'var(--gold)':score>=60?'var(--orange)':'var(--red)';
 
   // Component scores + driver detail
-  const dexaScore  = scan2 ? (() => { const fp=scan2.fat_pct; if(fp<=12)return 95; if(fp<=17)return 85; if(fp<=22)return 74; if(fp<=27)return 58; return 42; })() : null;
+  const dexaScore  = scan2 ? (() => {
+    const fp=scan2.fat_pct; if(fp==null) return null;
+    const fem = (scan2.sex||profile?.sex||'').toLowerCase()==='female';
+    if (fem) { if(fp<=20)return 95; if(fp<=28)return 85; if(fp<=32)return 74; if(fp<=37)return 58; return 42; }
+    else     { if(fp<=12)return 95; if(fp<=17)return 85; if(fp<=22)return 74; if(fp<=27)return 58; return 42; }
+  })() : null;
   const bloodScore = blood.length ? Math.round(((blood.filter(m=>m.status==='optimal').length + blood.filter(m=>m.status==='normal').length*0.75)/blood.length)*100) : null;
   const rmrScore   = rmr ? (rmr.fat_pct>=80?90:rmr.fat_pct>=75?76:rmr.fat_pct>=65?60:45) : null;
 
@@ -839,8 +1055,8 @@ function renderScore() {
   let dexaDriver = '';
   if (scan2) {
     const fp = scan2.fat_pct;
-    const fatCat = fp<=12?'Athletic':fp<=17?'Fit':fp<=22?'Average':fp<=27?'Above average':'High body fat';
-    dexaDriver = `${fp}% body fat — ${fatCat}`;
+    const fatCat = fatCategory(fp, scan2.sex || profile?.sex);
+    dexaDriver = `${fp}% body fat — ${fatCat||''}`.trim();
     if (scan2.ffmi != null) dexaDriver += ` · FFMI ${scan2.ffmi}`;
     if (scan2.vat_area_cm2 != null) dexaDriver += ` · VAT ${scan2.vat_area_cm2} cm²`;
   }
@@ -861,9 +1077,14 @@ function renderScore() {
   const focus = [];
 
   if (scan2) {
-    if (scan2.fat_pct <= 17) wins.push(`Body fat ${scan2.fat_pct}% — in the fit range`);
-    else if (scan2.fat_pct <= 22) wins.push(`Body fat ${scan2.fat_pct}% — within average range`);
-    else focus.push(`Body fat ${scan2.fat_pct}% — target below 20% for optimal health`);
+    const _sex = (scan2.sex || profile?.sex || '').toLowerCase();
+    const _female = _sex === 'female';
+    const _fitThreshold = _female ? 28 : 17;
+    const _avgThreshold = _female ? 32 : 22;
+    const _targetPct    = _female ? 25 : 18;
+    if (scan2.fat_pct <= _fitThreshold) wins.push(`Body fat ${scan2.fat_pct}% — in the ${_female?'fit range for women':'fit range'}`);
+    else if (scan2.fat_pct <= _avgThreshold) wins.push(`Body fat ${scan2.fat_pct}% — within average range`);
+    else focus.push(`Body fat ${scan2.fat_pct}% — target below ${_targetPct}% for optimal health`);
 
     if (scan2.ffmi != null) {
       if (scan2.ffmi >= 20) wins.push(`FFMI ${scan2.ffmi} — strong lean mass relative to height`);
@@ -895,7 +1116,7 @@ function renderScore() {
   const offset = circumference - (score / 100) * circumference;
 
   el.innerHTML = `
-    <div class="page-header"><div class="page-title">Life X Score</div><div class="page-subtitle">Composite health score across DEXA, Blood &amp; Metabolism</div></div>
+    <div class="page-header"><div class="page-title">Life X Score <button class="score-info-btn" onclick="document.getElementById('score-info-modal').classList.add('show')" title="How is this calculated?">ⓘ</button></div><div class="page-subtitle">Composite health score across DEXA, Blood &amp; Metabolism</div></div>
 
     <div class="card mb20">
       <div style="display:flex;align-items:center;gap:24px;flex-wrap:wrap;">
@@ -1005,13 +1226,13 @@ function renderBone() {
   el.innerHTML = `
     <div class="stats-row mb20">
       <div class="stat-tile green"><div class="tile-label">BMD Total</div><div class="tile-value">${scan2.bmd}<span class="tile-unit">g/cm²</span></div>${bmdDiff!==null?`<div class="tile-delta ${parseFloat(bmdDiff)>0?'good':'up'}">${parseFloat(bmdDiff)>0?'▲ +':''  }${bmdDiff}% vs last scan</div>`:''}</div>
-      ${scan2.t_score!=null?`<div class="stat-tile ${scan2.t_score>=-1?'blue':'red'}"><div class="tile-label">T-Score</div><div class="tile-value">${scan2.t_score}</div><div class="tile-delta ${scan2.t_score>=-1?'good':'up'}">${scan2.t_score>=-1?'✓ Normal range':'⚠️ Below normal'}</div></div>`:''}
+      ${scan2.t_score!=null?(()=>{const t=scan2.t_score;const cls=t>=-1?'blue':t>=-2.5?'orange':'red';const diag=t>=-1?'Normal (≥ -1.0)':t>=-2.5?'Osteopenia (-1.0 to -2.5)':'Osteoporosis (< -2.5)';return`<div class="stat-tile ${cls}"><div class="tile-label">T-Score</div><div class="tile-value">${t}</div><div class="tile-delta ${t>=-1?'good':'up'}">${diag}</div></div>`})():''}
       ${scan2.z_score!=null?`<div class="stat-tile teal"><div class="tile-label">Z-Score</div><div class="tile-value">${scan2.z_score>=0?'+':''}${scan2.z_score}</div><div class="tile-delta ${scan2.z_score>=0?'good':'neutral'}">${scan2.z_score>=0?'Above':'Below'} age-matched mean</div></div>`:''}
       ${scan2.pr_pct!=null?`<div class="stat-tile gold"><div class="tile-label">PR %</div><div class="tile-value">${scan2.pr_pct}<span class="tile-unit">%</span></div><div class="tile-delta good">% of young adult ref</div></div>`:''}
     </div>
     <div class="card"><div class="card-title">Bone Health</div><div class="insight-list">
       ${bmdDiff !== null && parseFloat(bmdDiff) > 0 ? `<div class="insight-item"><span class="icon">✅</span><span><strong>BMD improved +${bmdDiff}%</strong> between scans.</span></div>` : ''}
-      ${scan2.t_score!=null?`<div class="insight-item"><span class="icon">${scan2.t_score>=-1?'✅':'⚠️'}</span><span>T-score of ${scan2.t_score} — ${scan2.t_score>=-1?'within normal range':'approaching osteopenia threshold (-1.0)'}. <strong>Maintain heavy compound lifts.</strong></span></div>`:''}
+      ${scan2.t_score!=null?(()=>{const t=scan2.t_score;return`<div class="insight-item"><span class="icon">${t>=-1?'✅':t>=-2.5?'⚠️':'🚨'}</span><span>T-score <strong>${t}</strong> — ${t>=-1?'Normal bone density. Maintain heavy compound lifts to preserve it.':t>=-2.5?'Osteopenia detected. Prioritise weight-bearing exercise, calcium, D3 + K2.':'Osteoporosis range. Discuss treatment with your doctor alongside load-bearing exercise and supplements.'}</span></div>`})():''}
       <div class="insight-item"><span class="icon">💊</span><span>Ensure adequate <strong>Vitamin D3 + K2</strong> and calcium intake to support bone density.</span></div>
     </div>
     <div style="margin-top:14px;">
@@ -1401,6 +1622,18 @@ const WHEEL_SEGMENTS=[{pts:5,color:'#1c2128'},{pts:20,color:'#1a3a2a'},{pts:10,c
 function renderSpin() {
   const el = document.getElementById('spin-content');
   if (spinState.phase === 'quiz') {
+    // Check 48h cooldown
+    const lastSpin = parseInt(localStorage.getItem('lifex_spin_ts') || '0');
+    const hoursLeft = Math.ceil((48 * 3600 * 1000 - (Date.now() - lastSpin)) / 3600000);
+    if (lastSpin && hoursLeft > 0) {
+      el.innerHTML = `<div style="max-width:640px;margin:0 auto;"><div class="card" style="text-align:center;padding:40px 24px;">
+        <div style="font-size:48px;margin-bottom:12px;">⏳</div>
+        <div style="font-family:'Bebas Neue',sans-serif;font-size:28px;color:var(--gold);letter-spacing:2px;margin-bottom:8px;">Come Back in ${hoursLeft}h</div>
+        <div style="font-size:13px;color:var(--muted2);">You already spun today. One spin every 48 hours keeps it fair!</div>
+        <div style="margin-top:20px;font-size:22px;font-family:'Bebas Neue',sans-serif;color:var(--text);">🏆 ${profile?.points||0} pts total</div>
+      </div></div>`;
+      return;
+    }
     const q = quizBank[spinState.quizIdx % quizBank.length];
     const opts = shuffleArr([q.a, ...q.wrong]);
     el.innerHTML = `<div style="max-width:640px;margin:0 auto;"><div class="card mb20">
@@ -1442,7 +1675,7 @@ function answerQuiz(btn, selected, correct) {
     <div style="font-weight:600;color:${isCorrect?'var(--green)':'var(--orange)'};margin-bottom:4px;">${isCorrect?'✅ Correct!':'❌ Not quite.'}</div>
     ${!isCorrect?`<div style="font-size:12px;color:var(--muted2);">Answer: <strong style="color:var(--text)">${correct}</strong></div>`:''}
   </div>
-  <div style="margin-top:12px;text-align:center;"><button class="btn btn-gold" onclick="spinState.phase='wheel';renderSpin();">🎰 Spin the Wheel!</button></div>`;
+  <div style="margin-top:12px;text-align:center;"><button class="btn btn-gold" onclick="spinState.phase='wheel';spinState.quizAnswered=false;spinState.quizIdx++;renderSpin();">🎰 Spin the Wheel!</button></div>`;
 }
 
 function drawWheel(highlight=-1) {
@@ -1480,8 +1713,13 @@ function spinWheel() {
       const res=document.getElementById('spin-result');
       if(res) res.innerHTML=`<div style="font-family:'Bebas Neue',sans-serif;font-size:32px;color:var(--gold);letter-spacing:2px;">🎉 +${won} POINTS!</div><div style="color:var(--muted2);font-size:12px;">Next spin available in 48 hours</div>`;
       if(btn){btn.disabled=true;btn.textContent='⏳ Come back in 48 hrs';}
+      localStorage.setItem('lifex_spin_ts', Date.now().toString());
       // Update points in Supabase
-      if (profile) sb.from('profiles').update({ points: (profile.points||0)+won }).eq('id', profile.id);
+      if (profile) {
+        profile.points = (profile.points||0) + won;
+        sb.from('profiles').update({ points: profile.points }).eq('id', profile.id);
+        document.querySelector('.js-pts').textContent = profile.points + ' pts';
+      }
       return;
     }
     drawWheel(); wheelAnim=requestAnimationFrame(step);
@@ -1495,7 +1733,7 @@ function copyReferral(btn) {
   const code = document.getElementById('referral-code').textContent;
   navigator.clipboard.writeText(code).catch(()=>{});
   btn.textContent='✅ Copied!';
-  setTimeout(()=>btn.textContent='📋 Copy Link',2000);
+  setTimeout(()=>btn.textContent='📋 Copy Code',2000);
 }
 
 // Patch init to keep scans list globally
@@ -1534,6 +1772,136 @@ window.init = async function() {
   document.getElementById('loading').style.display='none';
   document.getElementById('app').style.display='flex';
   renderDashboard(); renderScore(); renderBodyComp(); renderBone(); renderBeforeAfter(); renderBlood(); renderHormones(); renderRMR(); renderSpin();
+  loadCheckins();
+}
+
+/* ══════════════════════════
+   PROGRESS TRACKER
+══════════════════════════ */
+let checkinsData = [];
+
+async function loadCheckins() {
+  const { data: { session } } = await sb.auth.getSession();
+  if (!session) return;
+  const { data, error } = await sb.from('check_ins')
+    .select('*')
+    .eq('client_id', session.user.id)
+    .order('date', { ascending: false })
+    .limit(60);
+  if (error) {
+    // Table may not exist yet
+    document.getElementById('ci-history').innerHTML = `<div style="font-size:12px;color:var(--muted2);padding:8px 0;">Check-in history will appear here.</div>`;
+    return;
+  }
+  checkinsData = data || [];
+  renderCheckins();
+}
+
+async function saveCheckin() {
+  const weight = parseFloat(document.getElementById('ci-weight').value);
+  const waist  = parseFloat(document.getElementById('ci-waist').value) || null;
+  const note   = document.getElementById('ci-note').value.trim() || null;
+  const statusEl = document.getElementById('ci-status');
+  const btn = document.getElementById('ci-save-btn');
+
+  if (!weight || weight < 30 || weight > 300) {
+    statusEl.textContent = 'Enter a valid weight (30–300 kg).';
+    statusEl.style.color = 'var(--red)';
+    return;
+  }
+  btn.disabled = true;
+  btn.textContent = 'Saving…';
+  statusEl.textContent = '';
+
+  const { data: { session } } = await sb.auth.getSession();
+  if (!session) return;
+
+  const today = new Date().toISOString().slice(0, 10);
+  const { error } = await sb.from('check_ins').upsert({
+    client_id: session.user.id,
+    date: today,
+    weight_kg: weight,
+    waist_cm: waist,
+    note: note,
+  }, { onConflict: 'client_id,date' });
+
+  btn.disabled = false;
+  btn.textContent = '➕ Save Check-In';
+
+  if (error) {
+    statusEl.textContent = 'Error: ' + error.message;
+    statusEl.style.color = 'var(--red)';
+    return;
+  }
+
+  statusEl.textContent = '✅ Saved!';
+  statusEl.style.color = 'var(--green)';
+  document.getElementById('ci-weight').value = '';
+  document.getElementById('ci-waist').value  = '';
+  document.getElementById('ci-note').value   = '';
+  setTimeout(() => { statusEl.textContent = ''; }, 2500);
+  await loadCheckins();
+}
+
+function renderCheckins() {
+  const histEl = document.getElementById('ci-history');
+  const countEl = document.getElementById('ci-count');
+  const rows = checkinsData;
+
+  countEl.textContent = rows.length ? rows.length + ' entries' : '';
+
+  // DEXA comparison callout
+  const compareEl = document.getElementById('ci-dexa-compare');
+  if (scan2?.weight_kg && rows.length) {
+    const latest = rows[0];
+    const dexaDate = scan2.date;
+    const dexaWeight = scan2.total_g ? scan2.total_g / 1000 : null;
+    if (dexaWeight && latest.weight_kg) {
+      const diff = (latest.weight_kg - dexaWeight).toFixed(1);
+      const sign = diff > 0 ? '+' : '';
+      const col  = diff > 0 ? 'var(--orange)' : 'var(--green)';
+      compareEl.innerHTML = `
+        <div class="card" style="border-left:3px solid var(--blue);background:rgba(77,166,255,0.04);">
+          <div style="display:flex;align-items:center;gap:12px;">
+            <span style="font-size:22px;">🫀</span>
+            <div>
+              <div style="font-weight:600;font-size:13px;color:var(--text);">vs Your Last DEXA (${fmtDate(dexaDate)})</div>
+              <div style="font-size:12px;color:var(--muted2);margin-top:2px;">DEXA weight: <strong style="color:var(--text)">${dexaWeight.toFixed(1)} kg</strong> &nbsp;·&nbsp; Today: <strong style="color:var(--text)">${latest.weight_kg} kg</strong> &nbsp;·&nbsp; Change: <strong style="color:${col}">${sign}${diff} kg</strong></div>
+              <div style="font-size:11px;color:var(--muted);margin-top:3px;">Book a rescan to see exactly how much of this is fat vs muscle.</div>
+            </div>
+            <a href="https://xgym.com.au/dexa-scan/" target="_blank" class="btn btn-gold" style="flex-shrink:0;font-size:12px;padding:8px 14px;">Book Rescan →</a>
+          </div>
+        </div>`;
+      compareEl.style.display = 'block';
+    }
+  }
+
+  if (!rows.length) {
+    histEl.innerHTML = '<div style="color:var(--muted2);font-size:13px;padding:10px 0;">No check-ins yet — log your first one above.</div>';
+    return;
+  }
+
+  histEl.innerHTML = rows.map((r, i) => {
+    const prev = rows[i + 1];
+    let weightDelta = '';
+    if (prev?.weight_kg) {
+      const d = (r.weight_kg - prev.weight_kg).toFixed(1);
+      const cls = d < 0 ? 'checkin-delta-good' : d > 0 ? 'checkin-delta-bad' : 'checkin-delta-neut';
+      weightDelta = `<span class="${cls}">${d > 0 ? '+' : ''}${d} kg</span>`;
+    }
+    return `
+      <div class="checkin-row">
+        <div class="checkin-date">${fmtDate(r.date)}</div>
+        <div style="flex:1;">
+          <div style="display:flex;align-items:baseline;gap:8px;">
+            <span class="checkin-val">${r.weight_kg}<span class="checkin-unit">kg</span></span>
+            ${weightDelta}
+            ${r.waist_cm ? `<span style="font-size:12px;color:var(--muted2);">· ${r.waist_cm} cm waist</span>` : ''}
+          </div>
+          ${r.note ? `<div style="font-size:11px;color:var(--muted2);margin-top:2px;">${r.note}</div>` : ''}
+        </div>
+      </div>`;
+  }).join('');
 }
 
 init();
