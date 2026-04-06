@@ -279,13 +279,16 @@ body { background: var(--bg); color: var(--text); font-family: 'Outfit', sans-se
         </div>
       </div>
 
-      <div class="ob-field" style="margin-bottom:20px;">
-        <label>Email <span style="color:var(--muted);font-weight:400;">optional — for your results</span></label>
+      <div class="ob-field" style="margin-bottom:8px;">
+        <label>Email <span style="color:var(--gold);font-weight:600;">— required to see your results</span></label>
         <input type="email" id="inp-email" placeholder="you@example.com" style="width:100%;background:var(--surface2);border:1px solid var(--border2);border-radius:8px;padding:13px 14px;color:var(--text);font-family:'Outfit',sans-serif;font-size:15px;outline:none;transition:border-color 0.15s;" onfocus="this.style.borderColor='var(--gold)'" onblur="this.style.borderColor='var(--border2)'">
+      </div>
+      <div style="font-size:11px;color:var(--muted2);margin-bottom:18px;display:flex;align-items:center;gap:6px;">
+        <span style="color:var(--green);">✓</span> Your results appear instantly — we'll also email you a copy. No spam.
       </div>
 
       <div class="ob-error" id="ob-error"></div>
-      <button class="ob-btn" onclick="calculateEstimate()">Calculate My Results &rarr;</button>
+      <button class="ob-btn" onclick="calculateEstimate()">Get My Free Results →</button>
 
       <div class="ob-signin">
         Already have an account? <a href="index.html">Sign In</a>
@@ -474,6 +477,14 @@ function calculateEstimate() {
   gHeight = parseFloat(document.getElementById('inp-height').value);
   gWaist  = parseFloat(document.getElementById('inp-waist').value) || null;
   gEmail  = (document.getElementById('inp-email').value || '').trim().toLowerCase() || null;
+
+  // Email required — basic format check
+  if (!gEmail || !gEmail.includes('@') || !gEmail.includes('.') || gEmail.length < 6) {
+    errEl.textContent = 'Please enter a valid email address to see your results.';
+    errEl.style.display = 'block';
+    document.getElementById('inp-email').focus();
+    return;
+  }
 
   if (!gAge || !gWeight || !gHeight) {
     errEl.textContent = 'Please fill in Age, Weight, and Height.';
@@ -824,7 +835,7 @@ function renderRMR() {
       <div class="card-title">Daily Expenditure Estimate &mdash; Add Your Steps</div>
       <div style="font-size:13px;color:var(--muted2);margin-bottom:4px;">How many steps do you average per day?</div>
       <div class="slider-wrap">
-        <input type="range" id="steps-slider" min="0" max="25000" step="500" value="7500"
+        <input type="range" id="steps-slider" min="0" max="25000" step="100" value="7500"
           oninput="updateTDEE(this.value)">
         <div class="slider-val" id="steps-display">7,500</div>
       </div>
@@ -850,7 +861,8 @@ function renderRMR() {
 function updateTDEE(steps) {
   steps = parseInt(steps);
   document.getElementById('steps-display').textContent = steps.toLocaleString();
-  const mult = steps < 2000 ? 1.2 : steps < 5000 ? 1.35 : steps < 10000 ? 1.5 : steps < 15000 ? 1.65 : 1.8;
+  // Smooth interpolation: 0 steps = 1.2 (sedentary), 25000 = 1.9 (very active)
+  const mult = 1.2 + (steps / 25000) * 0.7;
   const tdee = Math.round(gRMR * mult);
   document.getElementById('tdee-grid').innerHTML = `
     <div class="tdee-card">
@@ -926,16 +938,20 @@ function buildBellCurve(mean, sd, userVal) {
     ${rightArea ? `<path d="${rightArea}" fill="url(#gR)"/>` : ''}
     <path d="${curvePath}" fill="none" stroke="rgba(255,255,255,0.28)" stroke-width="1.5"/>
     <line x1="${sx(mean)}" y1="${PT}" x2="${sx(mean)}" y2="${baseline}" stroke="rgba(255,255,255,0.1)" stroke-width="1" stroke-dasharray="3,3"/>
-    <text x="${sx(mean)}" y="${baseline + 22}" text-anchor="middle" font-family="Outfit,sans-serif" font-size="10" fill="rgba(255,255,255,0.25)">avg ${Math.round(mean)}%</text>
+    <text x="${sx(mean)}" y="${PT + 12}" text-anchor="middle" font-family="Outfit,sans-serif" font-size="9" fill="rgba(255,255,255,0.2)">avg ${Math.round(mean)}%</text>
     <line x1="${userSX}" y1="${PT - 6}" x2="${userSX}" y2="${baseline}" stroke="#f5c842" stroke-width="2"/>
     <circle cx="${userSX}" cy="${userSY}" r="5.5" fill="#f5c842" stroke="#08090b" stroke-width="2"/>
     <rect x="${labelX - 28}" y="${PT - 25}" width="56" height="18" rx="5" fill="rgba(245,200,66,0.18)" stroke="rgba(245,200,66,0.5)" stroke-width="1"/>
     <text x="${labelX}" y="${PT - 12}" text-anchor="middle" font-family="Bebas Neue,sans-serif" font-size="12" fill="#f5c842" letter-spacing="1">YOU — ${clampedUser.toFixed(1)}%</text>
     <line x1="${PL}" y1="${baseline}" x2="${W - PR}" y2="${baseline}" stroke="rgba(255,255,255,0.08)" stroke-width="1"/>
-    ${tickVals.map(v => `
-      <line x1="${sx(v).toFixed(1)}" y1="${baseline}" x2="${sx(v).toFixed(1)}" y2="${baseline + 5}" stroke="rgba(255,255,255,0.12)" stroke-width="1"/>
-      <text x="${sx(v).toFixed(1)}" y="${baseline + 17}" text-anchor="middle" font-family="Outfit,sans-serif" font-size="10" fill="rgba(255,255,255,0.25)">${Math.round(v)}%</text>
-    `).join('')}
+    ${tickVals.map((v, i) => {
+      const tx = sx(v).toFixed(1);
+      // Skip tick if too close to user label (within 30px) to avoid overlap
+      const tooClose = Math.abs(parseFloat(tx) - userSX) < 30;
+      return tooClose ? '' : `
+        <line x1="${tx}" y1="${baseline}" x2="${tx}" y2="${(baseline+5).toFixed(1)}" stroke="rgba(255,255,255,0.12)" stroke-width="1"/>
+        <text x="${tx}" y="${(baseline+16).toFixed(1)}" text-anchor="middle" font-family="Outfit,sans-serif" font-size="9" fill="rgba(255,255,255,0.22)">${Math.round(v)}%</text>`;
+    }).join('')}
   </svg>`;
 }
 
@@ -962,16 +978,54 @@ function compBar(label, userVal, avgVal, top25Val, unit, lowerBetter) {
   </div>`;
 }
 
-/* ── Locked metric tile ── */
-function lockedTile(icon, label, fakeVal, unit) {
-  return `<div style="position:relative;background:var(--surface2);border:1px solid var(--border);border-radius:10px;padding:14px 12px;overflow:hidden;">
-    <div style="filter:blur(6px);pointer-events:none;user-select:none;">
-      <div style="font-size:10px;font-weight:600;text-transform:uppercase;letter-spacing:0.8px;color:var(--muted2);margin-bottom:4px;">${icon} ${label}</div>
-      <div style="font-family:'Bebas Neue',sans-serif;font-size:30px;color:var(--text);">${fakeVal}<span style="font-size:13px;color:var(--muted2);font-family:Outfit,sans-serif;margin-left:3px;">${unit}</span></div>
+/* ── Informative locked tile — shows what the metric means and risk ranges ── */
+const LOCKED_META = {
+  vat: {
+    icon:'🫁', label:'Visceral Fat Area', unit:'cm²',
+    what:'Fat surrounding your organs — invisible from the outside, highest cardiovascular risk.',
+    ranges:[{col:'var(--green)',label:'Normal',val:'< 100 cm²'},{col:'var(--orange)',label:'Borderline',val:'100–160 cm²'},{col:'var(--red)',label:'High Risk',val:'> 160 cm²'}],
+  },
+  bone: {
+    icon:'🦴', label:'Bone Density (T-Score)', unit:'',
+    what:'Compares your bone density to a healthy 30-year-old. Low T-score = fracture risk.',
+    ranges:[{col:'var(--green)',label:'Normal',val:'≥ −1.0'},{col:'var(--orange)',label:'Osteopenia',val:'−1.0 to −2.5'},{col:'var(--red)',label:'Osteoporosis',val:'< −2.5'}],
+  },
+  trunk: {
+    icon:'📊', label:'Trunk Fat %', unit:'%',
+    what:'Fat percentage in your chest and back region — correlates with metabolic health.',
+    ranges:[{col:'var(--green)',label:'Low Risk',val:'< 30%'},{col:'var(--orange)',label:'Moderate',val:'30–40%'},{col:'var(--red)',label:'High',val:'> 40%'}],
+  },
+  android: {
+    icon:'📊', label:'Android (Belly) Fat %', unit:'%',
+    what:'Fat in the belly zone. Drives visceral fat accumulation — the most metabolically harmful.',
+    ranges:[{col:'var(--green)',label:'Low Risk',val:'< 30%'},{col:'var(--orange)',label:'Moderate',val:'30–42%'},{col:'var(--red)',label:'High',val:'> 42%'}],
+  },
+  ag: {
+    icon:'⚖️', label:'Android:Gynoid Ratio', unit:'',
+    what:'Belly fat vs hip fat ratio. Higher ratio = more central fat = higher metabolic risk.',
+    ranges:[{col:'var(--green)',label:'Healthy',val:'< 1.0'},{col:'var(--orange)',label:'Elevated',val:'1.0–1.2'},{col:'var(--red)',label:'High Risk',val:'> 1.2'}],
+  },
+  almi: {
+    icon:'🏋️', label:'Lean Mass Index (ALMI)', unit:'kg/m²',
+    what:'Appendicular lean mass ÷ height². Measures skeletal muscle relative to your frame.',
+    ranges:[{col:'var(--red)',label:'Low (sarcopenia risk)',val:'M <7.0 / F <5.5'},{col:'var(--green)',label:'Normal',val:'M 7.0–9.0 / F 5.5–7.0'},{col:'var(--blue)',label:'High (athletic)',val:'M >9.0 / F >7.0'}],
+  },
+};
+function lockedTile(key) {
+  const m = LOCKED_META[key];
+  if (!m) return '';
+  return `<div style="background:var(--surface2);border:1px solid var(--border);border-radius:10px;padding:14px 12px;">
+    <div style="font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:0.8px;color:var(--muted2);margin-bottom:6px;">${m.icon} ${m.label}${m.unit?` (${m.unit})`:''}</div>
+    <div style="font-size:11px;color:var(--muted2);line-height:1.5;margin-bottom:8px;">${m.what}</div>
+    <div style="display:flex;flex-direction:column;gap:3px;">
+      ${m.ranges.map(r=>`<div style="display:flex;align-items:center;justify-content:space-between;font-size:10px;">
+        <span style="color:${r.col};font-weight:600;">${r.label}</span>
+        <span style="color:var(--muted2);">${r.val}</span>
+      </div>`).join('')}
     </div>
-    <div style="position:absolute;inset:0;display:flex;flex-direction:column;align-items:center;justify-content:center;background:rgba(8,9,11,0.6);gap:3px;">
-      <div style="font-size:20px;">🔒</div>
-      <div style="font-size:9px;font-weight:700;color:var(--muted2);letter-spacing:0.8px;text-transform:uppercase;">Scan required</div>
+    <div style="margin-top:8px;display:flex;align-items:center;gap:5px;">
+      <span style="font-size:13px;">🔒</span>
+      <span style="font-size:9px;font-weight:700;color:var(--muted);letter-spacing:0.8px;text-transform:uppercase;">DEXA scan required for your number</span>
     </div>
   </div>`;
 }
@@ -1014,7 +1068,7 @@ function renderCompare() {
         <div>
           <div class="card-title" style="margin-bottom:2px;">Body Fat % Distribution — Life X Scan Data</div>
           <div style="font-size:12px;color:var(--muted2);">${isMale ? 'Males' : 'Females'} aged ${gAge < 30 ? '20–29' : gAge < 40 ? '30–39' : gAge < 50 ? '40–49' : '50+'}
-            ${leaner_data.count ? `&nbsp;&middot;&nbsp; <span style="color:var(--teal)">${leaner_data.count} real scans</span>` : '&nbsp;&middot;&nbsp; <span style="color:var(--muted)">reference ranges</span>'}
+            ${leaner_data.count ? `&nbsp;&middot;&nbsp; <span style="color:var(--teal);font-weight:700;font-size:13px;">Based on ${leaner_data.count} real Life X scans</span>` : '&nbsp;&middot;&nbsp; <span style="color:var(--muted)">reference ranges</span>'}
           </div>
         </div>
         <div style="text-align:right;">
@@ -1055,12 +1109,12 @@ function renderCompare() {
         They're the difference between a guess and clinical knowledge.
       </div>
       <div class="locked-grid">
-        ${lockedTile('🫀', 'Visceral Fat Area', '79', 'cm²')}
-        ${lockedTile('🦴', 'Bone Density T-Score', '-0.4', '')}
-        ${lockedTile('📊', 'Trunk Fat %', '21.3', '%')}
-        ${lockedTile('📊', 'Android Fat %', '24.1', '%')}
-        ${lockedTile('⚖️', 'A:G Ratio', '0.87', '')}
-        ${lockedTile('🏋️', 'Appendicular LMI', '9.1', 'kg/m²')}
+        ${lockedTile('vat')}
+        ${lockedTile('bone')}
+        ${lockedTile('trunk')}
+        ${lockedTile('android')}
+        ${lockedTile('ag')}
+        ${lockedTile('almi')}
       </div>
       <div style="text-align:center;margin-top:6px;">
         <a href="https://xgym.com.au/dexa-scan/" target="_blank" class="btn btn-gold" style="font-size:15px;padding:13px 32px;">

@@ -334,6 +334,7 @@ html, body { height: 100%; background: var(--bg); color: var(--text); font-famil
     <div class="nav-item" data-panel="analytics" onclick="showPanel('analytics')"><span class="nav-icon">📊</span> Analytics</div>
 
     <div class="nav-group-label" style="margin-top:8px;">Data</div>
+    <div class="nav-item" data-panel="merge-profiles" onclick="showPanel('merge-profiles')"><span class="nav-icon">🔀</span> Merge Profiles</div>
     <div class="nav-item" data-panel="bulk-import" onclick="showPanel('bulk-import')"><span class="nav-icon">📥</span> Bulk Import</div>
     <div class="nav-item" data-panel="intake-import" onclick="showPanel('intake-import')"><span class="nav-icon">📋</span> Intake Form Import</div>
 
@@ -495,6 +496,33 @@ html, body { height: 100%; background: var(--bg); color: var(--text); font-famil
     </div>
   </div>
 
+
+  <!-- ── MERGE PROFILES ── -->
+  <div id="panel-merge-profiles" class="panel">
+    <div class="page-title">Merge Profiles</div>
+    <div class="page-subtitle">Fix duplicate client accounts — move all scans to the correct profile, then remove the duplicate</div>
+
+    <div class="card" style="max-width:560px;margin-bottom:20px;">
+      <div class="card-title">Step 1 — Find the Duplicate</div>
+      <div style="font-size:13px;color:var(--muted2);margin-bottom:12px;">Search by name to find two profiles for the same person.</div>
+      <input type="text" id="merge-search" placeholder="e.g. Nisal Rajapake" oninput="searchMergeProfiles()"
+        style="width:100%;background:var(--surface2);border:1px solid var(--border2);border-radius:8px;padding:10px 14px;color:var(--text);font-family:'Outfit',sans-serif;font-size:14px;outline:none;margin-bottom:12px;">
+      <div id="merge-search-results" style="display:flex;flex-direction:column;gap:8px;"></div>
+    </div>
+
+    <div id="merge-step2" style="display:none;max-width:560px;">
+      <div class="card" style="margin-bottom:16px;">
+        <div class="card-title">Step 2 — Choose Which to Keep</div>
+        <div style="font-size:13px;color:var(--muted2);margin-bottom:16px;line-height:1.6;">
+          The <strong style="color:var(--green)">primary</strong> account is kept. All scans from the <strong style="color:var(--red)">duplicate</strong> are moved to it, then the duplicate is deactivated.
+        </div>
+        <div style="display:grid;grid-template-columns:1fr 1fr;gap:14px;margin-bottom:16px;" id="merge-cards"></div>
+        <div style="font-size:12px;color:var(--muted2);padding:10px 12px;background:rgba(255,85,85,0.06);border:1px solid rgba(255,85,85,0.2);border-radius:8px;margin-bottom:14px;" id="merge-warning"></div>
+        <button class="btn btn-blue" id="merge-confirm-btn" onclick="confirmMerge()" disabled style="width:100%;opacity:0.4;">Select primary &amp; duplicate above first</button>
+        <div id="merge-status" style="font-size:13px;text-align:center;margin-top:10px;"></div>
+      </div>
+    </div>
+  </div>
 
   <!-- ── BULK IMPORT ── -->
   <div id="panel-bulk-import" class="panel">
@@ -2725,6 +2753,121 @@ async function activateGhost(id, firstName, lastName) {
     statusEl.textContent = '✗ ' + err.message;
     statusEl.style.color = 'var(--red)';
     emailEl.disabled = false;
+  }
+}
+
+// ── MERGE PROFILES ─────────────────────────────────────────────────────────
+let mergeSelected = { primary: null, duplicate: null };
+
+async function searchMergeProfiles() {
+  const q = document.getElementById('merge-search').value.trim();
+  const el = document.getElementById('merge-search-results');
+  document.getElementById('merge-step2').style.display = 'none';
+  mergeSelected = { primary: null, duplicate: null };
+  if (q.length < 2) { el.innerHTML = ''; return; }
+
+  const { data } = await sb.from('profiles')
+    .select('id,full_name,email,member_level,created_at')
+    .or('is_staff.is.null,is_staff.eq.false')
+    .ilike('full_name', `%${q}%`)
+    .limit(10);
+
+  if (!data?.length) { el.innerHTML = '<div style="font-size:13px;color:var(--muted2);">No profiles found.</div>'; return; }
+
+  // For each profile fetch their scan count
+  const ids = data.map(p => p.id);
+  const { data: dexaRows } = await sb.from('dexa_scans').select('client_id').in('client_id', ids);
+  const scanCount = {};
+  (dexaRows || []).forEach(r => { scanCount[r.client_id] = (scanCount[r.client_id] || 0) + 1; });
+
+  el.innerHTML = data.map(p => `
+    <div style="display:flex;align-items:center;justify-content:space-between;padding:10px 12px;background:var(--surface2);border:1px solid var(--border2);border-radius:8px;">
+      <div>
+        <div style="font-weight:600;font-size:13px;">${p.full_name}</div>
+        <div style="font-size:11px;color:var(--muted2);">${p.email || '<span style="color:var(--orange)">No email — ghost profile</span>'} · ${scanCount[p.id]||0} scans · ${p.member_level||'Bronze'}</div>
+      </div>
+      <div style="display:flex;gap:6px;flex-shrink:0;">
+        <button onclick="selectMergeProfile('primary','${p.id}','${(p.full_name||'').replace(/'/g,"\\'")}','${p.email||''}',${scanCount[p.id]||0})"
+          style="padding:5px 10px;font-size:11px;background:rgba(57,224,122,0.1);border:1px solid rgba(57,224,122,0.3);border-radius:5px;color:var(--green);cursor:pointer;font-family:'Outfit',sans-serif;font-weight:600;"
+          onmouseover="this.style.background='rgba(57,224,122,0.2)'" onmouseout="this.style.background='rgba(57,224,122,0.1)'">✓ Keep</button>
+        <button onclick="selectMergeProfile('duplicate','${p.id}','${(p.full_name||'').replace(/'/g,"\\'")}','${p.email||''}',${scanCount[p.id]||0})"
+          style="padding:5px 10px;font-size:11px;background:rgba(255,85,85,0.1);border:1px solid rgba(255,85,85,0.3);border-radius:5px;color:var(--red);cursor:pointer;font-family:'Outfit',sans-serif;font-weight:600;"
+          onmouseover="this.style.background='rgba(255,85,85,0.2)'" onmouseout="this.style.background='rgba(255,85,85,0.1)'">✕ Remove</button>
+      </div>
+    </div>`).join('');
+}
+
+function selectMergeProfile(role, id, name, email, scans) {
+  mergeSelected[role] = { id, name, email, scans };
+  renderMergeStep2();
+}
+
+function renderMergeStep2() {
+  const { primary, duplicate } = mergeSelected;
+  document.getElementById('merge-step2').style.display = 'block';
+  const card = (p, label, color, border) => p ? `
+    <div style="background:var(--surface2);border:1px solid ${border};border-radius:10px;padding:14px;">
+      <div style="font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:0.8px;color:${color};margin-bottom:8px;">${label}</div>
+      <div style="font-weight:600;font-size:14px;margin-bottom:4px;">${p.name}</div>
+      <div style="font-size:11px;color:var(--muted2);">${p.email || 'No email'}</div>
+      <div style="font-size:11px;color:var(--muted2);">${p.scans} scan${p.scans!==1?'s':''}</div>
+    </div>` : `<div style="background:var(--surface2);border:1px dashed var(--border2);border-radius:10px;padding:14px;display:flex;align-items:center;justify-content:center;color:var(--muted);font-size:12px;">Not selected</div>`;
+
+  document.getElementById('merge-cards').innerHTML =
+    card(primary, '✓ Keep (Primary)', 'var(--green)', 'rgba(57,224,122,0.3)') +
+    card(duplicate, '✕ Remove (Duplicate)', 'var(--red)', 'rgba(255,85,85,0.3)');
+
+  const btn = document.getElementById('merge-confirm-btn');
+  const warn = document.getElementById('merge-warning');
+  if (primary && duplicate) {
+    if (primary.id === duplicate.id) {
+      warn.innerHTML = '⚠️ You selected the same profile for both — choose two different profiles.';
+      btn.disabled = true; btn.style.opacity = '0.4'; btn.textContent = 'Select two different profiles';
+    } else {
+      warn.innerHTML = `${duplicate.scans} scan${duplicate.scans!==1?'s':''} will move from <strong style="color:var(--red)">${duplicate.name}</strong> to <strong style="color:var(--green)">${primary.name}</strong>. The duplicate profile will be deactivated (email cleared). <strong>This cannot be undone.</strong>`;
+      btn.disabled = false; btn.style.opacity = '1'; btn.textContent = `Merge — Keep "${primary.name}"`;
+    }
+  } else {
+    warn.innerHTML = '';
+    btn.disabled = true; btn.style.opacity = '0.4'; btn.textContent = 'Select primary & duplicate above first';
+  }
+  document.getElementById('merge-status').textContent = '';
+}
+
+async function confirmMerge() {
+  const { primary, duplicate } = mergeSelected;
+  if (!primary || !duplicate || primary.id === duplicate.id) return;
+  if (!confirm(`Move all scans from "${duplicate.name}" → "${primary.name}", then deactivate the duplicate?\n\nThis cannot be undone.`)) return;
+
+  const btn = document.getElementById('merge-confirm-btn');
+  const statusEl = document.getElementById('merge-status');
+  btn.disabled = true; btn.textContent = 'Merging…';
+  statusEl.style.color = 'var(--muted2)'; statusEl.textContent = 'Moving scans…';
+
+  try {
+    // Move all scans from duplicate → primary
+    const tables = ['dexa_scans', 'rmr_tests', 'blood_panels', 'hormone_panels', 'check_ins'];
+    for (const table of tables) {
+      const { error } = await sb.from(table).update({ client_id: primary.id }).eq('client_id', duplicate.id);
+      if (error && !error.message.includes('does not exist')) throw new Error(`${table}: ${error.message}`);
+    }
+
+    // Deactivate duplicate — clear email so they can't sign in, mark with note
+    const { error: profErr } = await sb.from('profiles').update({
+      email: null,
+      full_name: `[MERGED] ${duplicate.name}`,
+    }).eq('id', duplicate.id);
+    if (profErr) throw new Error('Profile update: ' + profErr.message);
+
+    statusEl.style.color = 'var(--green)';
+    statusEl.textContent = `✅ Done — ${duplicate.scans} scan${duplicate.scans!==1?'s':''} moved to ${primary.name}. Duplicate deactivated.`;
+    btn.textContent = 'Merge Complete';
+    mergeSelected = { primary: null, duplicate: null };
+    await loadClients(); // refresh client list cache
+  } catch (err) {
+    statusEl.style.color = 'var(--red)';
+    statusEl.textContent = '✗ Error: ' + err.message;
+    btn.disabled = false; btn.textContent = 'Retry Merge';
   }
 }
 

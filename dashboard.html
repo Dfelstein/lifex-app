@@ -1346,6 +1346,59 @@ function renderBone() {
       ${scan2.z_score!=null?`<div class="stat-tile teal"><div class="tile-label">Z-Score</div><div class="tile-value">${scan2.z_score>=0?'+':''}${scan2.z_score}</div><div class="tile-delta ${scan2.z_score>=0?'good':'neutral'}">${scan2.z_score>=0?'Above':'Below'} age-matched mean</div></div>`:''}
       ${scan2.pr_pct!=null?`<div class="stat-tile gold"><div class="tile-label">PR %</div><div class="tile-value">${scan2.pr_pct}<span class="tile-unit">%</span></div><div class="tile-delta good">% of young adult ref</div></div>`:''}
     </div>
+    ${scan2.t_score != null ? (() => {
+      const t = scan2.t_score;
+      const z = scan2.z_score;
+      // T-score range chart — spans -4 to +2
+      const tMin = -4, tMax = 2, tRange = tMax - tMin;
+      const tPct = v => Math.max(0, Math.min(100, ((v - tMin) / tRange) * 100)).toFixed(1);
+      const tColor = t >= -1 ? 'var(--green)' : t >= -2.5 ? 'var(--orange)' : 'var(--red)';
+      const zColor = z != null ? (z >= 0 ? 'var(--blue)' : 'var(--purple)') : null;
+      return `<div class="card mb20">
+        <div class="card-title">T-Score Reference Chart — Where You Sit</div>
+        <div style="margin-bottom:16px;">
+          <!-- Zone bar -->
+          <div style="position:relative;height:32px;border-radius:6px;overflow:hidden;display:flex;margin-bottom:6px;">
+            <div style="flex:3;background:rgba(255,85,85,0.25);display:flex;align-items:center;justify-content:center;font-size:9px;font-weight:700;color:var(--red);letter-spacing:0.5px;text-transform:uppercase;">Osteoporosis</div>
+            <div style="flex:1.5;background:rgba(255,159,67,0.25);display:flex;align-items:center;justify-content:center;font-size:9px;font-weight:700;color:var(--orange);letter-spacing:0.5px;text-transform:uppercase;">Osteopenia</div>
+            <div style="flex:3;background:rgba(57,224,122,0.18);display:flex;align-items:center;justify-content:center;font-size:9px;font-weight:700;color:var(--green);letter-spacing:0.5px;text-transform:uppercase;">Normal</div>
+          </div>
+          <!-- Scale bar with markers -->
+          <div style="position:relative;height:10px;background:var(--surface3);border-radius:5px;margin-bottom:20px;">
+            <!-- Zone dividers -->
+            <div style="position:absolute;left:${tPct(-2.5)}%;top:0;bottom:0;width:2px;background:rgba(255,159,67,0.5);"></div>
+            <div style="position:absolute;left:${tPct(-1)}%;top:0;bottom:0;width:2px;background:rgba(57,224,122,0.5);"></div>
+            <!-- T-score dot -->
+            <div style="position:absolute;left:${tPct(t)}%;top:50%;transform:translate(-50%,-50%);width:18px;height:18px;border-radius:50%;background:${tColor};border:2px solid #08090b;box-shadow:0 0 8px ${tColor};z-index:2;"></div>
+            ${z != null ? `<div style="position:absolute;left:${tPct(t + z - t)}%;top:50%;transform:translate(-50%,-50%);" title="Z-score"></div>` : ''}
+          </div>
+          <!-- Axis labels -->
+          <div style="position:relative;height:16px;margin-bottom:4px;">
+            ${[-4,-3,-2.5,-2,-1,0,1,2].map(v => `
+              <div style="position:absolute;left:${tPct(v)}%;transform:translateX(-50%);font-size:9px;color:var(--muted2);">${v}</div>
+            `).join('')}
+          </div>
+          <!-- Legend -->
+          <div style="display:flex;gap:16px;flex-wrap:wrap;margin-top:8px;">
+            <div style="display:flex;align-items:center;gap:6px;font-size:11px;color:var(--muted2);">
+              <div style="width:14px;height:14px;border-radius:50%;background:${tColor};flex-shrink:0;"></div>
+              Your T-score: <strong style="color:${tColor};">${t}</strong>
+            </div>
+            ${z != null ? `<div style="display:flex;align-items:center;gap:6px;font-size:11px;color:var(--muted2);">
+              <div style="width:14px;height:14px;border-radius:50%;background:${zColor};flex-shrink:0;border:2px dashed rgba(255,255,255,0.3);"></div>
+              Z-score (age-matched): <strong style="color:${zColor};">${z >= 0 ? '+' : ''}${z}</strong>
+            </div>` : ''}
+          </div>
+        </div>
+        <div style="font-size:12px;color:var(--muted2);line-height:1.6;padding:10px 12px;background:var(--surface2);border-radius:8px;">
+          <strong style="color:var(--text);">T-score</strong> compares your bone density to a healthy 30-year-old.
+          ${z != null ? `<strong style="color:var(--text);"> Z-score</strong> compares to others your age and sex — a negative Z-score means lower than expected even for your age.` : ''}
+          ${t >= -1 ? '<strong style="color:var(--green);"> Normal range</strong> — maintain with regular weight-bearing exercise and calcium.'
+            : t >= -2.5 ? '<strong style="color:var(--orange);"> Osteopenia</strong> — below normal. Prioritise resistance training, D3+K2, calcium.'
+            : '<strong style="color:var(--red);"> Osteoporosis range</strong> — discuss treatment options with your doctor alongside load-bearing exercise.'}
+        </div>
+      </div>`;
+    })() : ''}
     <div class="card"><div class="card-title">Bone Health</div><div class="insight-list">
       ${bmdDiff !== null && parseFloat(bmdDiff) > 0 ? `<div class="insight-item"><span class="icon">✅</span><span><strong>BMD improved +${bmdDiff}%</strong> between scans.</span></div>` : ''}
       ${scan2.t_score!=null?(()=>{const t=scan2.t_score;return`<div class="insight-item"><span class="icon">${t>=-1?'✅':t>=-2.5?'⚠️':'🚨'}</span><span>T-score <strong>${t}</strong> — ${t>=-1?'Normal bone density. Maintain heavy compound lifts to preserve it.':t>=-2.5?'Osteopenia detected. Prioritise weight-bearing exercise, calcium, D3 + K2.':'Osteoporosis range. Discuss treatment with your doctor alongside load-bearing exercise and supplements.'}</span></div>`})():''}
