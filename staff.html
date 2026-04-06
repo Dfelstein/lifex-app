@@ -14,7 +14,6 @@
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css"/>
 <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
-<script src="https://unpkg.com/leaflet.heat/dist/leaflet-heat.js"></script>
 <style>
 :root {
   --bg: #08090b; --surface: #0f1114; --surface2: #161a1f; --surface3: #1c2128;
@@ -3793,12 +3792,16 @@ async function loadAnalytics() {
 
 let anLeafletMap = null;
 
-// Colour gradient: low = teal, mid = gold, high = orange-red
+// Pre-baked Australian suburb coordinates — instant lookup, no API call needed
+const AUS_SUBURBS = {"castle hill||nsw":{lat:-33.7322,lng:151.0043},"baulkham hills||nsw":{lat:-33.7593,lng:150.9869},"kellyville||nsw":{lat:-33.7216,lng:150.9612},"rouse hill||nsw":{lat:-33.6883,lng:150.9163},"norwest||nsw":{lat:-33.7293,lng:150.9699},"bella vista||nsw":{lat:-33.7352,lng:150.9535},"winston hills||nsw":{lat:-33.7772,lng:150.9756},"seven hills||nsw":{lat:-33.7746,lng:150.9381},"blacktown||nsw":{lat:-33.7718,lng:150.9057},"penrith||nsw":{lat:-33.7512,lng:150.6942},"parramatta||nsw":{lat:-33.8148,lng:151.0017},"westmead||nsw":{lat:-33.8037,lng:150.9878},"pennant hills||nsw":{lat:-33.7359,lng:151.0706},"cherrybrook||nsw":{lat:-33.7291,lng:151.0467},"carlingford||nsw":{lat:-33.7779,lng:151.0477},"beecroft||nsw":{lat:-33.7495,lng:151.0618},"epping||nsw":{lat:-33.7721,lng:151.0814},"hornsby||nsw":{lat:-33.7022,lng:151.0997},"wahroonga||nsw":{lat:-33.7178,lng:151.1192},"pymble||nsw":{lat:-33.7452,lng:151.1407},"gordon||nsw":{lat:-33.7568,lng:151.1499},"st ives||nsw":{lat:-33.7375,lng:151.1682},"chatswood||nsw":{lat:-33.7974,lng:151.1806},"lane cove||nsw":{lat:-33.8152,lng:151.1687},"north sydney||nsw":{lat:-33.8404,lng:151.2073},"sydney||nsw":{lat:-33.8688,lng:151.2093},"manly||nsw":{lat:-33.7969,lng:151.2864},"dee why||nsw":{lat:-33.7494,lng:151.2848},"brookvale||nsw":{lat:-33.7708,lng:151.2698},"mosman||nsw":{lat:-33.8269,lng:151.2437},"bondi||nsw":{lat:-33.8915,lng:151.2767},"bondi junction||nsw":{lat:-33.8931,lng:151.2527},"surry hills||nsw":{lat:-33.8872,lng:151.2104},"newtown||nsw":{lat:-33.8977,lng:151.1795},"glebe||nsw":{lat:-33.8796,lng:151.1861},"leichhardt||nsw":{lat:-33.8833,lng:151.1574},"burwood||nsw":{lat:-33.8773,lng:151.1033},"strathfield||nsw":{lat:-33.8743,lng:151.0813},"merrylands||nsw":{lat:-33.8355,lng:150.9911},"liverpool||nsw":{lat:-33.9200,lng:150.9236},"campbelltown||nsw":{lat:-34.0667,lng:150.8144},"sutherland||nsw":{lat:-34.0324,lng:151.0569},"cronulla||nsw":{lat:-34.0548,lng:151.1527},"miranda||nsw":{lat:-34.0281,lng:151.1027},"kogarah||nsw":{lat:-33.9653,lng:151.1341},"hurstville||nsw":{lat:-33.9665,lng:151.1014},"bankstown||nsw":{lat:-33.9174,lng:151.0333},"fairfield||nsw":{lat:-33.8714,lng:150.9586},"cabramatta||nsw":{lat:-33.8935,lng:150.9413},"richmond||nsw":{lat:-33.5998,lng:150.7529},"windsor||nsw":{lat:-33.6134,lng:150.8126},"quakers hill||nsw":{lat:-33.7326,lng:150.8805},"stanhope gardens||nsw":{lat:-33.7160,lng:150.9207},"glenwood||nsw":{lat:-33.7282,lng:150.9286},"beaumont hills||nsw":{lat:-33.6992,lng:150.9443},"box hill||nsw":{lat:-33.6613,lng:150.9286},"schofields||nsw":{lat:-33.6924,lng:150.8804},"marsden park||nsw":{lat:-33.6957,lng:150.8466},"agnes banks||nsw":{lat:-33.5953,lng:150.7785},"cobbitty||nsw":{lat:-34.0218,lng:150.7108},"narellan||nsw":{lat:-34.0443,lng:150.7378},"camden||nsw":{lat:-34.0572,lng:150.6973},"wollongong||nsw":{lat:-34.4278,lng:150.8931},"newcastle||nsw":{lat:-32.9283,lng:151.7817},"maitland||nsw":{lat:-32.7333,lng:151.5500},"gosford||nsw":{lat:-33.4280,lng:151.3411},"wyong||nsw":{lat:-33.2833,lng:151.4167},"charlestown||nsw":{lat:-33.0192,lng:151.6917},"tuggerah||nsw":{lat:-33.2994,lng:151.3847},"central coast||nsw":{lat:-33.3300,lng:151.3600},"coffs harbour||nsw":{lat:-30.2963,lng:153.1135},"port macquarie||nsw":{lat:-31.4333,lng:152.9000},"tamworth||nsw":{lat:-31.0833,lng:150.9167},"orange||nsw":{lat:-33.2833,lng:149.1000},"dubbo||nsw":{lat:-32.2569,lng:148.6011},"albury||nsw":{lat:-36.0806,lng:146.9158},"wagga wagga||nsw":{lat:-35.1081,lng:147.3686},"melbourne||vic":{lat:-37.8136,lng:144.9631},"richmond||vic":{lat:-37.8183,lng:145.0019},"south yarra||vic":{lat:-37.8388,lng:144.9946},"fitzroy||vic":{lat:-37.8013,lng:144.9798},"carlton||vic":{lat:-37.8001,lng:144.9665},"st kilda||vic":{lat:-37.8676,lng:144.9820},"prahran||vic":{lat:-37.8510,lng:144.9971},"hawthorn||vic":{lat:-37.8217,lng:145.0280},"balwyn||vic":{lat:-37.8125,lng:145.0779},"box hill||vic":{lat:-37.8196,lng:145.1212},"ringwood||vic":{lat:-37.8157,lng:145.2282},"dandenong||vic":{lat:-37.9891,lng:145.2150},"frankston||vic":{lat:-38.1447,lng:145.1313},"geelong||vic":{lat:-38.1499,lng:144.3617},"ballarat||vic":{lat:-37.5622,lng:143.8503},"bendigo||vic":{lat:-36.7570,lng:144.2794},"brisbane||qld":{lat:-27.4698,lng:153.0251},"gold coast||qld":{lat:-28.0167,lng:153.4000},"sunshine coast||qld":{lat:-26.6500,lng:153.0667},"cairns||qld":{lat:-16.9186,lng:145.7781},"townsville||qld":{lat:-19.2589,lng:146.8169},"toowoomba||qld":{lat:-27.5598,lng:151.9507},"ipswich||qld":{lat:-27.6167,lng:152.7667},"springwood||qld":{lat:-27.6166,lng:153.1120},"chermside||qld":{lat:-27.3864,lng:153.0283},"perth||wa":{lat:-31.9505,lng:115.8605},"fremantle||wa":{lat:-32.0569,lng:115.7439},"joondalup||wa":{lat:-31.7436,lng:115.7660},"mandurah||wa":{lat:-32.5275,lng:115.7228},"rockingham||wa":{lat:-32.2803,lng:115.7292},"subiaco||wa":{lat:-31.9471,lng:115.8267},"adelaide||sa":{lat:-34.9285,lng:138.6007},"glenelg||sa":{lat:-34.9818,lng:138.5150},"norwood||sa":{lat:-34.9228,lng:138.6268},"unley||sa":{lat:-34.9500,lng:138.5975},"darwin||nt":{lat:-12.4634,lng:130.8456},"canberra||act":{lat:-35.2809,lng:149.1300},"belconnen||act":{lat:-35.2370,lng:149.0786},"tuggeranong||act":{lat:-35.4183,lng:149.0671},"hobart||tas":{lat:-42.8821,lng:147.3272},"launceston||tas":{lat:-41.4332,lng:147.1441}};
+
+// Colour scale: cool blue (few) → gold → orange-red (many)
 function countToColor(count, max) {
   const t = max > 1 ? count / max : 1;
-  if (t < 0.33)      return { fill: '#2dd4bf', border: '#22b3a0' }; // teal
-  else if (t < 0.66) return { fill: '#f5c842', border: '#d4a820' }; // gold
-  else               return { fill: '#ff7043', border: '#e05a30' }; // orange-red
+  if (t < 0.25)      return { fill: '#4da6ff', border: '#3a8fd9', opacity: 0.55 }; // blue
+  else if (t < 0.50) return { fill: '#2dd4bf', border: '#22b3a0', opacity: 0.65 }; // teal
+  else if (t < 0.75) return { fill: '#f5c842', border: '#d4a820', opacity: 0.75 }; // gold
+  else               return { fill: '#ff7043', border: '#e05a30', opacity: 0.90 }; // orange-red
 }
 
 async function renderSuburbMap(suburbs) {
@@ -3806,7 +3809,7 @@ async function renderSuburbMap(suburbs) {
   if (!mapEl) return;
   if (anLeafletMap) { anLeafletMap.remove(); anLeafletMap = null; }
 
-  anLeafletMap = L.map('an-map', { zoomControl: true }).setView([-27, 133], 4);
+  anLeafletMap = L.map('an-map', { zoomControl: true }).setView([-33.73, 151.0], 10);
   L.tileLayer('https://{s}.basemaps.cartocdn.com/dark_matter/{z}/{x}/{y}{r}.png', {
     attribution: '© OpenStreetMap © CARTO',
     subdomains: 'abcd', maxZoom: 18,
@@ -3816,52 +3819,54 @@ async function renderSuburbMap(suburbs) {
 
   const maxCount = suburbs[0].count;
   const allBounds = [];
-  const allHeatPoints = [];
 
-  const GEO_CACHE_KEY = 'lifex_geocache_v1';
+  const GEO_CACHE_KEY = 'lifex_geocache_v2';
   let geoCache = {};
   try { geoCache = JSON.parse(localStorage.getItem(GEO_CACHE_KEY) || '{}'); } catch {}
 
   const addToMap = (lat, lng, suburb, state, count) => {
     allBounds.push([lat, lng]);
-    allHeatPoints.push([lat, lng, count / maxCount]);
-    const { fill, border } = countToColor(count, maxCount);
-    const radius = 10 + Math.round((count / maxCount) * 22);
+    const { fill, border, opacity } = countToColor(count, maxCount);
+    // Scale radius: 8px base, up to 36px for most popular
+    const radius = 8 + Math.round((count / maxCount) * 28);
     const circle = L.circleMarker([lat, lng], {
-      radius, fillColor: fill, color: border, weight: 2, opacity: 1, fillOpacity: 0.75,
+      radius, fillColor: fill, color: border, weight: 2, opacity: 1, fillOpacity: opacity,
     }).addTo(anLeafletMap);
-    if (count === maxCount || count >= Math.ceil(maxCount * 0.5)) {
+    // Always show label for top-25%, always show count
+    if (count / maxCount >= 0.25) {
       L.marker([lat, lng], {
         icon: L.divIcon({
           className: '',
-          html: `<div style="background:rgba(0,0,0,0.75);color:#fff;font-size:10px;font-weight:600;padding:2px 5px;border-radius:3px;white-space:nowrap;pointer-events:none;">${suburb}</div>`,
-          iconAnchor: [0, -radius - 4],
+          html: `<div style="background:rgba(0,0,0,0.8);color:#fff;font-size:10px;font-weight:700;padding:2px 6px;border-radius:4px;white-space:nowrap;pointer-events:none;margin-top:${-radius-20}px;">${suburb} · ${count}</div>`,
+          iconSize: [0, 0],
         }),
         interactive: false,
       }).addTo(anLeafletMap);
     }
-    circle.bindTooltip(`<b>${suburb}</b>${state ? ', '+state : ''}<br><span style="color:#f5c842;font-weight:600;">${count} lead${count !== 1 ? 's' : ''}</span>`, {
+    circle.bindTooltip(`<b>${suburb}</b>${state ? ', '+state : ''}<br><span style="color:#f5c842;font-weight:700;">${count} client${count !== 1 ? 's' : ''}</span>`, {
       permanent: false, direction: 'top', offset: [0, -radius],
     });
   };
 
-  // Render cached suburbs immediately so the map appears straight away
+  // Phase 1: instant — check pre-baked table and localStorage cache
   const uncached = [];
   for (const { suburb, state, count } of suburbs) {
     const cacheKey = `${suburb}||${state}`.toLowerCase();
-    if (geoCache[cacheKey]) {
-      const { lat, lng } = geoCache[cacheKey];
-      addToMap(lat, lng, suburb, state, count);
+    const baked = AUS_SUBURBS[cacheKey];
+    if (baked) {
+      addToMap(baked.lat, baked.lng, suburb, state, count);
+    } else if (geoCache[cacheKey]) {
+      addToMap(geoCache[cacheKey].lat, geoCache[cacheKey].lng, suburb, state, count);
     } else {
       uncached.push({ suburb, state, count });
     }
   }
 
-  // Fit bounds to cached results right away
-  if (allBounds.length > 1) anLeafletMap.fitBounds(allBounds, { padding: [60, 60] });
+  // Fit map to all known points immediately
+  if (allBounds.length > 1) anLeafletMap.fitBounds(allBounds, { padding: [50, 50] });
   else if (allBounds.length === 1) anLeafletMap.setView(allBounds[0], 12);
 
-  // Geocode uncached suburbs in the background — 1 per second, Nominatim rate limit
+  // Phase 2: background geocode only truly unknown suburbs — 1/sec Nominatim limit
   if (uncached.length) {
     (async () => {
       for (const { suburb, state, count } of uncached) {
@@ -3873,33 +3878,18 @@ async function renderSuburbMap(suburbs) {
             { headers: { 'Accept-Language': 'en' } }
           );
           const data = await res.json();
-          if (!data.length) { await new Promise(r => setTimeout(r, 1100)); continue; }
-          const lat = parseFloat(data[0].lat);
-          const lng = parseFloat(data[0].lon);
-          geoCache[cacheKey] = { lat, lng };
-          try { localStorage.setItem(GEO_CACHE_KEY, JSON.stringify(geoCache)); } catch {}
-          addToMap(lat, lng, suburb, state, count);
-          // Refit only if map is still visible
-          if (allBounds.length > 1 && anLeafletMap) anLeafletMap.fitBounds(allBounds, { padding: [60, 60] });
+          if (data.length) {
+            const lat = parseFloat(data[0].lat);
+            const lng = parseFloat(data[0].lon);
+            geoCache[cacheKey] = { lat, lng };
+            try { localStorage.setItem(GEO_CACHE_KEY, JSON.stringify(geoCache)); } catch {}
+            addToMap(lat, lng, suburb, state, count);
+            if (allBounds.length > 1 && anLeafletMap) anLeafletMap.fitBounds(allBounds, { padding: [50, 50] });
+          }
         } catch { /* skip */ }
         await new Promise(r => setTimeout(r, 1100));
       }
-      // Add/refresh heatmap once all geocoding is done
-      if (allHeatPoints.length && typeof L.heatLayer !== 'undefined' && anLeafletMap) {
-        L.heatLayer(allHeatPoints, {
-          radius: 35, blur: 25, maxZoom: 14,
-          gradient: { 0.2: '#2dd4bf', 0.5: '#f5c842', 1.0: '#ff7043' },
-        }).addTo(anLeafletMap);
-      }
     })();
-  } else {
-    // All cached — add heatmap immediately
-    if (allHeatPoints.length && typeof L.heatLayer !== 'undefined') {
-      L.heatLayer(allHeatPoints, {
-        radius: 35, blur: 25, maxZoom: 14,
-        gradient: { 0.2: '#2dd4bf', 0.5: '#f5c842', 1.0: '#ff7043' },
-      }).addTo(anLeafletMap);
-    }
   }
 
   // Legend
@@ -3907,10 +3897,11 @@ async function renderSuburbMap(suburbs) {
   legend.onAdd = () => {
     const div = L.DomUtil.create('div');
     div.innerHTML = `<div style="background:rgba(15,17,20,0.9);border:1px solid rgba(255,255,255,0.1);border-radius:8px;padding:10px 14px;font-size:11px;color:#eef0f3;">
-      <div style="font-weight:600;margin-bottom:6px;letter-spacing:0.5px;">LEADS</div>
-      <div style="display:flex;align-items:center;gap:6px;margin-bottom:4px;"><div style="width:12px;height:12px;border-radius:50%;background:#ff7043;"></div> Highest</div>
-      <div style="display:flex;align-items:center;gap:6px;margin-bottom:4px;"><div style="width:12px;height:12px;border-radius:50%;background:#f5c842;"></div> Medium</div>
-      <div style="display:flex;align-items:center;gap:6px;"><div style="width:12px;height:12px;border-radius:50%;background:#2dd4bf;"></div> Lowest</div>
+      <div style="font-weight:600;margin-bottom:6px;letter-spacing:0.5px;">CLIENTS</div>
+      <div style="display:flex;align-items:center;gap:6px;margin-bottom:4px;"><div style="width:12px;height:12px;border-radius:50%;background:#ff7043;"></div> Most (75–100%)</div>
+      <div style="display:flex;align-items:center;gap:6px;margin-bottom:4px;"><div style="width:12px;height:12px;border-radius:50%;background:#f5c842;"></div> High (50–75%)</div>
+      <div style="display:flex;align-items:center;gap:6px;margin-bottom:4px;"><div style="width:12px;height:12px;border-radius:50%;background:#2dd4bf;"></div> Medium (25–50%)</div>
+      <div style="display:flex;align-items:center;gap:6px;"><div style="width:12px;height:12px;border-radius:50%;background:#4da6ff;"></div> Few (0–25%)</div>
     </div>`;
     return div;
   };

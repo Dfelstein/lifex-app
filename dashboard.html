@@ -12,6 +12,7 @@
 <link rel="apple-touch-icon" href="icons/icon-192.png">
 <link href="https://fonts.googleapis.com/css2?family=Bebas+Neue&family=Outfit:wght@300;400;500;600;700&display=swap" rel="stylesheet">
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+<script src="https://cdn.jsdelivr.net/npm/three@0.160.0/build/three.min.js"></script>
 <style>
 :root {
   --bg: #08090b; --surface: #0f1114; --surface2: #161a1f; --surface3: #1c2128;
@@ -297,6 +298,13 @@ body { background: var(--bg); color: var(--text); font-family: 'Outfit', sans-se
 .checkin-delta-good { font-size:11px;color:var(--green); }
 .checkin-delta-bad  { font-size:11px;color:var(--red); }
 .checkin-delta-neut { font-size:11px;color:var(--muted2); }
+/* BODY MAP — full-height screen override */
+#screen-body-map.active { display:flex !important; }
+@media(max-width:640px){
+  #bm-layout { flex-direction:column !important; }
+  #body-map-canvas { min-height:55vw !important; }
+  #body-map-panel { width:100% !important; border-left:none !important; border-top:1px solid var(--border); max-height:220px; }
+}
 </style>
 </head>
 <body>
@@ -349,6 +357,7 @@ body { background: var(--bg); color: var(--text); font-family: 'Outfit', sans-se
     <div class="nav-group">
       <div class="nav-group-label">DEXA Body Scan</div>
       <div class="nav-item" data-screen="body-comp"><span class="nav-icon">🫀</span> Body Composition</div>
+      <div class="nav-item" data-screen="body-map"><span class="nav-icon">🧬</span> 3D Body Map</div>
       <div class="nav-item" data-screen="bone"><span class="nav-icon">🦴</span> Bone Density</div>
       <div class="nav-item" data-screen="before-after"><span class="nav-icon">📈</span> Before vs After</div>
     </div>
@@ -415,6 +424,38 @@ body { background: var(--bg); color: var(--text); font-family: 'Outfit', sans-se
       <div class="page-subtitle">DEXA scan — regional breakdown</div>
     </div>
     <div id="body-comp-content"></div>
+  </div>
+
+  <!-- 3D BODY MAP -->
+  <div id="screen-body-map" class="screen" style="padding:0;overflow:hidden;height:100vh;display:none;flex-direction:column;">
+    <!-- Top bar -->
+    <div style="padding:16px 20px 10px;background:var(--surface);border-bottom:1px solid var(--border);flex-shrink:0;display:flex;align-items:center;justify-content:space-between;">
+      <div>
+        <div class="page-title" style="font-size:24px;margin-bottom:2px;">3D Body Map</div>
+        <div class="page-subtitle" id="bm-subtitle">Colour = body fat % from your latest DEXA scan · Drag to rotate · Tap a region</div>
+      </div>
+      <div id="bm-legend" style="display:flex;gap:8px;align-items:center;flex-wrap:wrap;justify-content:flex-end;"></div>
+    </div>
+    <!-- Main area: canvas + info panel side by side on desktop, stacked on mobile -->
+    <div style="flex:1;display:flex;min-height:0;overflow:hidden;" id="bm-layout">
+      <div id="body-map-canvas" style="flex:1;min-height:0;position:relative;cursor:grab;"></div>
+      <div id="body-map-panel" style="width:260px;flex-shrink:0;background:var(--surface);border-left:1px solid var(--border);padding:20px;overflow-y:auto;display:flex;flex-direction:column;gap:0;">
+        <div style="font-size:11px;font-weight:600;text-transform:uppercase;letter-spacing:1px;color:var(--muted2);margin-bottom:12px;">Region Detail</div>
+        <div id="bm-region-content" style="flex:1;">
+          <div style="color:var(--muted2);font-size:13px;line-height:1.7;">Tap any body region to see its composition data from your DEXA scan.</div>
+        </div>
+        <div id="bm-colour-key" style="margin-top:16px;border-top:1px solid var(--border);padding-top:14px;">
+          <div style="font-size:10px;font-weight:600;text-transform:uppercase;letter-spacing:0.8px;color:var(--muted2);margin-bottom:8px;">Colour Key</div>
+          <div style="display:flex;flex-direction:column;gap:5px;font-size:12px;color:var(--muted2);">
+            <div style="display:flex;align-items:center;gap:8px;"><div style="width:12px;height:12px;border-radius:50%;background:#4da6ff;flex-shrink:0;"></div> Athletic (very lean)</div>
+            <div style="display:flex;align-items:center;gap:8px;"><div style="width:12px;height:12px;border-radius:50%;background:#39e07a;flex-shrink:0;"></div> Fit</div>
+            <div style="display:flex;align-items:center;gap:8px;"><div style="width:12px;height:12px;border-radius:50%;background:#f5c842;flex-shrink:0;"></div> Average</div>
+            <div style="display:flex;align-items:center;gap:8px;"><div style="width:12px;height:12px;border-radius:50%;background:#ff9f43;flex-shrink:0;"></div> Above Average</div>
+            <div style="display:flex;align-items:center;gap:8px;"><div style="width:12px;height:12px;border-radius:50%;background:#ff5555;flex-shrink:0;"></div> High Body Fat</div>
+          </div>
+        </div>
+      </div>
+    </div>
   </div>
 
   <!-- BONE DENSITY -->
@@ -729,6 +770,7 @@ function navigate(id) {
   const nav = document.querySelector(`[data-screen="${id}"]`);
   if (nav) nav.classList.add('active');
   history.replaceState(null, '', '#' + id);
+  if (id === 'body-map') setTimeout(initBodyMap, 60);
 }
 document.querySelectorAll('.nav-item').forEach(item => {
   item.addEventListener('click', () => {
@@ -1145,22 +1187,96 @@ function renderScore() {
     </div>
 
     <div class="card mb20">
-      <div class="card-title">Score Breakdown</div>
-      ${[
-        dexaScore  !== null ? { label:'DEXA Body Composition', score:dexaScore,  color:'var(--blue)',   driver:dexaDriver,  icon:'🫀' } : null,
-        bloodScore !== null ? { label:'Blood Panel',           score:bloodScore, color:'var(--green)',  driver:bloodDriver, icon:'🩸' } : null,
-        rmrScore   !== null ? { label:'Metabolic Rate (RMR)',  score:rmrScore,   color:'var(--orange)', driver:rmrDriver,   icon:'🔥' } : null,
-      ].filter(Boolean).map(c => `
-        <div style="margin-bottom:16px;">
-          <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:6px;">
-            <div style="font-size:13px;font-weight:600;">${c.icon} ${c.label}</div>
-            <div style="font-family:'Bebas Neue',sans-serif;font-size:22px;color:${c.color};letter-spacing:1px;">${c.score}<span style="font-family:'Outfit',sans-serif;font-size:12px;color:var(--muted2);">/100</span></div>
-          </div>
-          <div style="height:8px;background:var(--surface3);border-radius:4px;overflow:hidden;margin-bottom:5px;">
-            <div style="width:${c.score}%;height:100%;background:${c.color};border-radius:4px;transition:width 0.8s ease;"></div>
-          </div>
-          <div style="font-size:11px;color:var(--muted2);">${c.driver}</div>
-        </div>`).join('')}
+      <div class="card-title">Score Breakdown — How to Improve Each Pillar</div>
+      ${(() => {
+        const fem = (scan2?.sex || profile?.sex || '').toLowerCase() === 'female';
+        const pillars = [];
+
+        // ── DEXA pillar ──
+        if (dexaScore !== null && scan2) {
+          const fp = scan2.fat_pct;
+          const nextThresh = fem
+            ? (fp > 37 ? 37 : fp > 32 ? 32 : fp > 28 ? 28 : fp > 20 ? 20 : null)
+            : (fp > 27 ? 27 : fp > 22 ? 22 : fp > 17 ? 17 : fp > 12 ? 12 : null);
+          const nextScore = fem
+            ? (fp > 37 ? 58 : fp > 32 ? 74 : fp > 28 ? 85 : fp > 20 ? 95 : null)
+            : (fp > 27 ? 58 : fp > 22 ? 74 : fp > 17 ? 85 : fp > 12 ? 95 : null);
+          const toImprove = nextThresh != null
+            ? `Reduce body fat to <strong style="color:var(--blue)">${nextThresh}%</strong> to unlock <strong>${nextScore}/100</strong>`
+            : `<strong style="color:var(--green)">Elite — maintain this level</strong>`;
+          const deficitMonths = nextThresh != null && fp != null
+            ? Math.ceil((fp - nextThresh) / 0.5) + ' months at 0.5%/month'
+            : '';
+          pillars.push({ icon:'🫀', label:'DEXA Body Composition', score:dexaScore, color:'var(--blue)', driver:dexaDriver,
+            toImprove, deficitMonths,
+            steps:[
+              `<strong>300–500 kcal/day deficit</strong> — creates 0.5% fat loss per month without muscle loss`,
+              `<strong>Protein at 2g/kg bodyweight</strong> — the #1 lever to preserve lean mass while cutting`,
+              `<strong>Resistance training 3×/week</strong> — signals the body to hold muscle during a deficit`,
+              scan2.vat_area_cm2 >= 100 ? `<strong>Target VAT (${scan2.vat_area_cm2} cm²)</strong> — 150+ min cardio/week reduces visceral fat faster than scale weight suggests` : null,
+            ].filter(Boolean),
+          });
+        }
+
+        // ── Blood pillar ──
+        if (bloodScore !== null && blood.length) {
+          const outside = blood.filter(m => m.status==='high' || m.status==='low');
+          const suboptimal = blood.filter(m => m.status==='normal');
+          const needed = suboptimal.length > 0
+            ? `Move <strong style="color:var(--green)">${Math.min(3, suboptimal.length)} more markers to optimal</strong> to raise score`
+            : outside.length > 0
+            ? `<strong style="color:var(--orange)">${outside.length} markers outside range</strong> — address with your clinician`
+            : `<strong style="color:var(--green)">All markers optimal — excellent</strong>`;
+          const worstMarkers = outside.map(m => m.name).join(', ');
+          pillars.push({ icon:'🩸', label:'Blood Panel', score:bloodScore, color:'var(--green)', driver:bloodDriver,
+            toImprove: needed,
+            steps:[
+              outside.length ? `Review <strong>${worstMarkers}</strong> with your clinician — these are outside reference range` : null,
+              `<strong>Omega-3 (2–4g EPA/DHA)</strong> — improves triglycerides, inflammation, and heart markers`,
+              `<strong>Reduce refined carbs + processed food</strong> — improves HbA1c, glucose, and inflammatory markers`,
+              `<strong>Retest in 3 months</strong> — blood markers respond faster than body composition`,
+            ].filter(Boolean),
+          });
+        }
+
+        // ── RMR pillar ──
+        if (rmrScore !== null && rmr) {
+          const fp = rmr.fat_pct || 0;
+          const nextFatPct = fp < 65 ? 65 : fp < 75 ? 75 : fp < 80 ? 80 : null;
+          const nextRmrScore = fp < 65 ? 60 : fp < 75 ? 76 : fp < 80 ? 90 : null;
+          const toImprove2 = nextFatPct != null
+            ? `Raise fat burning to <strong style="color:var(--orange)">${nextFatPct}%</strong> to unlock <strong>${nextRmrScore}/100</strong>`
+            : `<strong style="color:var(--green)">Elite metabolic flexibility — maintain it</strong>`;
+          pillars.push({ icon:'🔥', label:'Metabolic Rate (RMR)', score:rmrScore, color:'var(--orange)', driver:rmrDriver,
+            toImprove: toImprove2,
+            steps:[
+              `<strong>Fasted morning walks 30 min</strong> — trains fat oxidation pathways before glucose is available`,
+              `<strong>Cut simple sugars and refined carbs</strong> — reduces glucose dependency at rest`,
+              `<strong>Sleep 7–9 hours</strong> — poor sleep shifts metabolism toward glucose burning within 2 nights`,
+              `<strong>Intermittent fasting (16:8)</strong> — extends the overnight fat-burning window`,
+            ],
+          });
+        }
+
+        return pillars.map(p => `
+          <div style="margin-bottom:24px;padding-bottom:24px;border-bottom:1px solid var(--border);">
+            <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:8px;">
+              <div style="font-size:14px;font-weight:700;">${p.icon} ${p.label}</div>
+              <div style="font-family:'Bebas Neue',sans-serif;font-size:24px;color:${p.color};letter-spacing:1px;">${p.score}<span style="font-family:'Outfit',sans-serif;font-size:12px;color:var(--muted2);">/100</span></div>
+            </div>
+            <div style="height:8px;background:var(--surface3);border-radius:4px;overflow:hidden;margin-bottom:6px;">
+              <div style="width:${p.score}%;height:100%;background:${p.color};border-radius:4px;transition:width 0.8s ease;"></div>
+            </div>
+            <div style="font-size:11px;color:var(--muted2);margin-bottom:10px;">${p.driver}</div>
+            <div style="background:var(--surface2);border-radius:8px;padding:10px 14px;margin-bottom:10px;font-size:12px;">
+              <span style="color:var(--muted2);font-weight:600;text-transform:uppercase;letter-spacing:0.5px;font-size:10px;">Next target: </span>${p.toImprove}
+              ${p.deficitMonths ? `<span style="color:var(--muted2);font-size:11px;"> · ~${p.deficitMonths}</span>` : ''}
+            </div>
+            <div style="display:flex;flex-direction:column;gap:5px;">
+              ${p.steps.map(s=>`<div style="display:flex;gap:8px;font-size:12px;color:var(--muted2);line-height:1.5;"><span style="color:${p.color};flex-shrink:0;">→</span><span>${s}</span></div>`).join('')}
+            </div>
+          </div>`).join('');
+      })()}
     </div>
 
     ${wins.length ? `
@@ -1902,6 +2018,307 @@ function renderCheckins() {
         </div>
       </div>`;
   }).join('');
+}
+
+/* ══════════════════════════
+   3D BODY MAP
+══════════════════════════ */
+let bodyMapInited = false;
+
+function fatColor3D(fatPct, isFemale) {
+  if (fatPct == null) return 0x5a6272;
+  const a = isFemale ? 20 : 12;
+  const b = isFemale ? 28 : 17;
+  const c = isFemale ? 32 : 22;
+  const d = isFemale ? 37 : 27;
+  if (fatPct <= a) return 0x4da6ff;   // blue — athletic
+  if (fatPct <= b) return 0x39e07a;   // green — fit
+  if (fatPct <= c) return 0xf5c842;   // gold — average
+  if (fatPct <= d) return 0xff9f43;   // orange — above avg
+  return 0xff5555;                     // red — high
+}
+
+function fatLabel(fatPct, isFemale) {
+  if (fatPct == null) return 'No data';
+  const a = isFemale ? 20 : 12;
+  const b = isFemale ? 28 : 17;
+  const c = isFemale ? 32 : 22;
+  const d = isFemale ? 37 : 27;
+  if (fatPct <= a) return 'Athletic';
+  if (fatPct <= b) return 'Fit';
+  if (fatPct <= c) return 'Average';
+  if (fatPct <= d) return 'Above Average';
+  return 'High';
+}
+
+function initBodyMap() {
+  if (bodyMapInited || !window.THREE) return;
+  const container = document.getElementById('body-map-canvas');
+  if (!container) return;
+  bodyMapInited = true;
+
+  const isFemale = (scan2?.sex || profile?.sex || '').toLowerCase() === 'female';
+
+  // Scene
+  const scene = new THREE.Scene();
+  scene.background = new THREE.Color(0x08090b);
+  scene.fog = new THREE.Fog(0x08090b, 8, 18);
+
+  const W = container.clientWidth || 400;
+  const H = container.clientHeight || 500;
+  const camera = new THREE.PerspectiveCamera(42, W / H, 0.1, 50);
+  camera.position.set(0, 0.9, 4.2);
+
+  const renderer = new THREE.WebGLRenderer({ antialias: true, alpha: false });
+  renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
+  renderer.setSize(W, H);
+  renderer.shadowMap.enabled = true;
+  container.appendChild(renderer.domElement);
+
+  // Lights
+  scene.add(new THREE.AmbientLight(0xffffff, 0.55));
+  const key = new THREE.DirectionalLight(0xffffff, 0.9);
+  key.position.set(3, 6, 4); key.castShadow = true;
+  scene.add(key);
+  const fill = new THREE.DirectionalLight(0x4da6ff, 0.25);
+  fill.position.set(-4, 1, -3);
+  scene.add(fill);
+  const rim = new THREE.DirectionalLight(0xf5c842, 0.15);
+  rim.position.set(0, -4, -4);
+  scene.add(rim);
+
+  // Floor grid
+  const grid = new THREE.GridHelper(6, 24, 0x1c2128, 0x161a1f);
+  grid.position.y = -1.72;
+  scene.add(grid);
+
+  // Region data from scan
+  const regions = {
+    head:    { fat_pct: null, label: 'Head', detail: null },
+    torso:   { fat_pct: scan2?.trunk_fat_pct,      lean_g: null, fat_g: null,
+               label: 'Trunk',       detail: 'Upper chest and back fat from DEXA.' },
+    belly:   { fat_pct: scan2?.android_fat_pct,    lean_g: null, fat_g: null,
+               label: 'Belly (Android)', detail: 'Android zone — belly fat. Visceral fat (VAT) is stored here. Highest cardiovascular risk.' },
+    hips:    { fat_pct: scan2?.gynoid_fat_pct,     lean_g: null, fat_g: null,
+               label: 'Hips (Gynoid)',   detail: 'Gynoid zone — hips and glutes. Metabolically safer than android fat.' },
+    lArm:    { fat_pct: scan2?.left_arm_fat_pct,   lean_g: scan2?.left_arm_lean_g,   fat_g: scan2?.left_arm_fat_g,
+               label: 'Left Arm',    detail: 'Left arm segmental data from DEXA.' },
+    rArm:    { fat_pct: scan2?.right_arm_fat_pct,  lean_g: scan2?.right_arm_lean_g,  fat_g: scan2?.right_arm_fat_g,
+               label: 'Right Arm',   detail: 'Right arm segmental data from DEXA.' },
+    lLeg:    { fat_pct: scan2?.left_leg_fat_pct,   lean_g: scan2?.left_leg_lean_g,   fat_g: scan2?.left_leg_fat_g,
+               label: 'Left Leg',    detail: 'Left leg segmental data from DEXA.' },
+    rLeg:    { fat_pct: scan2?.right_leg_fat_pct,  lean_g: scan2?.right_leg_lean_g,  fat_g: scan2?.right_leg_fat_g,
+               label: 'Right Leg',   detail: 'Right leg segmental data from DEXA.' },
+  };
+
+  function col(key) { return fatColor3D(regions[key]?.fat_pct, isFemale); }
+
+  function makeMat(regionKey) {
+    return new THREE.MeshPhongMaterial({
+      color: col(regionKey), shininess: 45,
+      specular: new THREE.Color(0x333333),
+    });
+  }
+
+  function seg(geo, regionKey, pos, rot) {
+    const m = new THREE.Mesh(geo, makeMat(regionKey));
+    m.castShadow = true;
+    m.userData = { regionKey };
+    if (pos) m.position.set(...pos);
+    if (rot) m.rotation.set(...rot);
+    return m;
+  }
+
+  const body = new THREE.Group();
+
+  // Head
+  body.add(seg(new THREE.SphereGeometry(0.21, 20, 20), 'head', [0, 2.06, 0]));
+  // Neck
+  body.add(seg(new THREE.CylinderGeometry(0.08, 0.10, 0.24, 14), 'torso', [0, 1.84, 0]));
+  // Shoulders (L/R)
+  body.add(seg(new THREE.SphereGeometry(0.105, 14, 14), 'torso', [-0.34, 1.61, 0]));
+  body.add(seg(new THREE.SphereGeometry(0.105, 14, 14), 'torso', [ 0.34, 1.61, 0]));
+  // Chest/upper torso
+  const chestGeo = new THREE.CylinderGeometry(0.255, 0.26, 0.60, 16);
+  body.add(seg(chestGeo, 'torso', [0, 1.30, 0]));
+  // Belly
+  const bellyGeo = new THREE.CylinderGeometry(0.27, 0.24, 0.44, 16);
+  body.add(seg(bellyGeo, 'belly', [0, 0.91, 0]));
+  // Hips
+  const hipGeo = new THREE.CylinderGeometry(0.245, 0.22, 0.34, 16);
+  body.add(seg(hipGeo, 'hips', [0, 0.60, 0]));
+
+  // Upper arms
+  body.add(seg(new THREE.CylinderGeometry(0.08, 0.085, 0.40, 12), 'lArm', [-0.46, 1.35, 0], [0, 0,  0.18]));
+  body.add(seg(new THREE.CylinderGeometry(0.08, 0.085, 0.40, 12), 'rArm', [ 0.46, 1.35, 0], [0, 0, -0.18]));
+  // Elbow joints
+  body.add(seg(new THREE.SphereGeometry(0.075, 12, 12), 'lArm', [-0.53, 1.11, 0]));
+  body.add(seg(new THREE.SphereGeometry(0.075, 12, 12), 'rArm', [ 0.53, 1.11, 0]));
+  // Forearms
+  body.add(seg(new THREE.CylinderGeometry(0.062, 0.078, 0.36, 12), 'lArm', [-0.58, 0.84, 0], [0, 0,  0.22]));
+  body.add(seg(new THREE.CylinderGeometry(0.062, 0.078, 0.36, 12), 'rArm', [ 0.58, 0.84, 0], [0, 0, -0.22]));
+
+  // Thighs
+  body.add(seg(new THREE.CylinderGeometry(0.115, 0.125, 0.52, 14), 'lLeg', [-0.145, 0.17, 0]));
+  body.add(seg(new THREE.CylinderGeometry(0.115, 0.125, 0.52, 14), 'rLeg', [ 0.145, 0.17, 0]));
+  // Knee joints
+  body.add(seg(new THREE.SphereGeometry(0.10, 12, 12), 'lLeg', [-0.145, -0.13, 0]));
+  body.add(seg(new THREE.SphereGeometry(0.10, 12, 12), 'rLeg', [ 0.145, -0.13, 0]));
+  // Calves
+  body.add(seg(new THREE.CylinderGeometry(0.076, 0.095, 0.46, 14), 'lLeg', [-0.145, -0.43, 0]));
+  body.add(seg(new THREE.CylinderGeometry(0.076, 0.095, 0.46, 14), 'rLeg', [ 0.145, -0.43, 0]));
+  // Ankles
+  body.add(seg(new THREE.SphereGeometry(0.065, 10, 10), 'lLeg', [-0.145, -0.69, 0]));
+  body.add(seg(new THREE.SphereGeometry(0.065, 10, 10), 'rLeg', [ 0.145, -0.69, 0]));
+  // Feet
+  body.add(seg(new THREE.BoxGeometry(0.12, 0.07, 0.24), 'lLeg', [-0.145, -0.75, 0.06]));
+  body.add(seg(new THREE.BoxGeometry(0.12, 0.07, 0.24), 'rLeg', [ 0.145, -0.75, 0.06]));
+
+  // Centre the body vertically
+  body.position.y = -0.15;
+  scene.add(body);
+
+  // Rotation state
+  let rotY = 0, rotX = 0.05;
+  let autoRotate = true;
+  let isDragging = false, prevX = 0, prevY = 0;
+
+  // Mouse controls
+  renderer.domElement.addEventListener('mousedown', e => {
+    isDragging = true; autoRotate = false;
+    prevX = e.clientX; prevY = e.clientY;
+    renderer.domElement.style.cursor = 'grabbing';
+  });
+  window.addEventListener('mousemove', e => {
+    if (!isDragging) return;
+    rotY += (e.clientX - prevX) * 0.012;
+    rotX += (e.clientY - prevY) * 0.006;
+    rotX = Math.max(-0.55, Math.min(0.55, rotX));
+    prevX = e.clientX; prevY = e.clientY;
+  });
+  window.addEventListener('mouseup', () => {
+    isDragging = false;
+    renderer.domElement.style.cursor = 'grab';
+  });
+
+  // Touch controls
+  renderer.domElement.addEventListener('touchstart', e => {
+    autoRotate = false;
+    prevX = e.touches[0].clientX;
+    prevY = e.touches[0].clientY;
+  }, { passive: true });
+  renderer.domElement.addEventListener('touchmove', e => {
+    rotY += (e.touches[0].clientX - prevX) * 0.014;
+    rotX += (e.touches[0].clientY - prevY) * 0.007;
+    rotX = Math.max(-0.55, Math.min(0.55, rotX));
+    prevX = e.touches[0].clientX;
+    prevY = e.touches[0].clientY;
+  }, { passive: true });
+
+  // Click / tap to select region
+  const raycaster = new THREE.Raycaster();
+  const mouse2 = new THREE.Vector2();
+  let selectedMeshes = [];
+
+  function onBodyClick(e) {
+    const rect = renderer.domElement.getBoundingClientRect();
+    const cx = e.clientX ?? e.changedTouches?.[0]?.clientX;
+    const cy = e.clientY ?? e.changedTouches?.[0]?.clientY;
+    if (cx == null) return;
+    mouse2.x = ((cx - rect.left) / rect.width) * 2 - 1;
+    mouse2.y = -((cy - rect.top) / rect.height) * 2 + 1;
+    raycaster.setFromCamera(mouse2, camera);
+    const meshes = [];
+    body.traverse(c => { if (c.isMesh) meshes.push(c); });
+    const hits = raycaster.intersectObjects(meshes);
+    if (!hits.length) return;
+    const hit = hits[0].object;
+    const rKey = hit.userData.regionKey;
+    if (!rKey || rKey === 'head') return;
+
+    // Highlight all meshes for this region
+    meshes.forEach(m => {
+      m.material.emissive = new THREE.Color(0x000000);
+    });
+    body.traverse(c => {
+      if (c.isMesh && c.userData.regionKey === rKey) {
+        c.material.emissive = new THREE.Color(0x333333);
+      }
+    });
+    showBMRegion(rKey);
+  }
+  renderer.domElement.addEventListener('click', onBodyClick);
+  renderer.domElement.addEventListener('touchend', onBodyClick, { passive: true });
+
+  // Animate
+  let raf;
+  function animate() {
+    raf = requestAnimationFrame(animate);
+    if (autoRotate) rotY += 0.008;
+    body.rotation.y = rotY;
+    body.rotation.x = rotX;
+    renderer.render(scene, camera);
+  }
+  animate();
+
+  // Resize
+  const ro = new ResizeObserver(() => {
+    const w = container.clientWidth;
+    const h = container.clientHeight;
+    if (!w || !h) return;
+    camera.aspect = w / h;
+    camera.updateProjectionMatrix();
+    renderer.setSize(w, h);
+  });
+  ro.observe(container);
+
+  // Clean up when leaving screen
+  document.querySelector('[data-screen="body-map"]')?.addEventListener('click', () => {
+    // Already handled by navigate()
+  });
+}
+
+function showBMRegion(rKey) {
+  const isFemale = (scan2?.sex || profile?.sex || '').toLowerCase() === 'female';
+  const regionDefs = {
+    torso: { fat_pct: scan2?.trunk_fat_pct,     lean_g: null, fat_g: null, label: 'Trunk' },
+    belly: { fat_pct: scan2?.android_fat_pct,   lean_g: null, fat_g: null, label: 'Belly (Android)',
+             extra: scan2?.vat_area_cm2 != null ? `VAT: ${scan2.vat_area_cm2} cm² (${scan2.vat_area_cm2 < 100 ? 'Normal' : scan2.vat_area_cm2 < 160 ? 'Borderline' : 'High Risk'})` : null },
+    hips:  { fat_pct: scan2?.gynoid_fat_pct,    lean_g: null, fat_g: null, label: 'Hips (Gynoid)' },
+    lArm:  { fat_pct: scan2?.left_arm_fat_pct,  lean_g: scan2?.left_arm_lean_g,  fat_g: scan2?.left_arm_fat_g,  label: 'Left Arm' },
+    rArm:  { fat_pct: scan2?.right_arm_fat_pct, lean_g: scan2?.right_arm_lean_g, fat_g: scan2?.right_arm_fat_g, label: 'Right Arm' },
+    lLeg:  { fat_pct: scan2?.left_leg_fat_pct,  lean_g: scan2?.left_leg_lean_g,  fat_g: scan2?.left_leg_fat_g,  label: 'Left Leg' },
+    rLeg:  { fat_pct: scan2?.right_leg_fat_pct, lean_g: scan2?.right_leg_lean_g, fat_g: scan2?.right_leg_fat_g, label: 'Right Leg' },
+  };
+  const r = regionDefs[rKey];
+  if (!r) return;
+  const el = document.getElementById('bm-region-content');
+  const col = r.fat_pct != null ? (['#4da6ff','#39e07a','#f5c842','#ff9f43','#ff5555'])[
+    r.fat_pct <= (isFemale?20:12) ? 0 : r.fat_pct <= (isFemale?28:17) ? 1 : r.fat_pct <= (isFemale?32:22) ? 2 : r.fat_pct <= (isFemale?37:27) ? 3 : 4
+  ] : '#5a6272';
+
+  el.innerHTML = `
+    <div style="font-family:'Bebas Neue',sans-serif;font-size:22px;letter-spacing:1px;color:${col};margin-bottom:10px;">${r.label}</div>
+    ${r.fat_pct != null ? `
+      <div style="margin-bottom:10px;">
+        <div style="font-size:11px;color:var(--muted2);text-transform:uppercase;letter-spacing:0.8px;margin-bottom:4px;">Body Fat</div>
+        <div style="font-family:'Bebas Neue',sans-serif;font-size:36px;color:${col};line-height:1;">${r.fat_pct}<span style="font-family:'Outfit',sans-serif;font-size:14px;color:var(--muted2);">%</span></div>
+        <div style="font-size:12px;color:${col};font-weight:600;">${fatLabel(r.fat_pct, isFemale)}</div>
+        <div style="height:6px;background:var(--surface3);border-radius:3px;margin-top:8px;overflow:hidden;">
+          <div style="height:100%;width:${Math.min(r.fat_pct * 2, 100)}%;background:${col};border-radius:3px;transition:width 0.5s;"></div>
+        </div>
+      </div>` : '<div style="color:var(--muted2);font-size:13px;margin-bottom:10px;">No fat % data for this region.</div>'}
+    ${r.lean_g != null ? `
+      <div style="margin-bottom:10px;">
+        <div style="font-size:11px;color:var(--muted2);text-transform:uppercase;letter-spacing:0.8px;margin-bottom:2px;">Lean Mass</div>
+        <div style="font-size:20px;font-weight:700;color:var(--green);">${(r.lean_g/1000).toFixed(2)} <span style="font-size:12px;color:var(--muted2);">kg</span></div>
+      </div>` : ''}
+    ${r.fat_g != null ? `
+      <div style="margin-bottom:10px;">
+        <div style="font-size:11px;color:var(--muted2);text-transform:uppercase;letter-spacing:0.8px;margin-bottom:2px;">Fat Mass</div>
+        <div style="font-size:20px;font-weight:700;color:var(--text);">${(r.fat_g/1000).toFixed(2)} <span style="font-size:12px;color:var(--muted2);">kg</span></div>
+      </div>` : ''}
+    ${r.extra ? `<div style="font-size:12px;padding:8px 10px;background:var(--surface2);border-radius:6px;color:var(--muted2);">${r.extra}</div>` : ''}`;
 }
 
 init();
