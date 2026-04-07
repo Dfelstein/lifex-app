@@ -1,0 +1,51 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>DEXA Interpretation Guide — Life X</title>
+<link href="https://fonts.googleapis.com/css2?family=Bebas+Neue&family=Outfit:wght@400;600&display=swap" rel="stylesheet">
+<style>
+*, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+body { background: #08090b; color: #eef0f3; font-family: 'Outfit', sans-serif; display: flex; flex-direction: column; height: 100vh; }
+.topbar {
+  display: flex; align-items: center; gap: 14px;
+  padding: 12px 20px; background: #0f1114;
+  border-bottom: 1px solid rgba(255,255,255,0.06);
+  flex-shrink: 0;
+}
+.back-btn {
+  display: inline-flex; align-items: center; gap: 7px;
+  background: #f5c842; color: #000; border: none; border-radius: 8px;
+  padding: 8px 16px; font-family: 'Outfit', sans-serif; font-weight: 600;
+  font-size: 14px; cursor: pointer; text-decoration: none;
+  transition: background 0.15s;
+}
+.back-btn:hover { background: #e8a020; }
+.title { font-family: 'Bebas Neue', sans-serif; font-size: 20px; letter-spacing: 2px; color: #eef0f3; }
+.subtitle { font-size: 12px; color: #8a94a6; }
+iframe { flex: 1; border: none; width: 100%; }
+@media (max-width: 600px) {
+  .subtitle { display: none; }
+  .pdf-fallback { display: flex; flex: 1; flex-direction: column; align-items: center; justify-content: center; gap: 16px; padding: 32px; text-align: center; }
+  .pdf-fallback p { font-size: 14px; color: #8a94a6; line-height: 1.6; }
+}
+</style>
+</head>
+<body>
+<div class="topbar">
+  <a href="dashboard.html" class="back-btn">← Back to Results</a>
+  <div>
+    <div class="title">DEXA Interpretation Guide</div>
+    <div class="subtitle">How to read your body composition report</div>
+  </div>
+</div>
+<iframe src="dexa-interpretation-guide.pdf" title="DEXA Interpretation Guide">
+  <div class="pdf-fallback">
+    <p>Your browser can't display the PDF inline.</p>
+    <a href="dexa-interpretation-guide.pdf" download class="back-btn" style="background:var(--gold)">Download Guide</a>
+    <a href="dashboard.html" class="back-btn" style="background:#161a1f;color:#eef0f3;border:1px solid rgba(255,255,255,0.1);">← Back to Results</a>
+  </div>
+</iframe>
+</body>
+</html>

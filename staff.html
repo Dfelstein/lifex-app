@@ -1390,6 +1390,47 @@ async function openEditProfile() {
   }
 }
 
+async function resendInvite(clientId) {
+  const btn = document.getElementById('resend-btn');
+  if (btn) { btn.disabled = true; btn.textContent = 'Sending…'; }
+  const res = await fetch(`${SUPABASE_URL}/functions/v1/client-ops`, {
+    method: 'POST',
+    headers: { 'Authorization': `Bearer ${SUPABASE_KEY}`, 'Content-Type': 'application/json' },
+    body: JSON.stringify({ action: 'resend_invite', clientId }),
+  });
+  const data = await res.json();
+  if (data.error) {
+    toast('Failed to resend invite: ' + data.error, 'error');
+    if (btn) { btn.disabled = false; btn.textContent = 'Resend Invite'; }
+  } else {
+    toast('Invite resent!', 'success');
+    if (btn) { btn.textContent = '✅ Sent'; }
+  }
+}
+
+async function sendClientMessage(clientId) {
+  const subject = document.getElementById('comms-subject')?.value.trim();
+  const message = document.getElementById('comms-message')?.value.trim();
+  const statusEl = document.getElementById('comms-status');
+  if (!message) { toast('Enter a message first', 'error'); return; }
+  if (statusEl) statusEl.textContent = 'Sending…';
+  const res = await fetch(`${SUPABASE_URL}/functions/v1/client-ops`, {
+    method: 'POST',
+    headers: { 'Authorization': `Bearer ${SUPABASE_KEY}`, 'Content-Type': 'application/json' },
+    body: JSON.stringify({ action: 'send_message', clientId, message, subject }),
+  });
+  const data = await res.json();
+  if (data.error) {
+    if (statusEl) statusEl.textContent = '❌ ' + data.error;
+    toast('Failed to send: ' + data.error, 'error');
+  } else {
+    if (statusEl) statusEl.textContent = '✅ Sent';
+    document.getElementById('comms-message').value = '';
+    document.getElementById('comms-subject').value = '';
+    toast('Message sent!', 'success');
+  }
+}
+
 function closeEditProfile() {
   document.getElementById('edit-profile-modal').style.display = 'none';
 }
@@ -1441,12 +1482,17 @@ async function viewClientProfile(clientId, firstName, lastName) {
   el.innerHTML = '<div style="color:var(--muted2);padding:20px 0;">Loading…</div>';
 
   try {
-    const [dexaRes, rmrRes, bloodRes, hormoneRes, activityRes] = await Promise.all([
+    const [dexaRes, rmrRes, bloodRes, hormoneRes, activityRes, authStatusRes] = await Promise.all([
       sb.from('dexa_scans').select('*').eq('client_id', clientId).order('scan_date', { ascending: true }),
       sb.from('rmr_tests').select('*').eq('client_id', clientId).order('test_date', { ascending: false }).limit(1),
       sb.from('blood_panels').select('*').eq('client_id', clientId).order('panel_date', { ascending: false }).limit(1),
       sb.from('hormone_panels').select('*').eq('client_id', clientId).order('panel_date', { ascending: false }).limit(1),
       sb.from('client_activity').select('event,created_at').eq('client_id', clientId).order('created_at', { ascending: false }).limit(30),
+      fetch(`${SUPABASE_URL}/functions/v1/client-ops`, {
+        method: 'POST',
+        headers: { 'Authorization': `Bearer ${SUPABASE_KEY}`, 'Content-Type': 'application/json' },
+        body: JSON.stringify({ action: 'get_status', clientId }),
+      }).then(r => r.json()).catch(() => null),
     ]);
 
     const dexaScans = dexaRes.data || [];
@@ -1455,6 +1501,7 @@ async function viewClientProfile(clientId, firstName, lastName) {
     const bp   = bloodRes.data?.[0] || null;
     const hp   = hormoneRes.data?.[0] || null;
     const activity = activityRes.data || [];
+    const authStatus = authStatusRes?.error ? null : authStatusRes;
 
     // Fetch markers if panels exist
     const [bmRes, hmRes] = await Promise.all([
@@ -1511,6 +1558,66 @@ async function viewClientProfile(clientId, firstName, lastName) {
     };
 
     let html = '';
+
+    // ── Communications card ─────────────────────────────────────────
+    {
+      const fmtDate = d => d ? new Date(d).toLocaleDateString('en-AU', { day:'numeric', month:'short', year:'numeric' }) : '—';
+      const confirmed = authStatus?.confirmed;
+      const statusDot = confirmed
+        ? `<span style="display:inline-block;width:8px;height:8px;border-radius:50%;background:var(--green);margin-right:6px;"></span>Active`
+        : `<span style="display:inline-block;width:8px;height:8px;border-radius:50%;background:var(--gold);margin-right:6px;"></span>Invite pending`;
+
+      // Build email log from scan upload dates
+      const emailLog = [];
+      (dexaRes.data||[]).forEach(s => { if (s.scan_date) emailLog.push({ date: s.scan_date, label: 'DEXA results email sent' }); });
+      (rmrRes.data ? [rmrRes.data[0]] : []).filter(Boolean).forEach(s => { if (s.test_date) emailLog.push({ date: s.test_date, label: 'RMR results email sent' }); });
+      (bloodRes.data ? [bloodRes.data[0]] : []).filter(Boolean).forEach(s => { if (s.panel_date) emailLog.push({ date: s.panel_date, label: 'Blood panel results email sent' }); });
+      (hormoneRes.data ? [hormoneRes.data[0]] : []).filter(Boolean).forEach(s => { if (s.panel_date) emailLog.push({ date: s.panel_date, label: 'Hormone panel results email sent' }); });
+      emailLog.sort((a,b) => b.date.localeCompare(a.date));
+
+      html += `<div class="card" style="margin-bottom:20px;" id="comms-card">
+        <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:16px;">
+          <div class="card-title" style="margin:0;">Communications</div>
+          <div style="font-size:13px;color:var(--muted2);">${statusDot}</div>
+        </div>
+        <div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:12px;margin-bottom:16px;">
+          <div style="background:var(--surface2);border-radius:8px;padding:10px 14px;">
+            <div style="font-size:10px;color:var(--muted2);text-transform:uppercase;letter-spacing:0.8px;margin-bottom:4px;">Account created</div>
+            <div style="font-size:13px;font-weight:600;">${fmtDate(authStatus?.createdAt)}</div>
+          </div>
+          <div style="background:var(--surface2);border-radius:8px;padding:10px 14px;">
+            <div style="font-size:10px;color:var(--muted2);text-transform:uppercase;letter-spacing:0.8px;margin-bottom:4px;">${confirmed ? 'Activated' : 'Invite sent'}</div>
+            <div style="font-size:13px;font-weight:600;">${confirmed ? fmtDate(authStatus?.confirmedAt) : fmtDate(authStatus?.createdAt)}</div>
+          </div>
+          <div style="background:var(--surface2);border-radius:8px;padding:10px 14px;">
+            <div style="font-size:10px;color:var(--muted2);text-transform:uppercase;letter-spacing:0.8px;margin-bottom:4px;">Last sign in</div>
+            <div style="font-size:13px;font-weight:600;">${authStatus?.lastSignIn ? fmtDate(authStatus.lastSignIn) : 'Never'}</div>
+          </div>
+        </div>
+        ${!confirmed ? `
+        <div style="margin-bottom:16px;padding:10px 14px;background:rgba(245,200,66,0.08);border:1px solid rgba(245,200,66,0.2);border-radius:8px;display:flex;align-items:center;justify-content:space-between;gap:12px;">
+          <div style="font-size:13px;color:var(--muted2);">Client hasn't activated their account yet — resend the invite link?</div>
+          <button onclick="resendInvite('${clientId}')" id="resend-btn" style="background:var(--gold);color:#000;border:none;border-radius:6px;padding:7px 14px;font-family:'Outfit',sans-serif;font-size:13px;font-weight:600;cursor:pointer;white-space:nowrap;">Resend Invite</button>
+        </div>` : ''}
+        ${emailLog.length ? `
+        <div style="margin-bottom:16px;">
+          <div style="font-size:11px;font-weight:600;text-transform:uppercase;letter-spacing:0.8px;color:var(--muted2);margin-bottom:8px;">Results Emails Sent</div>
+          ${emailLog.map(e => `
+            <div style="display:flex;align-items:center;gap:10px;padding:7px 0;border-bottom:1px solid var(--border);">
+              <span style="font-size:14px;">📧</span>
+              <span style="font-size:13px;flex:1;">${e.label}</span>
+              <span style="font-size:11px;color:var(--muted2);">${fmtDate(e.date)}</span>
+            </div>`).join('')}
+        </div>` : ''}
+        <div style="border-top:1px solid var(--border);padding-top:14px;">
+          <div style="font-size:11px;font-weight:600;text-transform:uppercase;letter-spacing:0.8px;color:var(--muted2);margin-bottom:8px;">Send a Message</div>
+          <input id="comms-subject" type="text" placeholder="Subject (optional)" style="width:100%;background:var(--surface2);border:1px solid var(--border2);border-radius:6px;padding:8px 12px;color:var(--text);font-family:'Outfit',sans-serif;font-size:13px;outline:none;margin-bottom:8px;">
+          <textarea id="comms-message" rows="3" placeholder="Type your message…" style="width:100%;background:var(--surface2);border:1px solid var(--border2);border-radius:6px;padding:8px 12px;color:var(--text);font-family:'Outfit',sans-serif;font-size:13px;outline:none;resize:vertical;margin-bottom:8px;"></textarea>
+          <button onclick="sendClientMessage('${clientId}')" style="background:var(--surface2);border:1px solid var(--border2);border-radius:6px;padding:8px 16px;color:var(--text);font-family:'Outfit',sans-serif;font-size:13px;cursor:pointer;">Send Email</button>
+          <span id="comms-status" style="font-size:12px;color:var(--muted2);margin-left:10px;"></span>
+        </div>
+      </div>`;
+    }
 
     if (activity.length) {
       const lastLogin = activity.find(a => a.event === 'login');

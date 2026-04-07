@@ -128,7 +128,7 @@ async function sendResultsEmail(sb: any, clientId: string, scanType: string, par
   const resultsList = bodyLines.map(l => `<p style="margin:4px 0;font-size:15px;color:#222">${l}</p>`).join('\n');
 
   const introLine = scanType === 'DEXA'
-    ? `Your DEXA report has been uploaded to your Life X profile. You can also download the <a href="https://lifex.xgym.com.au/dexa-interpretation-guide.pdf" style="color:#b8860b;font-weight:600">DEXA Interpretation Guide</a> for help understanding your results.`
+    ? `Your DEXA report has been uploaded to your Life X profile. You can also download the <a href="https://lifex.xgym.com.au/interpretation-guide.html" style="color:#b8860b;font-weight:600">DEXA Interpretation Guide</a> for help understanding your results.`
     : scanType === 'RMR'
     ? `Your RMR (Resting Metabolic Rate) results have been uploaded to your Life X profile. These show how your body burns fuel at rest — a great starting point for dialling in your nutrition.`
     : scanType === 'BLOOD'
