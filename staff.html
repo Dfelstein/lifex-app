@@ -2904,7 +2904,7 @@ async function loadAllScans() {
   // Fetch all dexa scans + all profiles in parallel
   const [scansRes, profRes] = await Promise.all([
     sb.from('dexa_scans').select('*').order('scan_date', { ascending: false }).limit(5000),
-    sb.from('profiles').select('id,full_name,email').limit(2000),
+    sb.from('profiles').select('id,full_name').limit(2000),
   ]);
 
   allScansProfiles = {};
@@ -2928,15 +2928,15 @@ function filterAllScans() {
   if (q) rows = rows.filter(r => (r.profile?.full_name || '').toLowerCase().includes(q));
   if (from) rows = rows.filter(r => r.scan_date >= from);
   if (to)   rows = rows.filter(r => r.scan_date <= to);
-  if (filter === 'linked')   rows = rows.filter(r => r.profile?.email);
-  if (filter === 'unlinked') rows = rows.filter(r => !r.profile?.email);
+  if (filter === 'linked')   rows = rows.filter(r => !!r.profile);
+  if (filter === 'unlinked') rows = rows.filter(r => !r.profile);
 
   renderAllScans(rows);
 }
 
 function renderAllScans(rows) {
   const total    = allScansData.length;
-  const linked   = allScansData.filter(s => allScansProfiles[s.client_id]?.email).length;
+  const linked   = allScansData.filter(s => !!allScansProfiles[s.client_id]).length;
   const unlinked = total - linked;
 
   document.getElementById('all-scans-stats').innerHTML = [
@@ -2966,11 +2966,11 @@ function renderAllScans(rows) {
       </div>
       ${rows.map((s, idx) => {
         const name     = s.profile?.full_name || '—';
-        const hasEmail = !!s.profile?.email;
+        const hasProfile = !!s.profile;
         const isLast   = idx === rows.length - 1;
         const border   = isLast ? '' : 'border-bottom:1px solid var(--border);';
         const cellStyle = `padding:11px 16px;${border}font-size:13px;cursor:pointer;transition:background 0.12s;` ;
-        const clickRow = `openScanRow('${s.client_id}', '${(name).replace(/'/g,"\\'")}', ${hasEmail})`;
+        const clickRow = `openScanRow('${s.client_id}', '${(name).replace(/'/g,"\\'")}', ${hasProfile})`;
         return `
           <div style="${cellStyle}font-weight:600;" onclick="${clickRow}" onmouseover="this.parentElement.querySelectorAll('[data-row=&quot;r${idx}&quot;]').forEach(c=>c.style.background='var(--surface2)')" onmouseout="this.parentElement.querySelectorAll('[data-row=&quot;r${idx}&quot;]').forEach(c=>c.style.background='')" data-row="r${idx}">${name}</div>
           <div style="${cellStyle}color:var(--muted2);" onclick="${clickRow}" data-row="r${idx}">${s.scan_date || '—'}</div>
@@ -2978,7 +2978,7 @@ function renderAllScans(rows) {
           <div style="${cellStyle}color:var(--muted2);" onclick="${clickRow}" data-row="r${idx}">${s.weight_kg != null ? s.weight_kg.toFixed(1)+'kg' : '—'}</div>
           <div style="${cellStyle}color:var(--muted2);" onclick="${clickRow}" data-row="r${idx}">${s.lean_g != null ? (s.lean_g/1000).toFixed(1)+'kg' : '—'}</div>
           <div style="${cellStyle}display:flex;align-items:center;gap:8px;" data-row="r${idx}">
-            ${hasEmail
+            ${hasProfile
               ? `<span style="font-size:11px;padding:2px 8px;background:rgba(80,200,120,0.12);color:var(--green);border-radius:4px;font-weight:600;">Linked</span>`
               : `<span style="font-size:11px;padding:2px 8px;background:rgba(255,170,50,0.12);color:var(--orange);border-radius:4px;font-weight:600;">No Account</span>
                  <button onclick="event.stopPropagation();openLinkModal('${s.client_id}','${(name).replace(/'/g,"\\'")}','${s.scan_date||''}')" style="font-size:11px;padding:3px 8px;background:transparent;border:1px solid var(--border2);border-radius:4px;color:var(--muted2);cursor:pointer;font-family:'Outfit',sans-serif;" onmouseover="this.style.borderColor='var(--blue)';this.style.color='var(--blue)'" onmouseout="this.style.borderColor='var(--border2)';this.style.color='var(--muted2)'">Link</button>`
