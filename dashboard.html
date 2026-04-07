@@ -1327,8 +1327,9 @@ function renderBodyComp() {
       <div style="flex:1;min-width:140px;text-align:center;padding:16px;background:var(--surface2);border-radius:8px;"><div style="font-size:11px;color:var(--muted2);text-transform:uppercase;letter-spacing:0.8px;margin-bottom:6px;">Gynoid (Hip)</div><div style="font-family:'Bebas Neue',sans-serif;font-size:36px;color:var(--blue)">${scan2.gynoid}%</div></div>
       <div style="flex:1;min-width:140px;text-align:center;padding:16px;background:var(--surface2);border-radius:8px;"><div style="font-size:11px;color:var(--muted2);text-transform:uppercase;letter-spacing:0.8px;margin-bottom:6px;">A:G Ratio</div><div style="font-family:'Bebas Neue',sans-serif;font-size:36px;color:${(scan2.ag_ratio||0)<1?'var(--green)':'var(--red)'}">${scan2.ag_ratio}</div><div style="font-size:11px;color:var(--muted2);margin-top:2px;">${(scan2.ag_ratio||0)<1?'✓ Healthy':'⚠️ Elevated'}</div></div>
     </div></div>`:''}
-    <div style="margin-top:4px;">
+    <div style="margin-top:4px;display:flex;gap:10px;flex-wrap:wrap;">
       <a href="https://xgym.com.au/dexa-scan/" target="_blank" class="btn btn-gold">📅 Book Next DEXA Scan →</a>
+      <a href="/dexa-interpretation-guide.pdf" target="_blank" class="btn" style="background:var(--surface2);color:var(--muted2);border:1px solid var(--border2);">📄 Interpretation Guide</a>
     </div>`;
 }
 
@@ -1404,8 +1405,9 @@ function renderBone() {
       ${scan2.t_score!=null?(()=>{const t=scan2.t_score;return`<div class="insight-item"><span class="icon">${t>=-1?'✅':t>=-2.5?'⚠️':'🚨'}</span><span>T-score <strong>${t}</strong> — ${t>=-1?'Normal bone density. Maintain heavy compound lifts to preserve it.':t>=-2.5?'Osteopenia detected. Prioritise weight-bearing exercise, calcium, D3 + K2.':'Osteoporosis range. Discuss treatment with your doctor alongside load-bearing exercise and supplements.'}</span></div>`})():''}
       <div class="insight-item"><span class="icon">💊</span><span>Ensure adequate <strong>Vitamin D3 + K2</strong> and calcium intake to support bone density.</span></div>
     </div>
-    <div style="margin-top:14px;">
+    <div style="margin-top:14px;display:flex;gap:10px;flex-wrap:wrap;">
       <a href="https://xgym.com.au/dexa-scan/" target="_blank" class="btn btn-gold">📅 Book Next DEXA Scan →</a>
+      <a href="/dexa-interpretation-guide.pdf" target="_blank" class="btn" style="background:var(--surface2);color:var(--muted2);border:1px solid var(--border2);">📄 Interpretation Guide</a>
     </div>
     </div>`;
 }
@@ -1885,9 +1887,12 @@ function spinWheel() {
       localStorage.setItem('lifex_spin_ts', Date.now().toString());
       // Update points in Supabase
       if (profile) {
-        profile.points = (profile.points||0) + won;
-        sb.from('profiles').update({ points: profile.points }).eq('id', profile.id);
-        document.querySelector('.js-pts').textContent = profile.points + ' pts';
+        const newPoints = (profile.points||0) + won;
+        const { error: ptErr } = await sb.from('profiles').update({ points: newPoints }).eq('id', profile.id);
+        if (!ptErr) {
+          profile.points = newPoints;
+          document.querySelector('.js-pts').textContent = profile.points + ' pts';
+        }
       }
       return;
     }
