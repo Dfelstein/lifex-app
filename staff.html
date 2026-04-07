@@ -3989,12 +3989,14 @@ function renderSuburbMap(suburbs) {
 
   if (!points.length) return;
 
-  // Size canvas to container
+  // Size canvas — use fixed logical size, CSS scales it to fit
   const container = canvas.parentElement;
-  const W = container.clientWidth  || 800;
-  const H = container.clientHeight || 520;
+  const W = 900;
+  const H = 520;
   canvas.width  = W;
   canvas.height = H;
+  canvas.style.width  = '100%';
+  canvas.style.height = '100%';
 
   const PAD = 48;
   const lats = points.map(p => p.lat), lngs = points.map(p => p.lng);
@@ -4042,18 +4044,21 @@ function renderSuburbMap(suburbs) {
     const { fill, border } = countToColor(pt.count, maxCount);
 
     // Glow
+    ctx.globalAlpha = 1.0;
     const grd = ctx.createRadialGradient(x, y, 0, x, y, radius * 1.8);
-    grd.addColorStop(0, fill + '55');
+    grd.addColorStop(0, fill + '44');
     grd.addColorStop(1, fill + '00');
     ctx.beginPath(); ctx.arc(x, y, radius * 1.8, 0, Math.PI*2);
     ctx.fillStyle = grd; ctx.fill();
 
     // Circle
     ctx.beginPath(); ctx.arc(x, y, radius, 0, Math.PI*2);
-    ctx.fillStyle = fill + 'cc';
+    ctx.globalAlpha = 0.85;
+    ctx.fillStyle = fill;
     ctx.strokeStyle = border;
     ctx.lineWidth = 1.5;
     ctx.fill(); ctx.stroke();
+    ctx.globalAlpha = 1.0;
 
     // Label for top suburbs
     if (ratio >= 0.25) {
@@ -4079,9 +4084,7 @@ function renderSuburbMap(suburbs) {
   ];
   const lx = W - 145, ly = H - 20 - legendItems.length * 20;
   ctx.fillStyle = 'rgba(10,12,16,0.88)';
-  ctx.beginPath();
-  ctx.roundRect(lx - 10, ly - 10, 148, legendItems.length * 20 + 20, 6);
-  ctx.fill();
+  ctx.fillRect(lx - 10, ly - 10, 148, legendItems.length * 20 + 20);
   legendItems.forEach(({ color, label }, i) => {
     ctx.beginPath(); ctx.arc(lx + 5, ly + i*20 + 5, 5, 0, Math.PI*2);
     ctx.fillStyle = color; ctx.fill();
