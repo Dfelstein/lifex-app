@@ -1507,56 +1507,125 @@ async function loadSearchConsole() {
   }
 }
 
+let _scData = null;
+let _scView = 'aus'; // 'global' | 'aus'
+
 function renderSearchConsole(data) {
-  const queries = data.queries || [];
-  const pages   = data.pages   || [];
-  const totals  = queries.reduce((a, q) => ({ clicks: a.clicks + (q.clicks||0), impressions: a.impressions + (q.impressions||0) }), { clicks:0, impressions:0 });
-  const avgPos  = queries.length ? (queries.reduce((s,q) => s + q.position, 0) / queries.length).toFixed(1) : '—';
-  const avgCtr  = totals.impressions > 0 ? ((totals.clicks / totals.impressions) * 100).toFixed(1) + '%' : '—';
-  const period  = data.period ? `${data.period.start} → ${data.period.end}` : 'Last 28 days';
+  _scData = data;
+  _scView = 'aus';
+  _renderSCView();
+}
+
+function _renderSCView() {
+  const data = _scData;
+  const isAus = _scView === 'aus';
+  const queries  = isAus ? (data.aus_queries || [])  : (data.queries || []);
+  const pages    = isAus ? (data.aus_pages   || [])  : (data.pages   || []);
+  const devices  = isAus ? (data.aus_devices || [])  : (data.devices || []);
+  const local    = data.local_queries       || [];
+  const nonBrand = data.non_branded_queries || [];
+  const period   = data.period ? `${data.period.start} → ${data.period.end}` : 'Last 28 days';
+
+  const totals = queries.reduce((a, q) => ({ clicks: a.clicks + (q.clicks||0), impressions: a.impressions + (q.impressions||0) }), { clicks:0, impressions:0 });
+  const clickWeightedPos = queries.length ? queries.reduce((s, q) => s + q.position * Math.max(q.clicks, 1), 0) / queries.reduce((s, q) => s + Math.max(q.clicks, 1), 0) : null;
+  const avgPos = clickWeightedPos ? clickWeightedPos.toFixed(1) : '—';
+  const avgCtr = totals.impressions > 0 ? ((totals.clicks / totals.impressions) * 100).toFixed(1) + '%' : '—';
+
+  // Device breakdown
+  const devMap = {};
+  devices.forEach(d => { devMap[d.keys[0].toLowerCase()] = d; });
+  const devHtml = devices.length ? `
+    <div class="card" style="margin-bottom:20px;">
+      <div class="card-title">DEVICE BREAKDOWN${isAus ? ' — AUSTRALIA' : ' — GLOBAL'}</div>
+      <div style="display:grid;grid-template-columns:repeat(3,1fr);gap:12px;">
+        ${['mobile','desktop','tablet'].map(dev => {
+          const d = devMap[dev];
+          if (!d) return `<div class="roi-stat"><div class="roi-stat-value" style="color:var(--muted2);">—</div><div class="roi-stat-label">${dev}</div></div>`;
+          const ctr = d.impressions > 0 ? ((d.clicks/d.impressions)*100).toFixed(1)+'%' : '—';
+          const icon = dev === 'mobile' ? '📱' : dev === 'desktop' ? '🖥' : '📟';
+          return `<div class="roi-stat">
+            <div style="font-size:20px;margin-bottom:6px;">${icon}</div>
+            <div class="roi-stat-value">${d.clicks}</div>
+            <div class="roi-stat-label">${dev} clicks</div>
+            <div style="font-size:11px;color:var(--muted2);margin-top:4px;">${d.impressions.toLocaleString('en-AU')} impr · pos ${d.position.toFixed(1)} · CTR ${ctr}</div>
+          </div>`;
+        }).join('')}
+      </div>
+    </div>` : '';
+
+  // Query table helper
+  function queryTable(rows, title, note = '') {
+    if (!rows.length) return `<div class="card"><div class="card-title">${title}</div><div style="color:var(--muted2);font-size:13px;">No data yet</div></div>`;
+    return `<div class="card"><div class="card-title">${title}${note ? `<span style="font-size:10px;color:var(--muted2);font-weight:400;text-transform:none;letter-spacing:0;margin-left:8px;">${note}</span>` : ''}</div>
+      <table class="sc-table"><thead><tr><th>Keyword</th><th>Pos</th><th>Clicks</th><th>Impr</th><th>CTR</th><th>Δ clicks</th></tr></thead><tbody>
+      ${rows.slice(0,15).map(q => {
+        const pos = parseFloat(q.position.toFixed(1));
+        const pc  = pos <= 3 ? 'pos-1-3' : pos <= 10 ? 'pos-4-10' : 'pos-11p';
+        const ctr = q.impressions > 0 ? ((q.clicks/q.impressions)*100).toFixed(1)+'%' : '—';
+        const delta = (q.click_delta||0) > 0 ? `<span class="delta-up">↑${q.click_delta}</span>` :
+                      (q.click_delta||0) < 0 ? `<span class="delta-down">↓${Math.abs(q.click_delta)}</span>` : '<span style="color:var(--muted)">—</span>';
+        return `<tr>
+          <td style="max-width:160px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;" title="${q.keys[0]}">${q.keys[0]}</td>
+          <td><span class="pos-badge ${pc}">${pos}</span></td>
+          <td>${q.clicks}</td><td>${q.impressions}</td><td>${ctr}</td><td>${delta}</td></tr>`;
+      }).join('')}
+      </tbody></table></div>`;
+  }
+
+  function pageTable(rows) {
+    if (!rows.length) return '';
+    return `<div class="card"><div class="card-title">TOP PAGES</div>
+      <table class="sc-table"><thead><tr><th>Page</th><th>Clicks</th><th>Pos</th><th>CTR</th></tr></thead><tbody>
+      ${rows.slice(0,10).map(p => {
+        const url = p.keys[0].replace(/https?:\/\/(www\.)?xgym\.com\.au/, '') || '/';
+        const pos = parseFloat(p.position.toFixed(1));
+        const pc  = pos <= 3 ? 'pos-1-3' : pos <= 10 ? 'pos-4-10' : 'pos-11p';
+        const ctr = p.impressions > 0 ? ((p.clicks/p.impressions)*100).toFixed(1)+'%' : '—';
+        return `<tr>
+          <td style="max-width:200px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;" title="${url}">${url}</td>
+          <td>${p.clicks}</td><td><span class="pos-badge ${pc}">${pos}</span></td><td>${ctr}</td></tr>`;
+      }).join('')}
+      </tbody></table></div>`;
+  }
+
+  const tabStyle = (v) => v === _scView
+    ? 'padding:6px 16px;border-radius:6px;font-size:12px;font-weight:600;cursor:pointer;background:var(--gold);color:#000;border:none;'
+    : 'padding:6px 16px;border-radius:6px;font-size:12px;font-weight:600;cursor:pointer;background:transparent;color:var(--muted2);border:1px solid var(--border2);';
 
   let html = `
-    <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:12px;">
-      <div style="font-size:11px;font-weight:600;letter-spacing:1px;text-transform:uppercase;color:var(--muted2);">SEARCH CONSOLE · ${period}</div>
+    <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:16px;flex-wrap:wrap;gap:10px;">
+      <div>
+        <div style="font-size:11px;font-weight:600;letter-spacing:1px;text-transform:uppercase;color:var(--muted2);margin-bottom:8px;">SEARCH CONSOLE · ${period}</div>
+        <div style="display:flex;gap:6px;">
+          <button style="${tabStyle('aus')}" onclick="_scView='aus';_renderSCView()">🇦🇺 Australia</button>
+          <button style="${tabStyle('global')}" onclick="_scView='global';_renderSCView()">🌏 Global</button>
+        </div>
+      </div>
       <button class="btn btn-outline btn-sm" onclick="loadSearchConsole()">↻ Refresh</button>
     </div>
-    <div class="sc-summary">
+
+    <div class="sc-summary" style="margin-bottom:20px;">
       <div class="sc-stat"><div class="sc-stat-value">${totals.clicks.toLocaleString('en-AU')}</div><div class="sc-stat-label">Clicks</div></div>
       <div class="sc-stat"><div class="sc-stat-value">${totals.impressions.toLocaleString('en-AU')}</div><div class="sc-stat-label">Impressions</div></div>
-      <div class="sc-stat"><div class="sc-stat-value">${avgPos}</div><div class="sc-stat-label">Avg Position</div></div>
+      <div class="sc-stat"><div class="sc-stat-value">${avgPos}</div><div class="sc-stat-label">Avg Position <span style="font-size:9px;font-weight:400;">(click-weighted)</span></div></div>
       <div class="sc-stat"><div class="sc-stat-value">${avgCtr}</div><div class="sc-stat-label">CTR</div></div>
+    </div>
+
+    ${devHtml}
+
+    <div class="two-col" style="margin-bottom:20px;">
+      ${queryTable(queries, isAus ? 'TOP QUERIES — AUSTRALIA' : 'TOP QUERIES — GLOBAL')}
+      ${pageTable(pages)}
     </div>`;
 
-  if (queries.length || pages.length) {
-    html += `<div class="two-col" style="margin-bottom:24px;">`;
-    if (queries.length) {
-      html += `<div class="card"><div class="card-title">TOP QUERIES (last 28 days)</div>
-        <table class="sc-table"><thead><tr><th>Keyword</th><th>Pos</th><th>Clicks</th><th>Impr</th><th>Δ</th></tr></thead><tbody>
-        ${queries.slice(0,15).map(q => {
-          const pos = parseFloat(q.position.toFixed(1));
-          const pc  = pos <= 3 ? 'pos-1-3' : pos <= 10 ? 'pos-4-10' : 'pos-11p';
-          const delta = q.click_delta > 0 ? `<span class="delta-up">↑${q.click_delta}</span>` :
-                        q.click_delta < 0 ? `<span class="delta-down">↓${Math.abs(q.click_delta)}</span>` : '<span style="color:var(--muted)">—</span>';
-          return `<tr><td style="max-width:170px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;" title="${q.keys[0]}">${q.keys[0]}</td>
-            <td><span class="pos-badge ${pc}">${pos}</span></td>
-            <td>${q.clicks}</td><td>${q.impressions}</td><td>${delta}</td></tr>`;
-        }).join('')}
-        </tbody></table></div>`;
-    }
-    if (pages.length) {
-      html += `<div class="card"><div class="card-title">TOP PAGES (last 28 days)</div>
-        <table class="sc-table"><thead><tr><th>Page</th><th>Clicks</th><th>Pos</th><th>CTR</th></tr></thead><tbody>
-        ${pages.slice(0,10).map(p => {
-          const url = p.keys[0].replace(/https?:\/\/(www\.)?xgym\.com\.au/, '') || '/';
-          const pos = parseFloat(p.position.toFixed(1));
-          const pc  = pos <= 3 ? 'pos-1-3' : pos <= 10 ? 'pos-4-10' : 'pos-11p';
-          const ctr = p.impressions > 0 ? ((p.clicks/p.impressions)*100).toFixed(1)+'%' : '—';
-          return `<tr><td style="max-width:190px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;" title="${url}">${url}</td>
-            <td>${p.clicks}</td><td><span class="pos-badge ${pc}">${pos}</span></td><td>${ctr}</td></tr>`;
-        }).join('')}
-        </tbody></table></div>`;
-    }
-    html += `</div>`;
+  if (isAus) {
+    html += `<div class="two-col" style="margin-bottom:24px;">
+      ${queryTable(local, 'LOCAL INTENT QUERIES', 'castle hill · sydney · near me etc.')}
+      ${queryTable(nonBrand, 'NON-BRANDED QUERIES', 'excludes xgym / lifex searches')}
+    </div>
+    <div style="font-size:11px;color:var(--muted2);margin-bottom:20px;">
+      ℹ️ Sydney-city filtering is not available in the Search Console API — Australia is the smallest geographic unit. Local intent queries above are filtered by suburb/city keywords from within the Australia dataset.
+    </div>`;
   }
 
   document.getElementById('sc-block').innerHTML = html;

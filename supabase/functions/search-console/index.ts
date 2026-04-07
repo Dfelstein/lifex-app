@@ -79,28 +79,62 @@ Deno.serve(async (req) => {
     const prevEndDate = prevEnd.toISOString().split('T')[0];
     const prevStartDate = prevStart.toISOString().split('T')[0];
 
-    const [queries, pages, prevQueries] = await Promise.all([
+    const ausFilter = { dimensionFilterGroups: [{ filters: [{ dimension: 'country', operator: 'equals', expression: 'aus' }] }] };
+
+    const [
+      queries, pages, prevQueries,
+      ausQueries, ausPages, ausPrevQueries,
+      devices, ausDevices,
+    ] = await Promise.all([
+      // Global
       scQuery(token, { startDate, endDate, dimensions: ['query'], rowLimit: 25, orderBy: [{ fieldName: 'clicks', sortOrder: 'DESCENDING' }] }),
       scQuery(token, { startDate, endDate, dimensions: ['page'], rowLimit: 10, orderBy: [{ fieldName: 'clicks', sortOrder: 'DESCENDING' }] }),
       scQuery(token, { startDate: prevStartDate, endDate: prevEndDate, dimensions: ['query'], rowLimit: 25 }),
+      // Australia
+      scQuery(token, { startDate, endDate, dimensions: ['query'], rowLimit: 25, orderBy: [{ fieldName: 'clicks', sortOrder: 'DESCENDING' }], ...ausFilter }),
+      scQuery(token, { startDate, endDate, dimensions: ['page'], rowLimit: 10, orderBy: [{ fieldName: 'clicks', sortOrder: 'DESCENDING' }], ...ausFilter }),
+      scQuery(token, { startDate: prevStartDate, endDate: prevEndDate, dimensions: ['query'], rowLimit: 25, ...ausFilter }),
+      // Device breakdown (global + Australia)
+      scQuery(token, { startDate, endDate, dimensions: ['device'], rowLimit: 10 }),
+      scQuery(token, { startDate, endDate, dimensions: ['device'], rowLimit: 10, ...ausFilter }),
     ]);
 
-    // Build prev period lookup for click comparison
-    const prevMap: Record<string, number> = {};
-    (prevQueries.rows || []).forEach((r: any) => { prevMap[r.keys[0]] = r.clicks; });
+    function enrich(rows: any[], prevRows: any[]) {
+      const prevMap: Record<string, number> = {};
+      (prevRows || []).forEach((r: any) => { prevMap[r.keys[0]] = r.clicks; });
+      return (rows || []).map((r: any) => ({
+        ...r,
+        prev_clicks: prevMap[r.keys[0]] || 0,
+        click_delta: (r.clicks || 0) - (prevMap[r.keys[0]] || 0),
+      }));
+    }
 
-    // Add delta to each query row
-    const enrichedQueries = (queries.rows || []).map((r: any) => ({
-      ...r,
-      prev_clicks: prevMap[r.keys[0]] || 0,
-      click_delta: (r.clicks || 0) - (prevMap[r.keys[0]] || 0),
-    }));
+    // Local intent queries from the Australia set
+    const localTerms = ['castle hill', 'sydney', 'parramatta', 'hills district', 'near me', 'norwest', 'baulkham', 'blacktown', 'kellyville'];
+    const localQueries = (ausQueries.rows || []).filter((r: any) =>
+      localTerms.some(t => r.keys[0].toLowerCase().includes(t))
+    );
+
+    // Branded vs non-branded split (aus)
+    const brandTerms = ['xgym', 'x gym', 'life x', 'lifex'];
+    const nonBranded = (ausQueries.rows || []).filter((r: any) =>
+      !brandTerms.some(t => r.keys[0].toLowerCase().includes(t))
+    );
 
     return cors(JSON.stringify({
       period: { start: startDate, end: endDate },
       prev_period: { start: prevStartDate, end: prevEndDate },
-      queries: enrichedQueries,
+      // Global
+      queries: enrich(queries.rows, prevQueries.rows),
       pages: pages.rows || [],
+      devices: devices.rows || [],
+      // Australia
+      aus_queries: enrich(ausQueries.rows, ausPrevQueries.rows),
+      aus_pages: ausPages.rows || [],
+      aus_devices: ausDevices.rows || [],
+      // Local intent
+      local_queries: localQueries,
+      non_branded_queries: nonBranded.slice(0, 15),
     }));
   } catch (e) {
     return cors(JSON.stringify({ error: String(e) }), 500);
