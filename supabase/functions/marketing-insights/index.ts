@@ -78,6 +78,18 @@ Deno.serve(async (req) => {
       monthCounts[key] = (monthCounts[key] || 0) + 1;
     });
 
+    // Revenue from marketing_conversions (actual Acuity bookings)
+    const { data: convData } = await sb.from('marketing_conversions')
+      .select('price, service_type')
+      .eq('action', 'scheduled')
+      .gte('booked_at', thisMonthStart);
+
+    const actualRevenue = (convData || []).reduce((s: number, r: any) => s + (parseFloat(r.price) || 0), 0);
+
+    // Estimated revenue from scan counts
+    const estimatedRevenue = ((dexaThisMonth || 0) * 149) + ((rmrThisMonth || 0) * 160);
+    const estimatedRevenueLast = ((dexaLastMonth || 0) * 149);
+
     const internalData = {
       dexa_scans_this_month: dexaThisMonth || 0,
       dexa_scans_last_month: dexaLastMonth || 0,
@@ -90,6 +102,10 @@ Deno.serve(async (req) => {
       target_weekly_dexa: 25,
       current_month_day: now.getDate(),
       days_in_month: new Date(now.getFullYear(), now.getMonth() + 1, 0).getDate(),
+      estimated_revenue_this_month_aud: estimatedRevenue,
+      estimated_revenue_last_month_aud: estimatedRevenueLast,
+      actual_tracked_revenue_aud: actualRevenue,
+      revenue_on_track: estimatedRevenue >= (estimatedRevenueLast * 0.9),
     };
 
     // Also accept external data passed in the request body
@@ -122,7 +138,8 @@ Best content: educational posts about training, body composition, and DEXA data.
 Social: Instagram (synced to Facebook), YouTube.
 Primary conversion goal: DEXA scan bookings (direct to Acuity). These clients often convert to personal training clients or gym memberships after their scan.
 Wednesday team meetings generate great native video content when patients present to other patients.
-Target: ~25 DEXA scans per week.
+Target: ~25 DEXA scans per week. Target monthly revenue: ~$14,875 (25 scans/wk × 4.3 × $149).
+Pricing: DEXA $149, RMR $160, Blood panels via Square (price varies).
 
 Current data:
 ${JSON.stringify(allData, null, 2)}

@@ -173,6 +173,45 @@ html, body { height: 100%; background: var(--bg); color: var(--text); font-famil
 .btn-green { background:rgba(57,224,122,0.12);color:var(--green);border:1px solid rgba(57,224,122,0.3); }
 .btn-green:hover { background:rgba(57,224,122,0.2); }
 
+/* REVENUE PANEL */
+.rev-summary { display:grid;grid-template-columns:repeat(auto-fill,minmax(180px,1fr));gap:14px;margin-bottom:20px; }
+.rev-card { background:var(--surface);border:1px solid var(--border);border-radius:12px;padding:20px; }
+.rev-card.highlight { border-color:rgba(245,200,66,0.3);background:rgba(245,200,66,0.04); }
+.rev-label { font-size:11px;font-weight:600;letter-spacing:0.8px;text-transform:uppercase;color:var(--muted2);margin-bottom:8px; }
+.rev-value { font-family:'Bebas Neue',sans-serif;font-size:36px;letter-spacing:1px;line-height:1;color:var(--gold); }
+.rev-sub { font-size:12px;color:var(--muted2);margin-top:6px; }
+.rev-row { display:flex;justify-content:space-between;align-items:center;padding:10px 0;border-bottom:1px solid var(--border);font-size:13px; }
+.rev-row:last-child { border-bottom:none; }
+.cost-grid { display:grid;grid-template-columns:1fr 1fr;gap:12px; }
+.roi-bar { display:grid;grid-template-columns:repeat(3,1fr);gap:12px;margin-top:16px; }
+.roi-stat { text-align:center;padding:16px;background:var(--surface2);border-radius:10px; }
+.roi-stat-value { font-family:'Bebas Neue',sans-serif;font-size:28px;color:var(--gold); }
+.roi-stat-label { font-size:10px;color:var(--muted2);text-transform:uppercase;letter-spacing:0.5px;margin-top:4px; }
+
+/* SEO PANEL */
+.sc-summary { display:grid;grid-template-columns:repeat(auto-fill,minmax(150px,1fr));gap:12px;margin-bottom:20px; }
+.sc-stat { background:var(--surface);border:1px solid var(--border);border-radius:12px;padding:16px;text-align:center; }
+.sc-stat-value { font-family:'Bebas Neue',sans-serif;font-size:30px;letter-spacing:1px; }
+.sc-stat-label { font-size:11px;color:var(--muted2);text-transform:uppercase;letter-spacing:0.5px;margin-top:4px; }
+.sc-table { width:100%;border-collapse:collapse;font-size:13px; }
+.sc-table th { text-align:left;font-size:10px;font-weight:600;letter-spacing:0.8px;text-transform:uppercase;color:var(--muted2);padding:8px 10px;border-bottom:1px solid var(--border); }
+.sc-table td { padding:9px 10px;border-bottom:1px solid rgba(255,255,255,0.03);vertical-align:middle; }
+.sc-table tr:hover td { background:var(--surface2); }
+.pos-badge { display:inline-flex;align-items:center;justify-content:center;width:34px;height:22px;border-radius:6px;font-size:11px;font-weight:700; }
+.pos-1-3 { background:rgba(57,224,122,0.15);color:var(--green); }
+.pos-4-10 { background:rgba(245,200,66,0.15);color:var(--gold); }
+.pos-11p { background:rgba(255,255,255,0.06);color:var(--muted2); }
+.delta-up { color:var(--green);font-size:11px;font-weight:600; }
+.delta-down { color:var(--red);font-size:11px;font-weight:600; }
+.seo-change-item { background:var(--surface2);border-radius:10px;padding:14px;margin-bottom:10px;border-left:3px solid var(--border2); }
+.seo-change-item.status-positive { border-left-color:var(--green); }
+.seo-change-item.status-negative { border-left-color:var(--red); }
+.seo-change-item.status-monitoring { border-left-color:var(--gold); }
+.seo-change-item.status-reverted { border-left-color:var(--muted); }
+.seo-change-item.status-neutral { border-left-color:var(--blue); }
+.change-type-badge { display:inline-block;padding:2px 8px;border-radius:8px;font-size:10px;font-weight:700;letter-spacing:0.5px;text-transform:uppercase;background:rgba(255,255,255,0.06);color:var(--muted2);margin-right:6px; }
+.status-select { background:var(--surface);border:1px solid var(--border2);border-radius:6px;color:var(--text);font-family:'Outfit',sans-serif;font-size:12px;padding:4px 8px;cursor:pointer;outline:none; }
+
 /* TOAST */
 .toast { position:fixed;bottom:24px;right:24px;padding:12px 20px;border-radius:10px;font-size:13px;font-weight:500;z-index:1000;transition:all 0.3s;transform:translateY(20px);opacity:0; }
 .toast.show { transform:translateY(0);opacity:1; }
@@ -233,6 +272,10 @@ html, body { height: 100%; background: var(--bg); color: var(--text); font-famil
       <div class="nav-item" data-panel="content-ideas" onclick="showPanel('content-ideas')"><span class="nav-icon">💡</span> Content Ideas</div>
       <div class="nav-item" data-panel="content-saved" onclick="showPanel('content-saved')"><span class="nav-icon">📋</span> Saved Content</div>
 
+      <div class="nav-group-label">Performance</div>
+      <div class="nav-item" data-panel="revenue" onclick="showPanel('revenue')"><span class="nav-icon">💰</span> Revenue & ROI</div>
+      <div class="nav-item" data-panel="seo" onclick="showPanel('seo')"><span class="nav-icon">🔍</span> SEO Insights</div>
+
       <div class="nav-group-label">Data</div>
       <div class="nav-item" data-panel="tracker" onclick="showPanel('tracker')"><span class="nav-icon">📈</span> Weekly Tracker</div>
       <div class="nav-item" data-panel="setup" onclick="showPanel('setup')"><span class="nav-icon">⚙️</span> Integrations</div>
@@ -262,6 +305,12 @@ html, body { height: 100%; background: var(--bg); color: var(--text); font-famil
 
       <!-- KPI grid -->
       <div class="kpi-grid" id="kpi-grid">
+        <div class="kpi-card" style="border-color:rgba(245,200,66,0.25);background:rgba(245,200,66,0.03);">
+          <div class="kpi-label">Est. Revenue This Month</div>
+          <div class="kpi-value" id="kpi-revenue" style="color:var(--gold);">—</div>
+          <div class="kpi-sub" id="kpi-revenue-sub">Calculating…</div>
+          <div id="kpi-revenue-trend" class="kpi-trend flat">…</div>
+        </div>
         <div class="kpi-card">
           <div class="kpi-label">DEXA Scans This Month</div>
           <div class="kpi-value" id="kpi-dexa-month">—</div>
@@ -608,6 +657,169 @@ html, body { height: 100%; background: var(--bg); color: var(--text); font-famil
       </div>
     </div>
 
+    <!-- REVENUE & ROI PANEL -->
+    <div id="panel-revenue" class="panel">
+      <div class="page-title">REVENUE & ROI</div>
+      <div class="page-subtitle">Estimated from scan counts · Actual where Acuity webhook has data</div>
+
+      <div class="rev-summary">
+        <div class="rev-card highlight">
+          <div class="rev-label">Revenue This Month (Est.)</div>
+          <div class="rev-value" id="rev-total">—</div>
+          <div class="rev-sub" id="rev-mom-trend">vs last month</div>
+        </div>
+        <div class="rev-card">
+          <div class="rev-label">Last Month</div>
+          <div class="rev-value" id="rev-last" style="color:var(--muted2);">—</div>
+          <div class="rev-sub">Estimated</div>
+        </div>
+        <div class="rev-card">
+          <div class="rev-label">Monthly Run-Rate</div>
+          <div class="rev-value" id="rev-runrate" style="color:var(--text);">—</div>
+          <div class="rev-sub">At current scan pace</div>
+        </div>
+        <div class="rev-card">
+          <div class="rev-label">Actual Tracked (Acuity)</div>
+          <div class="rev-value" id="rev-actual-card" style="color:var(--green);">—</div>
+          <div class="rev-sub">Real booking revenue</div>
+        </div>
+      </div>
+
+      <div class="two-col">
+        <div>
+          <div class="card">
+            <div class="card-title">REVENUE BREAKDOWN</div>
+            <div class="rev-row">
+              <span>DEXA Scans</span>
+              <span id="rev-dexa-value" style="color:var(--gold);font-weight:600;">—</span>
+            </div>
+            <div class="rev-row">
+              <span>RMR Tests</span>
+              <span id="rev-rmr-value" style="color:var(--gold);font-weight:600;">—</span>
+            </div>
+            <div class="rev-row">
+              <span>Blood Panels</span>
+              <span id="rev-blood-value" style="color:var(--muted2);">—</span>
+            </div>
+            <div class="rev-row" style="padding-top:14px;margin-top:4px;border-top:1px solid var(--border2);">
+              <span style="font-weight:600;">Total Estimated</span>
+              <span id="rev-total-row" style="color:var(--gold);font-weight:700;font-family:'Bebas Neue';font-size:20px;">—</span>
+            </div>
+            <div class="rev-row" style="border-bottom:none;">
+              <span style="font-size:12px;color:var(--muted2);">Acuity tracked (actual)</span>
+              <span id="rev-actual-row" style="color:var(--green);font-weight:600;">—</span>
+            </div>
+          </div>
+
+          <div class="card">
+            <div class="card-title">AD SPEND & ROI</div>
+            <div class="cost-grid">
+              <div class="field">
+                <label>Google Ads Spend ($)</label>
+                <input type="number" id="roi-google-spend" placeholder="0.00" step="0.01" oninput="updateROI()">
+              </div>
+              <div class="field">
+                <label>Meta Ads Spend ($)</label>
+                <input type="number" id="roi-meta-spend" placeholder="0.00" step="0.01" oninput="updateROI()">
+              </div>
+            </div>
+            <div class="roi-bar">
+              <div class="roi-stat">
+                <div class="roi-stat-value" id="roi-total-spend">$0</div>
+                <div class="roi-stat-label">Total Spend</div>
+              </div>
+              <div class="roi-stat">
+                <div class="roi-stat-value" id="roi-roas">—</div>
+                <div class="roi-stat-label">ROAS</div>
+              </div>
+              <div class="roi-stat">
+                <div class="roi-stat-value" id="roi-cpa">—</div>
+                <div class="roi-stat-label">Cost / Booking</div>
+              </div>
+            </div>
+            <div style="font-size:11px;color:var(--muted2);margin-top:12px;">Enter this month's total spend. ROAS = Estimated Revenue ÷ Spend. Cost per booking = Spend ÷ DEXA scans.</div>
+          </div>
+        </div>
+
+        <div>
+          <div class="card">
+            <div class="card-title">REVENUE TREND — 6 MONTHS (EST.)</div>
+            <div class="chart-wrap" style="height:220px;"><canvas id="revenue-chart"></canvas></div>
+          </div>
+          <div class="card">
+            <div class="card-title">ACUITY TRACKED BOOKINGS THIS MONTH</div>
+            <div id="rev-conversions-list"><div style="color:var(--muted2);font-size:13px;">Loading…</div></div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- SEO INSIGHTS PANEL -->
+    <div id="panel-seo" class="panel">
+      <div class="page-title">SEO INSIGHTS</div>
+      <div class="page-subtitle">Search Console performance, website changes, and ranking impact</div>
+
+      <div id="sc-block">
+        <div class="loading-insights"><div class="spinner"></div>Loading Search Console data…</div>
+      </div>
+
+      <div style="display:flex;justify-content:space-between;align-items:center;margin:28px 0 12px;">
+        <div style="font-size:11px;font-weight:600;letter-spacing:1px;text-transform:uppercase;color:var(--muted2);">SEO CHANGE LOG</div>
+        <button class="btn btn-gold btn-sm" onclick="toggleAddChange()">+ Log Change</button>
+      </div>
+
+      <div id="add-change-form" style="display:none;">
+        <div class="card" style="margin-bottom:20px;">
+          <div class="card-title">LOG A WEBSITE / SEO CHANGE</div>
+          <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px;">
+            <div class="field">
+              <label>Date</label>
+              <input type="date" id="chg-date">
+            </div>
+            <div class="field">
+              <label>Change Type</label>
+              <select id="chg-type">
+                <option value="content">Content update</option>
+                <option value="meta">Meta title / description</option>
+                <option value="heading">Heading structure (H1/H2)</option>
+                <option value="links">Internal links</option>
+                <option value="speed">Page speed</option>
+                <option value="new-page">New page added</option>
+                <option value="redirect">Redirect</option>
+                <option value="schema">Schema markup</option>
+                <option value="backlinks">Backlinks / outreach</option>
+                <option value="other">Other</option>
+              </select>
+            </div>
+            <div class="field">
+              <label>Page Name</label>
+              <input type="text" id="chg-page" placeholder="e.g. DEXA Scan page">
+            </div>
+            <div class="field">
+              <label>Page URL (optional)</label>
+              <input type="text" id="chg-url" placeholder="e.g. /dexa-scan/">
+            </div>
+          </div>
+          <div class="field">
+            <label>What was changed — be specific</label>
+            <textarea id="chg-desc" placeholder="e.g. Rewrote the main H1 from 'DEXA Scans Sydney' to 'Body Composition Scans Castle Hill — XGYM'. Added 3 internal links from the homepage. Expected to improve ranking for Castle Hill searches." style="height:90px;"></textarea>
+          </div>
+          <div class="field">
+            <label>Changed by</label>
+            <input type="text" id="chg-by" value="SEO team">
+          </div>
+          <div style="display:flex;gap:10px;">
+            <button class="btn btn-gold" onclick="addSEOChange()">Save Change</button>
+            <button class="btn btn-outline" onclick="toggleAddChange()">Cancel</button>
+          </div>
+        </div>
+      </div>
+
+      <div id="seo-changes-list">
+        <div class="loading-insights"><div class="spinner"></div>Loading change log…</div>
+      </div>
+    </div>
+
   </div><!-- /main -->
 </div><!-- /app -->
 
@@ -648,7 +860,9 @@ async function init() {
 
   // Load data
   await loadKPIs();
+  loadRevenue();
   loadInsights();
+  loadSEO();
   loadSnapshots();
   loadSavedDrafts();
   loadRecentBookings();
@@ -677,20 +891,26 @@ async function loadKPIs() {
     { count: dexaThis },
     { count: dexaLast },
     { count: rmrThis },
+    { count: rmrLast },
     { count: bloodThis },
     { count: totalClients },
     { count: newClients },
     { count: leads },
-    { data: trendRaw }
+    { data: trendRaw },
+    { data: convThis },
+    { data: convLast },
   ] = await Promise.all([
     sb.from('dexa_scans').select('*',{count:'exact',head:true}).gte('scan_date', thisMonthStart),
     sb.from('dexa_scans').select('*',{count:'exact',head:true}).gte('scan_date', lastMonthStart).lte('scan_date', lastMonthEnd),
     sb.from('rmr_tests').select('*',{count:'exact',head:true}).gte('test_date', thisMonthStart),
+    sb.from('rmr_tests').select('*',{count:'exact',head:true}).gte('test_date', lastMonthStart).lte('test_date', lastMonthEnd),
     sb.from('blood_panels').select('*',{count:'exact',head:true}).gte('panel_date', thisMonthStart),
     sb.from('profiles').select('*',{count:'exact',head:true}).eq('is_staff', false),
     sb.from('profiles').select('*',{count:'exact',head:true}).eq('is_staff', false).gte('created_at', thisMonthStart),
     sb.from('zoho_intake_pending').select('*',{count:'exact',head:true}),
     sb.from('dexa_scans').select('scan_date').gte('scan_date', sixMonthsAgo).order('scan_date', {ascending:true}),
+    sb.from('marketing_conversions').select('price,service_type,client_name,booked_at').eq('action','scheduled').gte('booked_at', thisMonthStart).order('booked_at',{ascending:false}),
+    sb.from('marketing_conversions').select('price').eq('action','scheduled').gte('booked_at', lastMonthStart).lte('booked_at', lastMonthEnd),
   ]);
 
   // DEXA month
@@ -725,6 +945,34 @@ async function loadKPIs() {
   if ((leads ?? 0) > 10) {
     document.getElementById('kpi-leads-action').innerHTML = `<span style="font-size:11px;color:var(--gold);">⚡ ${leads} leads ready to follow up</span>`;
   }
+
+  // ── Revenue ──────────────────────────────────────────────────────────────
+  const DEXA_PRICE = 149, RMR_PRICE = 160, BLOOD_EST = 75;
+  const revDexa = (dexaThis ?? 0) * DEXA_PRICE;
+  const revRmr  = (rmrThis ?? 0)  * RMR_PRICE;
+  const revBlood = (bloodThis ?? 0) * BLOOD_EST;
+  const revTotal = revDexa + revRmr + revBlood;
+  const revDexaLast = (dexaLast ?? 0) * DEXA_PRICE;
+  const revRmrLast  = (rmrLast ?? 0)  * RMR_PRICE;
+  const revTotalLast = revDexaLast + revRmrLast;
+  const actualThis = (convThis || []).reduce((s, r) => s + (parseFloat(r.price) || 0), 0);
+  const actualLast = (convLast || []).reduce((s, r) => s + (parseFloat(r.price) || 0), 0);
+
+  // Store for Revenue panel (populated on demand)
+  window._revData = { dexaThis: dexaThis??0, rmrThis: rmrThis??0, bloodThis: bloodThis??0,
+    dexaLast: dexaLast??0, rmrLast: rmrLast??0,
+    revDexa, revRmr, revBlood, revTotal, revTotalLast, actualThis, actualLast,
+    trendRaw, convThis };
+
+  // Revenue KPI card on overview
+  document.getElementById('kpi-revenue').textContent = '$' + revTotal.toLocaleString('en-AU');
+  const rDiff = revTotal - revTotalLast;
+  const rEl = document.getElementById('kpi-revenue-trend');
+  if (rDiff > 0)      { rEl.className='kpi-trend up';   rEl.textContent=`↑ $${Math.abs(rDiff).toLocaleString('en-AU')} vs last month`; }
+  else if (rDiff < 0) { rEl.className='kpi-trend down'; rEl.textContent=`↓ $${Math.abs(rDiff).toLocaleString('en-AU')} vs last month`; }
+  else                { rEl.className='kpi-trend flat';  rEl.textContent='Same as last month'; }
+  document.getElementById('kpi-revenue-sub').textContent =
+    actualThis > 0 ? `Actual tracked: $${actualThis.toLocaleString('en-AU')}` : 'Estimated from scan counts';
 
   // Trend chart
   const monthCounts = {};
@@ -1114,6 +1362,285 @@ function toast(msg, type = 'success') {
   t.textContent = msg;
   t.className = `toast ${type} show`;
   setTimeout(() => t.classList.remove('show'), 2800);
+}
+
+// ─── REVENUE PANEL ─────────────────────────────────────────────────────────
+let revenueChart = null;
+
+function loadRevenue() {
+  const d = window._revData;
+  if (!d) return;
+
+  document.getElementById('rev-total').textContent = '$' + d.revTotal.toLocaleString('en-AU');
+  document.getElementById('rev-last').textContent  = '$' + d.revTotalLast.toLocaleString('en-AU');
+  document.getElementById('rev-actual-card').textContent = d.actualThis > 0 ? '$' + d.actualThis.toLocaleString('en-AU') : '—';
+
+  const diff = d.revTotal - d.revTotalLast;
+  document.getElementById('rev-mom-trend').textContent =
+    diff > 0 ? `↑ $${Math.abs(diff).toLocaleString('en-AU')} vs last month` :
+    diff < 0 ? `↓ $${Math.abs(diff).toLocaleString('en-AU')} vs last month` : 'Same as last month';
+
+  const now = new Date();
+  const day = now.getDate();
+  const daysInMonth = new Date(now.getFullYear(), now.getMonth() + 1, 0).getDate();
+  const runRate = d.revTotal > 0 ? Math.round((d.revTotal / day) * daysInMonth) : 0;
+  document.getElementById('rev-runrate').textContent = '$' + runRate.toLocaleString('en-AU');
+
+  document.getElementById('rev-dexa-value').textContent  = d.dexaThis  > 0 ? `${d.dexaThis} × $149 = $${d.revDexa.toLocaleString('en-AU')}` : '0 scans';
+  document.getElementById('rev-rmr-value').textContent   = d.rmrThis   > 0 ? `${d.rmrThis} × $160 = $${d.revRmr.toLocaleString('en-AU')}` : '—';
+  document.getElementById('rev-blood-value').textContent = d.bloodThis  > 0 ? `${d.bloodThis} × ~$75 = ~$${d.revBlood.toLocaleString('en-AU')}` : '—';
+  document.getElementById('rev-total-row').textContent   = '$' + d.revTotal.toLocaleString('en-AU');
+  document.getElementById('rev-actual-row').textContent  = d.actualThis > 0 ? '$' + d.actualThis.toLocaleString('en-AU') : 'No webhook data yet';
+
+  // Revenue trend chart (DEXA revenue per month, last 6 months)
+  const monthCounts = {};
+  (d.trendRaw || []).forEach(s => {
+    const key = s.scan_date.substring(0, 7);
+    monthCounts[key] = (monthCounts[key] || 0) + 1;
+  });
+  const labels = [], values = [];
+  for (let i = 5; i >= 0; i--) {
+    const dt = new Date(now.getFullYear(), now.getMonth() - i, 1);
+    const key = dt.toISOString().substring(0, 7);
+    labels.push(dt.toLocaleDateString('en-AU', { month: 'short', year: '2-digit' }));
+    values.push((monthCounts[key] || 0) * 149);
+  }
+  if (revenueChart) revenueChart.destroy();
+  const ctx = document.getElementById('revenue-chart').getContext('2d');
+  revenueChart = new Chart(ctx, {
+    type: 'bar',
+    data: {
+      labels,
+      datasets: [{
+        label: 'Est. Revenue (DEXA)',
+        data: values,
+        backgroundColor: 'rgba(57,224,122,0.2)',
+        borderColor: 'rgba(57,224,122,0.6)',
+        borderWidth: 1,
+        borderRadius: 4,
+      }]
+    },
+    options: {
+      responsive: true, maintainAspectRatio: false,
+      plugins: { legend: { display: false } },
+      scales: {
+        x: { grid: { color: 'rgba(255,255,255,0.04)' }, ticks: { color: '#8a94a6', font: { family: 'Outfit' } } },
+        y: { grid: { color: 'rgba(255,255,255,0.04)' }, beginAtZero: true,
+          ticks: { color: '#8a94a6', font: { family: 'Outfit' }, callback: v => '$' + v.toLocaleString('en-AU') } }
+      }
+    }
+  });
+
+  // Acuity tracked bookings breakdown
+  const convEl = document.getElementById('rev-conversions-list');
+  if (!d.convThis || !d.convThis.length) {
+    convEl.innerHTML = '<div style="color:var(--muted2);font-size:13px;">No Acuity bookings tracked yet — webhook captures future bookings automatically.</div>';
+  } else {
+    const byType = {};
+    d.convThis.forEach(c => {
+      const k = (c.service_type || 'other').replace(/_/g,' ');
+      if (!byType[k]) byType[k] = { count: 0, revenue: 0 };
+      byType[k].count++;
+      byType[k].revenue += parseFloat(c.price) || 0;
+    });
+    convEl.innerHTML = Object.entries(byType).map(([type, data]) =>
+      `<div class="rev-row"><span style="text-transform:capitalize;">${type}</span>
+       <span>${data.count} booking${data.count!==1?'s':''} &nbsp;·&nbsp; <strong style="color:var(--green);">$${data.revenue.toLocaleString('en-AU')}</strong></span></div>`
+    ).join('') +
+    `<div class="rev-row" style="border-bottom:none;margin-top:4px;">
+       <strong>Total tracked</strong>
+       <strong style="color:var(--green);font-family:'Bebas Neue';font-size:18px;">$${d.actualThis.toLocaleString('en-AU')}</strong>
+     </div>`;
+  }
+
+  updateROI();
+}
+
+function updateROI() {
+  const d = window._revData;
+  const google = parseFloat(document.getElementById('roi-google-spend').value) || 0;
+  const meta   = parseFloat(document.getElementById('roi-meta-spend').value)   || 0;
+  const spend  = google + meta;
+  const rev    = d?.revTotal || 0;
+  const scans  = d?.dexaThis || 0;
+
+  document.getElementById('roi-total-spend').textContent = '$' + spend.toFixed(0);
+  if (spend > 0) {
+    document.getElementById('roi-roas').textContent = (rev / spend).toFixed(2) + 'x';
+    document.getElementById('roi-cpa').textContent  = scans > 0 ? '$' + (spend / scans).toFixed(0) : '—';
+  } else {
+    document.getElementById('roi-roas').textContent = '—';
+    document.getElementById('roi-cpa').textContent  = '—';
+  }
+}
+
+// ─── SEO PANEL ─────────────────────────────────────────────────────────────
+async function loadSEO() {
+  document.getElementById('chg-date').value = new Date().toISOString().split('T')[0];
+  loadSearchConsole();
+  loadSEOChanges();
+}
+
+async function loadSearchConsole() {
+  const el = document.getElementById('sc-block');
+  try {
+    const res = await fetch(`${EDGE}/search-console`, {
+      headers: { 'Authorization': `Bearer ${SUPABASE_ANON}` }
+    });
+    const json = await res.json();
+    if (json.error) throw new Error(json.error);
+    renderSearchConsole(json);
+  } catch (e) {
+    el.innerHTML = `
+      <div class="card" style="border-color:rgba(245,200,66,0.2);margin-bottom:20px;">
+        <div class="card-title">SEARCH CONSOLE — SETUP REQUIRED</div>
+        <p style="font-size:13px;color:var(--muted2);line-height:1.7;margin-bottom:14px;">Connect a Google service account to auto-pull rankings, clicks, and impressions.</p>
+        <ol style="font-size:13px;color:var(--muted2);line-height:2;padding-left:20px;margin-bottom:14px;">
+          <li>Go to <strong style="color:var(--text);">console.cloud.google.com</strong> → create project → enable <strong style="color:var(--text);">Search Console API</strong></li>
+          <li>IAM & Admin → Service Accounts → Create → download JSON key file</li>
+          <li><strong style="color:var(--text);">search.google.com/search-console</strong> → Settings → Users & permissions → Add user → paste service account email → Read access</li>
+          <li>Supabase dashboard → Edge Functions → Secrets → add <code style="background:var(--surface3);padding:2px 6px;border-radius:4px;">GOOGLE_SERVICE_ACCOUNT_JSON</code> = paste full JSON file contents</li>
+          <li>Terminal: <code style="background:var(--surface3);padding:2px 6px;border-radius:4px;">supabase functions deploy search-console</code></li>
+        </ol>
+        <button class="btn btn-outline btn-sm" onclick="loadSearchConsole()">↻ Retry</button>
+      </div>`;
+  }
+}
+
+function renderSearchConsole(data) {
+  const queries = data.queries || [];
+  const pages   = data.pages   || [];
+  const totals  = queries.reduce((a, q) => ({ clicks: a.clicks + (q.clicks||0), impressions: a.impressions + (q.impressions||0) }), { clicks:0, impressions:0 });
+  const avgPos  = queries.length ? (queries.reduce((s,q) => s + q.position, 0) / queries.length).toFixed(1) : '—';
+  const avgCtr  = totals.impressions > 0 ? ((totals.clicks / totals.impressions) * 100).toFixed(1) + '%' : '—';
+  const period  = data.period ? `${data.period.start} → ${data.period.end}` : 'Last 28 days';
+
+  let html = `
+    <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:12px;">
+      <div style="font-size:11px;font-weight:600;letter-spacing:1px;text-transform:uppercase;color:var(--muted2);">SEARCH CONSOLE · ${period}</div>
+      <button class="btn btn-outline btn-sm" onclick="loadSearchConsole()">↻ Refresh</button>
+    </div>
+    <div class="sc-summary">
+      <div class="sc-stat"><div class="sc-stat-value">${totals.clicks.toLocaleString('en-AU')}</div><div class="sc-stat-label">Clicks</div></div>
+      <div class="sc-stat"><div class="sc-stat-value">${totals.impressions.toLocaleString('en-AU')}</div><div class="sc-stat-label">Impressions</div></div>
+      <div class="sc-stat"><div class="sc-stat-value">${avgPos}</div><div class="sc-stat-label">Avg Position</div></div>
+      <div class="sc-stat"><div class="sc-stat-value">${avgCtr}</div><div class="sc-stat-label">CTR</div></div>
+    </div>`;
+
+  if (queries.length || pages.length) {
+    html += `<div class="two-col" style="margin-bottom:24px;">`;
+    if (queries.length) {
+      html += `<div class="card"><div class="card-title">TOP QUERIES (last 28 days)</div>
+        <table class="sc-table"><thead><tr><th>Keyword</th><th>Pos</th><th>Clicks</th><th>Impr</th><th>Δ</th></tr></thead><tbody>
+        ${queries.slice(0,15).map(q => {
+          const pos = parseFloat(q.position.toFixed(1));
+          const pc  = pos <= 3 ? 'pos-1-3' : pos <= 10 ? 'pos-4-10' : 'pos-11p';
+          const delta = q.click_delta > 0 ? `<span class="delta-up">↑${q.click_delta}</span>` :
+                        q.click_delta < 0 ? `<span class="delta-down">↓${Math.abs(q.click_delta)}</span>` : '<span style="color:var(--muted)">—</span>';
+          return `<tr><td style="max-width:170px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;" title="${q.keys[0]}">${q.keys[0]}</td>
+            <td><span class="pos-badge ${pc}">${pos}</span></td>
+            <td>${q.clicks}</td><td>${q.impressions}</td><td>${delta}</td></tr>`;
+        }).join('')}
+        </tbody></table></div>`;
+    }
+    if (pages.length) {
+      html += `<div class="card"><div class="card-title">TOP PAGES (last 28 days)</div>
+        <table class="sc-table"><thead><tr><th>Page</th><th>Clicks</th><th>Pos</th><th>CTR</th></tr></thead><tbody>
+        ${pages.slice(0,10).map(p => {
+          const url = p.keys[0].replace(/https?:\/\/(www\.)?xgym\.com\.au/, '') || '/';
+          const pos = parseFloat(p.position.toFixed(1));
+          const pc  = pos <= 3 ? 'pos-1-3' : pos <= 10 ? 'pos-4-10' : 'pos-11p';
+          const ctr = p.impressions > 0 ? ((p.clicks/p.impressions)*100).toFixed(1)+'%' : '—';
+          return `<tr><td style="max-width:190px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;" title="${url}">${url}</td>
+            <td>${p.clicks}</td><td><span class="pos-badge ${pc}">${pos}</span></td><td>${ctr}</td></tr>`;
+        }).join('')}
+        </tbody></table></div>`;
+    }
+    html += `</div>`;
+  }
+
+  document.getElementById('sc-block').innerHTML = html;
+}
+
+async function loadSEOChanges() {
+  const el = document.getElementById('seo-changes-list');
+  const { data: changes } = await sb.from('seo_changes').select('*').order('change_date', { ascending: false }).limit(60);
+
+  if (!changes || !changes.length) {
+    el.innerHTML = '<div style="color:var(--muted2);font-size:13px;padding:20px 0;text-align:center;">No changes logged yet — click "+ Log Change" above to track your first SEO update.</div>';
+    return;
+  }
+
+  const typeLabel = { content:'Content', meta:'Meta', heading:'Headings', links:'Links', speed:'Speed', 'new-page':'New Page', redirect:'Redirect', schema:'Schema', backlinks:'Backlinks', other:'Other' };
+  const statusOpts = [
+    ['monitoring','🟡 Monitoring'], ['positive','🟢 Positive impact'],
+    ['negative','🔴 Negative impact'], ['neutral','⚪ No change'], ['reverted','↩ Reverted'],
+  ];
+
+  el.innerHTML = changes.map(c => `
+    <div class="seo-change-item status-${c.status || 'monitoring'}" id="chg-${c.id}">
+      <div style="display:flex;justify-content:space-between;align-items:flex-start;gap:12px;">
+        <div style="flex:1;min-width:0;">
+          <div style="display:flex;align-items:center;gap:8px;flex-wrap:wrap;margin-bottom:6px;">
+            <span style="font-weight:600;font-size:13px;">${c.page_name}</span>
+            <span class="change-type-badge">${typeLabel[c.change_type] || c.change_type}</span>
+            <span style="font-size:11px;color:var(--muted2);">${new Date(c.change_date + 'T00:00:00').toLocaleDateString('en-AU',{day:'numeric',month:'short',year:'numeric'})}</span>
+            <span style="font-size:11px;color:var(--muted);">· ${c.changed_by}</span>
+          </div>
+          <div style="font-size:13px;line-height:1.55;">${c.description}</div>
+          ${c.page_url ? `<div style="font-size:11px;color:var(--blue);margin-top:5px;">${c.page_url}</div>` : ''}
+          ${c.outcome_notes ? `<div style="font-size:12px;color:var(--muted2);margin-top:8px;padding:8px 10px;background:var(--surface3);border-radius:6px;line-height:1.5;font-style:italic;">${c.outcome_notes}</div>` : ''}
+        </div>
+        <div style="flex-shrink:0;display:flex;flex-direction:column;gap:6px;align-items:flex-end;">
+          <select class="status-select" onchange="updateSEOStatus('${c.id}', this.value, this.closest('.seo-change-item'))">
+            ${statusOpts.map(([v,l]) => `<option value="${v}" ${c.status===v?'selected':''}>${l}</option>`).join('')}
+          </select>
+          <button class="btn btn-outline btn-sm" onclick="addOutcomeNote('${c.id}')">+ Note</button>
+        </div>
+      </div>
+    </div>`).join('');
+}
+
+function toggleAddChange() {
+  const f = document.getElementById('add-change-form');
+  f.style.display = f.style.display === 'none' ? 'block' : 'none';
+}
+
+async function addSEOChange() {
+  const date = document.getElementById('chg-date').value;
+  const page = document.getElementById('chg-page').value.trim();
+  const url  = document.getElementById('chg-url').value.trim();
+  const type = document.getElementById('chg-type').value;
+  const desc = document.getElementById('chg-desc').value.trim();
+  const by   = document.getElementById('chg-by').value.trim() || 'SEO team';
+
+  if (!date || !page || !desc) { toast('Date, page name, and description are required', 'error'); return; }
+
+  const { error } = await sb.from('seo_changes').insert({ change_date: date, page_name: page, page_url: url || null, change_type: type, description: desc, changed_by: by, status: 'monitoring' });
+  if (error) { toast('Error saving: ' + error.message, 'error'); return; }
+
+  toast('Change logged', 'success');
+  toggleAddChange();
+  ['chg-page','chg-url','chg-desc'].forEach(id => { document.getElementById(id).value = ''; });
+  document.getElementById('chg-by').value = 'SEO team';
+  document.getElementById('chg-date').value = new Date().toISOString().split('T')[0];
+  loadSEOChanges();
+}
+
+async function updateSEOStatus(id, status, el) {
+  const { error } = await sb.from('seo_changes').update({ status }).eq('id', id);
+  if (error) { toast('Error updating status', 'error'); return; }
+  if (el) el.className = `seo-change-item status-${status}`;
+  toast('Status updated', 'success');
+}
+
+async function addOutcomeNote(id) {
+  const note = prompt('What happened after this change? (ranking movement, traffic change, etc.)');
+  if (note === null) return;
+  const { error } = await sb.from('seo_changes').update({ outcome_notes: note.trim() || null }).eq('id', id);
+  if (error) { toast('Error saving note', 'error'); return; }
+  toast('Note saved', 'success');
+  loadSEOChanges();
 }
 
 // ─── START ─────────────────────────────────────────────────────────────────
