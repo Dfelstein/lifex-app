@@ -4117,7 +4117,7 @@ async function loadAnalytics() {
 }
 
 let _leafletMap = null;
-let _leafletCircles = null; // LayerGroup for circles — cleared on re-render
+let _leafletPolygons = null; // LayerGroup for suburb polygons — cleared on re-render
 
 // Pre-baked Australian suburb coordinates — instant lookup, no API call needed
 const AUS_SUBURBS = {"castle hill||nsw":{lat:-33.7322,lng:151.0043},"baulkham hills||nsw":{lat:-33.7593,lng:150.9869},"kellyville||nsw":{lat:-33.7216,lng:150.9612},"rouse hill||nsw":{lat:-33.6883,lng:150.9163},"norwest||nsw":{lat:-33.7293,lng:150.9699},"bella vista||nsw":{lat:-33.7352,lng:150.9535},"winston hills||nsw":{lat:-33.7772,lng:150.9756},"seven hills||nsw":{lat:-33.7746,lng:150.9381},"blacktown||nsw":{lat:-33.7718,lng:150.9057},"penrith||nsw":{lat:-33.7512,lng:150.6942},"parramatta||nsw":{lat:-33.8148,lng:151.0017},"westmead||nsw":{lat:-33.8037,lng:150.9878},"pennant hills||nsw":{lat:-33.7359,lng:151.0706},"cherrybrook||nsw":{lat:-33.7291,lng:151.0467},"carlingford||nsw":{lat:-33.7779,lng:151.0477},"beecroft||nsw":{lat:-33.7495,lng:151.0618},"epping||nsw":{lat:-33.7721,lng:151.0814},"hornsby||nsw":{lat:-33.7022,lng:151.0997},"wahroonga||nsw":{lat:-33.7178,lng:151.1192},"pymble||nsw":{lat:-33.7452,lng:151.1407},"gordon||nsw":{lat:-33.7568,lng:151.1499},"st ives||nsw":{lat:-33.7375,lng:151.1682},"chatswood||nsw":{lat:-33.7974,lng:151.1806},"lane cove||nsw":{lat:-33.8152,lng:151.1687},"north sydney||nsw":{lat:-33.8404,lng:151.2073},"sydney||nsw":{lat:-33.8688,lng:151.2093},"manly||nsw":{lat:-33.7969,lng:151.2864},"dee why||nsw":{lat:-33.7494,lng:151.2848},"brookvale||nsw":{lat:-33.7708,lng:151.2698},"mosman||nsw":{lat:-33.8269,lng:151.2437},"bondi||nsw":{lat:-33.8915,lng:151.2767},"bondi junction||nsw":{lat:-33.8931,lng:151.2527},"surry hills||nsw":{lat:-33.8872,lng:151.2104},"newtown||nsw":{lat:-33.8977,lng:151.1795},"glebe||nsw":{lat:-33.8796,lng:151.1861},"leichhardt||nsw":{lat:-33.8833,lng:151.1574},"burwood||nsw":{lat:-33.8773,lng:151.1033},"strathfield||nsw":{lat:-33.8743,lng:151.0813},"merrylands||nsw":{lat:-33.8355,lng:150.9911},"liverpool||nsw":{lat:-33.9200,lng:150.9236},"campbelltown||nsw":{lat:-34.0667,lng:150.8144},"sutherland||nsw":{lat:-34.0324,lng:151.0569},"cronulla||nsw":{lat:-34.0548,lng:151.1527},"miranda||nsw":{lat:-34.0281,lng:151.1027},"kogarah||nsw":{lat:-33.9653,lng:151.1341},"hurstville||nsw":{lat:-33.9665,lng:151.1014},"bankstown||nsw":{lat:-33.9174,lng:151.0333},"fairfield||nsw":{lat:-33.8714,lng:150.9586},"cabramatta||nsw":{lat:-33.8935,lng:150.9413},"richmond||nsw":{lat:-33.5998,lng:150.7529},"windsor||nsw":{lat:-33.6134,lng:150.8126},"quakers hill||nsw":{lat:-33.7326,lng:150.8805},"stanhope gardens||nsw":{lat:-33.7160,lng:150.9207},"glenwood||nsw":{lat:-33.7282,lng:150.9286},"beaumont hills||nsw":{lat:-33.6992,lng:150.9443},"box hill||nsw":{lat:-33.6613,lng:150.9286},"schofields||nsw":{lat:-33.6924,lng:150.8804},"marsden park||nsw":{lat:-33.6957,lng:150.8466},"agnes banks||nsw":{lat:-33.5953,lng:150.7785},"cobbitty||nsw":{lat:-34.0218,lng:150.7108},"narellan||nsw":{lat:-34.0443,lng:150.7378},"camden||nsw":{lat:-34.0572,lng:150.6973},"wollongong||nsw":{lat:-34.4278,lng:150.8931},"newcastle||nsw":{lat:-32.9283,lng:151.7817},"maitland||nsw":{lat:-32.7333,lng:151.5500},"gosford||nsw":{lat:-33.4280,lng:151.3411},"wyong||nsw":{lat:-33.2833,lng:151.4167},"charlestown||nsw":{lat:-33.0192,lng:151.6917},"tuggerah||nsw":{lat:-33.2994,lng:151.3847},"central coast||nsw":{lat:-33.3300,lng:151.3600},"coffs harbour||nsw":{lat:-30.2963,lng:153.1135},"port macquarie||nsw":{lat:-31.4333,lng:152.9000},"tamworth||nsw":{lat:-31.0833,lng:150.9167},"orange||nsw":{lat:-33.2833,lng:149.1000},"dubbo||nsw":{lat:-32.2569,lng:148.6011},"albury||nsw":{lat:-36.0806,lng:146.9158},"wagga wagga||nsw":{lat:-35.1081,lng:147.3686},"melbourne||vic":{lat:-37.8136,lng:144.9631},"richmond||vic":{lat:-37.8183,lng:145.0019},"south yarra||vic":{lat:-37.8388,lng:144.9946},"fitzroy||vic":{lat:-37.8013,lng:144.9798},"carlton||vic":{lat:-37.8001,lng:144.9665},"st kilda||vic":{lat:-37.8676,lng:144.9820},"prahran||vic":{lat:-37.8510,lng:144.9971},"hawthorn||vic":{lat:-37.8217,lng:145.0280},"balwyn||vic":{lat:-37.8125,lng:145.0779},"box hill||vic":{lat:-37.8196,lng:145.1212},"ringwood||vic":{lat:-37.8157,lng:145.2282},"dandenong||vic":{lat:-37.9891,lng:145.2150},"frankston||vic":{lat:-38.1447,lng:145.1313},"geelong||vic":{lat:-38.1499,lng:144.3617},"ballarat||vic":{lat:-37.5622,lng:143.8503},"bendigo||vic":{lat:-36.7570,lng:144.2794},"brisbane||qld":{lat:-27.4698,lng:153.0251},"gold coast||qld":{lat:-28.0167,lng:153.4000},"sunshine coast||qld":{lat:-26.6500,lng:153.0667},"cairns||qld":{lat:-16.9186,lng:145.7781},"townsville||qld":{lat:-19.2589,lng:146.8169},"toowoomba||qld":{lat:-27.5598,lng:151.9507},"ipswich||qld":{lat:-27.6167,lng:152.7667},"springwood||qld":{lat:-27.6166,lng:153.1120},"chermside||qld":{lat:-27.3864,lng:153.0283},"perth||wa":{lat:-31.9505,lng:115.8605},"fremantle||wa":{lat:-32.0569,lng:115.7439},"joondalup||wa":{lat:-31.7436,lng:115.7660},"mandurah||wa":{lat:-32.5275,lng:115.7228},"rockingham||wa":{lat:-32.2803,lng:115.7292},"subiaco||wa":{lat:-31.9471,lng:115.8267},"adelaide||sa":{lat:-34.9285,lng:138.6007},"glenelg||sa":{lat:-34.9818,lng:138.5150},"norwood||sa":{lat:-34.9228,lng:138.6268},"unley||sa":{lat:-34.9500,lng:138.5975},"darwin||nt":{lat:-12.4634,lng:130.8456},"canberra||act":{lat:-35.2809,lng:149.1300},"belconnen||act":{lat:-35.2370,lng:149.0786},"tuggeranong||act":{lat:-35.4183,lng:149.0671},"hobart||tas":{lat:-42.8821,lng:147.3272},"launceston||tas":{lat:-41.4332,lng:147.1441}};
@@ -4131,25 +4131,20 @@ function countToColor(count, max) {
   else               return { fill: '#ff7043', border: '#e05a30', opacity: 0.90 }; // orange-red
 }
 
+const POLY_CACHE_KEY = 'lifex_poly_cache_v1';
+let _polyCache = null;
+function loadPolyCache() {
+  if (_polyCache) return _polyCache;
+  try { _polyCache = JSON.parse(localStorage.getItem(POLY_CACHE_KEY) || '{}'); } catch { _polyCache = {}; }
+  return _polyCache;
+}
+function savePolyCache() {
+  try { localStorage.setItem(POLY_CACHE_KEY, JSON.stringify(_polyCache)); } catch {}
+}
+
 function renderSuburbMap(suburbs) {
   const mapEl = document.getElementById('an-map');
-  if (!mapEl) return;
-
-  // Resolve coordinates from pre-baked table + localStorage cache
-  const GEO_CACHE_KEY = 'lifex_geocache_v2';
-  let geoCache = {};
-  try { geoCache = JSON.parse(localStorage.getItem(GEO_CACHE_KEY) || '{}'); } catch {}
-
-  const points = [];
-  const missing = [];
-  for (const { suburb, state, count } of suburbs) {
-    const key = `${suburb}||${state}`.toLowerCase();
-    const coords = AUS_SUBURBS[key] || geoCache[key];
-    if (coords) points.push({ lat: coords.lat, lng: coords.lng, suburb, state, count });
-    else missing.push({ suburb, state, count });
-  }
-
-  if (!points.length && !missing.length) return;
+  if (!mapEl || !suburbs.length) return;
 
   // Init Leaflet map once — reuse across calls
   if (!_leafletMap) {
@@ -4158,65 +4153,92 @@ function renderSuburbMap(suburbs) {
       attribution: '&copy; OpenStreetMap &copy; CARTO',
       subdomains: 'abcd', maxZoom: 18
     }).addTo(_leafletMap);
-    _leafletCircles = L.layerGroup().addTo(_leafletMap);
+    _leafletPolygons = L.layerGroup().addTo(_leafletMap);
   } else {
-    _leafletCircles.clearLayers();
+    _leafletPolygons.clearLayers();
   }
 
-  if (!points.length) {
-    _leafletMap.setView([-33.87, 151.21], 10);
-    return;
-  }
+  const maxCount = Math.max(...suburbs.map(s => s.count));
+  const polyCache = loadPolyCache();
+  const allBounds = [];
 
-  const maxCount = Math.max(...points.map(p => p.count));
-  const sorted = [...points].sort((a, b) => a.count - b.count); // small first so big draw on top
-
-  for (const pt of sorted) {
-    const { fill, border, opacity } = countToColor(pt.count, maxCount);
-    const radius = 800 + (pt.count / maxCount) * 6000; // metres
-    const circle = L.circle([pt.lat, pt.lng], {
-      radius,
-      color: border,
-      fillColor: fill,
-      fillOpacity: opacity,
-      weight: 1.5,
+  // Render a suburb polygon (from cached GeoJSON) onto the map
+  const addPolygon = (suburb, state, count, geojson) => {
+    const { fill, border, opacity } = countToColor(count, maxCount);
+    const layer = L.geoJSON(geojson, {
+      style: {
+        color: border,
+        fillColor: fill,
+        fillOpacity: opacity,
+        weight: 1.5,
+        opacity: 1,
+      }
     });
-    circle.bindTooltip(
-      `<strong>${pt.suburb}</strong>${pt.state ? ', ' + pt.state : ''} — <span style="color:#f5c842;font-weight:700;">${pt.count} client${pt.count !== 1 ? 's' : ''}</span>`,
+    layer.bindTooltip(
+      `<strong>${suburb}</strong>${state ? ', ' + state : ''} — <span style="color:#f5c842;font-weight:700;">${count} client${count !== 1 ? 's' : ''}</span>`,
       { sticky: true, opacity: 0.95 }
     );
-    _leafletCircles.addLayer(circle);
+    layer.on('mouseover', function() { this.setStyle({ fillOpacity: Math.min(opacity + 0.2, 1), weight: 2.5 }); });
+    layer.on('mouseout',  function() { this.setStyle({ fillOpacity: opacity, weight: 1.5 }); });
+    _leafletPolygons.addLayer(layer);
+    try {
+      const b = layer.getBounds();
+      if (b.isValid()) allBounds.push(b);
+    } catch {}
+  };
+
+  // Queue of suburbs that need polygon fetch
+  const toFetch = [];
+
+  for (const { suburb, state, count } of suburbs) {
+    const key = `${suburb}||${state}`.toLowerCase();
+    if (polyCache[key]) {
+      addPolygon(suburb, state, count, polyCache[key]);
+    } else {
+      toFetch.push({ suburb, state, count, key });
+    }
   }
 
-  // Fit map to circles
-  const lats = points.map(p => p.lat), lngs = points.map(p => p.lng);
-  const bounds = L.latLngBounds(
-    [Math.min(...lats) - 0.1, Math.min(...lngs) - 0.1],
-    [Math.max(...lats) + 0.1, Math.max(...lngs) + 0.1]
-  );
-  _leafletMap.fitBounds(bounds, { padding: [24, 24] });
+  // Fit map immediately to whatever is already rendered
+  const fitMap = () => {
+    if (allBounds.length) {
+      const combined = allBounds.reduce((acc, b) => acc.extend(b), L.latLngBounds(allBounds[0]));
+      _leafletMap.fitBounds(combined, { padding: [24, 24] });
+    } else {
+      _leafletMap.setView([-33.75, 151.0], 10); // default: Castle Hill area
+    }
+  };
+  fitMap();
 
-  // Background geocode any uncached suburbs at 1/sec (Nominatim free tier)
-  if (missing.length) {
-    let i = 0;
-    const geocodeNext = () => {
-      if (i >= missing.length) return;
-      const { suburb, state } = missing[i++];
-      const query = encodeURIComponent(`${suburb}${state ? ', ' + state : ''}, Australia`);
-      fetch(`https://nominatim.openstreetmap.org/search?q=${query}&format=json&limit=1`)
-        .then(r => r.json())
-        .then(res => {
-          if (res?.[0]) {
-            const key = `${suburb}||${state}`.toLowerCase();
-            geoCache[key] = { lat: parseFloat(res[0].lat), lng: parseFloat(res[0].lon) };
-            try { localStorage.setItem(GEO_CACHE_KEY, JSON.stringify(geoCache)); } catch {}
+  // Fetch polygons for uncached suburbs 1/sec (Nominatim rate limit)
+  if (!toFetch.length) return;
+  let i = 0;
+  const fetchNext = () => {
+    if (i >= toFetch.length) return;
+    const { suburb, state, count, key } = toFetch[i++];
+    const q = encodeURIComponent(`${suburb}${state ? ', ' + state : ''}, Australia`);
+    fetch(`https://nominatim.openstreetmap.org/search?q=${q}&format=geojson&limit=3&polygon_geojson=1&featureType=settlement`)
+      .then(r => r.json())
+      .then(data => {
+        // Pick best match: prefer suburb/hamlet/village type, polygon geometry
+        const features = data.features || [];
+        const best = features.find(f => f.geometry?.type === 'Polygon' || f.geometry?.type === 'MultiPolygon')
+                  || features[0];
+        if (best?.geometry) {
+          _polyCache[key] = best.geometry;
+          savePolyCache();
+          addPolygon(suburb, state, count, best.geometry);
+          // Re-fit after new polygon added
+          if (allBounds.length) {
+            const combined = allBounds.reduce((acc, b) => acc.extend(b), L.latLngBounds(allBounds[0]));
+            _leafletMap.fitBounds(combined, { padding: [24, 24] });
           }
-        })
-        .catch(() => {})
-        .finally(() => setTimeout(geocodeNext, 1100));
-    };
-    setTimeout(geocodeNext, 500);
-  }
+        }
+      })
+      .catch(() => {})
+      .finally(() => setTimeout(fetchNext, 1200));
+  };
+  setTimeout(fetchNext, 300);
 }
 
 function anBarChart(entries, color, total, colors) {
