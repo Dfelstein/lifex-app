@@ -1762,31 +1762,75 @@ const quizBank = [
   { q:'What is considered a "fit" body fat range for males on a DEXA scan?', a:'8–17%', wrong:['4–7%','18–24%','25–29%'] },
   { q:'What is considered a "fit" body fat range for females on a DEXA scan?', a:'18–27%', wrong:['10–15%','28–34%','35–40%'] },
   { q:'What is the average lean mass (muscle + bone) for a male Life X client?', a:'60–70 kg', wrong:['45–50 kg','75–85 kg','30–40 kg'] },
-  { q:'What is Fat Mass Index (FMI) and what is a healthy male value?', a:'Fat mass divided by height² — healthy is below 6 kg/m²', wrong:['Fat percentage × weight — healthy is below 20','Total fat grams ÷ lean grams — healthy is below 0.3','Fat mass × BMI — healthy is below 25'] },
-  { q:'What does FFMI (Fat-Free Mass Index) measure?', a:'Lean mass relative to height — a score above 20 indicates good muscle development', wrong:['Fat mass relative to body weight','Bone mineral density relative to age','Metabolic rate per unit of lean tissue'] },
+  { q:'What does FFMI (Fat-Free Mass Index) measure?', a:'Lean mass relative to height — above 20 indicates good muscle development', wrong:['Fat mass relative to body weight','Bone mineral density relative to age','Metabolic rate per unit of lean tissue'] },
   { q:'On a DEXA scan, what does the A:G (Android:Gynoid) ratio tell you?', a:'The ratio of belly fat to hip fat — above 1.0 indicates elevated metabolic risk', wrong:['The ratio of muscle to fat in the abdomen','How fat is distributed between upper and lower limbs','The ratio of bone density to body mass'] },
   { q:'During a calorie deficit, which is the BEST way to preserve muscle mass?', a:'High protein intake + resistance training', wrong:['Low-intensity cardio only','Eating at maintenance','Fasting for 24 hours weekly'] },
+  { q:'A DEXA scan can detect which of these that a regular scale CANNOT?', a:'Whether weight loss is fat, muscle, or water', wrong:['How many calories you burned today','Your blood pressure and cholesterol','Your hydration level'] },
+  { q:'What is the recommended minimum protein intake to preserve muscle during a calorie deficit?', a:'1.6–2.2g per kg of bodyweight', wrong:['0.5–0.8g per kg of bodyweight','3.0–4.0g per kg of bodyweight','0.8–1.0g per kg of bodyweight'] },
+  { q:'The trunk fat % on a DEXA scan refers to fat in which region?', a:'The torso — chest, abdomen, and lower back', wrong:['Only the abdominal area below the navel','The entire upper body including arms','The gluteal and hip region only'] },
+  { q:'What is Fat Mass Index (FMI)? A healthy value for males is:', a:'Fat mass ÷ height² — healthy is below 6 kg/m²', wrong:['Fat% × weight — healthy is below 20','Total fat grams ÷ lean grams — healthy is below 0.3','Fat mass × BMI — healthy is below 25'] },
+  { q:'Which body fat distribution pattern is more metabolically dangerous?', a:'Apple shape — excess fat concentrated in the abdomen', wrong:['Pear shape — excess fat in hips and thighs','Uniform fat distribution across all regions','Higher fat in the arms and legs'] },
+  { q:'What is the ALMI (Appendicular Lean Mass Index) used for?', a:'Measuring muscle mass in limbs relative to height — low scores indicate sarcopenia risk', wrong:['Measuring bone density in the spine and hip','Calculating total body water percentage','Estimating daily calorie burn from movement'] },
 
   // ── VAT (Visceral Adipose Tissue) ──
   { q:'What does VAT stand for and why does it matter?', a:'Visceral Adipose Tissue — fat around organs, highest metabolic risk', wrong:['Vascular Adipose Tissue — fat in blood vessels','Volumetric Adipose Tracking — total fat volume','Variable Abdominal Tissue — abdominal wall fat'] },
   { q:'What is the average VAT area (cm²) seen in Life X clients on a DEXA scan?', a:'80–130 cm²', wrong:['10–30 cm²','200–300 cm²','150–180 cm²'] },
-  { q:'According to the Hologic DEXA interpretation guide, at what VAT area does high risk begin?', a:'Above 160 cm²', wrong:['Above 50 cm²','Above 300 cm²','Above 100 cm²'] },
+  { q:'According to the Hologic DEXA guide, at what VAT area does high risk begin?', a:'Above 160 cm²', wrong:['Above 50 cm²','Above 300 cm²','Above 100 cm²'] },
   { q:'What is the BEST proven strategy to reduce visceral fat (VAT)?', a:'Calorie deficit + high-intensity cardio + resistance training', wrong:['Spot reduction ab exercises','High-fat ketogenic diet only','Increasing daily steps alone'] },
+  { q:'VAT is metabolically dangerous because it:', a:'Releases inflammatory hormones directly into the portal bloodstream', wrong:['Makes it harder to move freely','Reduces testosterone production directly','Causes water retention in the lower body'] },
+  { q:'Which lifestyle factor has the STRONGEST link to elevated VAT?', a:'Chronic stress + poor sleep + processed food diet', wrong:['Eating after 8pm only','Skipping breakfast','Low vitamin C intake'] },
 
   // ── RMR & Metabolism ──
   { q:'What RMR fat burning % is considered optimal at Life X?', a:'80% fat burning at rest', wrong:['50% fat burning at rest','95% fat burning at rest','60% fat burning at rest'] },
-  { q:'What is the average RMR (resting metabolic rate) for a male Life X client?', a:'1,800–2,100 kcal/day', wrong:['1,000–1,200 kcal/day','2,500–2,800 kcal/day','800–1,000 kcal/day'] },
+  { q:'What is the average RMR for a male Life X client?', a:'1,800–2,100 kcal/day', wrong:['1,000–1,200 kcal/day','2,500–2,800 kcal/day','800–1,000 kcal/day'] },
   { q:'What does a low fat burning % on your RMR test most likely indicate?', a:'Poor metabolic flexibility — the body over-relies on glucose at rest', wrong:['An overactive thyroid gland','Too much muscle mass reducing fat access','Dehydration on the day of testing'] },
+  { q:'What does FEO2 (efficiency) measure in an RMR test?', a:'How efficiently your body extracts oxygen from the air you breathe', wrong:['How much fat you can burn during exercise','The percentage of energy from carbohydrates','Your lung capacity at rest'] },
+  { q:'What is the most reliable way to boost your resting metabolic rate long term?', a:'Build more muscle mass through progressive resistance training', wrong:['Drink more coffee daily','Do fasted cardio every morning','Eat 6 small meals per day'] },
+  { q:'The RMR test at Life X uses which method?', a:'Indirect calorimetry — measuring oxygen consumption and CO₂ output', wrong:['Bioelectrical impedance — sending electrical current through the body','A formula based on height, weight, and age','An infrared scan of core body temperature'] },
+  { q:'Why do generic calorie calculators (Harris-Benedict etc.) often underestimate Life X clients?', a:'Clients tend to have above-average muscle mass, which burns more at rest', wrong:['The formulas are designed for children','Life X clients eat too little to match the formula','Generic calculators only work for females'] },
 
   // ── Bone Density ──
   { q:'A T-score of −1.0 to −2.5 on a bone density scan indicates:', a:'Osteopenia — low bone density, not yet osteoporosis', wrong:['Osteoporosis — severe bone loss','Normal bone density','Hyperdensity — too much bone mineral'] },
   { q:'Which training type is MOST effective for maintaining bone density?', a:'Heavy compound resistance training (squats, deadlifts)', wrong:['Swimming and cycling','High-rep light weight training','Stretching and yoga'] },
+  { q:'Which nutrients work together to direct calcium into bones (not arteries)?', a:'Vitamin D3 + Vitamin K2 + Calcium', wrong:['Vitamin C + Magnesium + Zinc','Iron + Folate + B12','Omega-3 + CoQ10 + Selenium'] },
+  { q:'The Z-score on a DEXA bone scan compares you to:', a:'People of the same age and sex', wrong:['A healthy 30-year-old of the same sex','The world average regardless of age','The previous scan result'] },
+  { q:'A T-score better than −1.0 on a DEXA scan means:', a:'Normal bone density', wrong:['Osteopenia detected','Early osteoporosis','Hyperdensity — too dense'] },
 
   // ── Blood & Hormones ──
   { q:'SHBG affects testosterone availability. Low SHBG means:', a:'More free (bioavailable) testosterone', wrong:['Less testosterone produced','Higher total testosterone','Lower metabolic rate'] },
   { q:'Which blood marker is the strongest indicator of long-term cardiovascular risk?', a:'ApoB (Apolipoprotein B) — counts all atherogenic particles', wrong:['Total cholesterol','LDL particle size only','Triglycerides alone'] },
+  { q:'What does hsCRP measure in a blood panel?', a:'Systemic inflammation — elevated levels indicate higher cardiovascular and metabolic risk', wrong:['Red blood cell count and iron stores','Blood sugar regulation over 3 months','Kidney filtration efficiency'] },
+  { q:'HbA1c reflects your average blood glucose over:', a:'The past 2–3 months', wrong:['The past 24 hours','The past 2 weeks','The past 12 months'] },
+  { q:'A fasting insulin level above 10 mU/L most commonly indicates:', a:'Early insulin resistance — cells are becoming less responsive to insulin', wrong:['Type 1 diabetes','Low blood sugar risk','Overactive pancreas from too much protein'] },
+  { q:'Cortisol is often called the "stress hormone." Chronically high cortisol leads to:', a:'Increased VAT, muscle breakdown, and elevated blood sugar', wrong:['Faster metabolism and better fat burning','Higher testosterone and better sleep','Improved insulin sensitivity and lower blood pressure'] },
+  { q:'Free testosterone differs from total testosterone because:', a:'Free testosterone is not bound to SHBG and is the biologically active form', wrong:['Free testosterone is produced in the adrenal gland only','Free testosterone is measured differently based on age','Free testosterone only matters in females'] },
+  { q:'Which thyroid marker is the most sensitive indicator of active thyroid function?', a:'FT3 (Free Triiodothyronine) — the active form of thyroid hormone', wrong:['TSH — thyroid stimulating hormone','Total T4 — bound and free thyroxine combined','Reverse T3 — the inactive form'] },
+
+  // ── Lifestyle & Performance ──
+  { q:'How many hours of sleep is optimal for muscle recovery and hormone production?', a:'7–9 hours per night consistently', wrong:['4–5 hours with naps','10–12 hours for maximum recovery','Exactly 6 hours, no more needed'] },
+  { q:'Which macronutrient has the highest thermic effect (burns the most calories digesting)?', a:'Protein — roughly 25–30% of its calories are used in digestion', wrong:['Fat — requires the most energy to store','Carbohydrates — spikes insulin the most','Fibre — passes through undigested'] },
+  { q:'Progressive overload means:', a:'Gradually increasing the stress on a muscle over time to force adaptation', wrong:['Eating more food each week to fuel bigger muscles','Training the same muscle group every day','Adding cardio sessions until you plateau'] },
+  { q:'What is the minimum effective volume of resistance training for muscle growth?', a:'Around 10 sets per muscle group per week', wrong:['1–2 sets per session is sufficient','30+ sets per muscle group per week','Only one heavy session per muscle per month'] },
+  { q:'Why is muscle mass so important for long-term metabolic health?', a:'Muscle is metabolically active — it burns more calories at rest and improves insulin sensitivity', wrong:['Muscle makes the body look leaner but has no metabolic effect','More muscle means higher cortisol and lower fat burning','Muscle mass only matters for athletes, not general health'] },
 ];
-let spinState = { phase:'quiz', quizIdx:0, quizAnswered:false, spinning:false };
+
+// Shuffle array in place (Fisher-Yates)
+function shuffleArr(arr) {
+  for (let i = arr.length - 1; i > 0; i--) {
+    const j = Math.floor(Math.random() * (i + 1));
+    [arr[i], arr[j]] = [arr[j], arr[i]];
+  }
+  return arr;
+}
+
+// Build a randomised queue that exhausts all questions before repeating
+let _quizQueue = [];
+function nextQuizQuestion() {
+  if (_quizQueue.length === 0) _quizQueue = shuffleArr([...Array(quizBank.length).keys()]);
+  return quizBank[_quizQueue.pop()];
+}
+
+let spinState = { phase:'quiz', currentQ: null, quizAnswered:false, spinning:false };
 let wheelAngle=0, wheelVelocity=0, wheelAnim=null;
 const WHEEL_SEGMENTS=[{pts:5,color:'#1c2128'},{pts:20,color:'#1a3a2a'},{pts:10,color:'#1c2128'},{pts:30,color:'#2a2010'},{pts:5,color:'#1c2128'},{pts:15,color:'#1a3050'},{pts:10,color:'#1c2128'},{pts:20,color:'#1a3a2a'}];
 
@@ -1805,7 +1849,8 @@ function renderSpin() {
       </div></div>`;
       return;
     }
-    const q = quizBank[spinState.quizIdx % quizBank.length];
+    if (!spinState.currentQ) spinState.currentQ = nextQuizQuestion();
+    const q = spinState.currentQ;
     const opts = shuffleArr([q.a, ...q.wrong]);
     el.innerHTML = `<div style="max-width:640px;margin:0 auto;"><div class="card mb20">
       <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:16px;">
@@ -1846,7 +1891,7 @@ function answerQuiz(btn, selected, correct) {
     <div style="font-weight:600;color:${isCorrect?'var(--green)':'var(--orange)'};margin-bottom:4px;">${isCorrect?'✅ Correct!':'❌ Not quite.'}</div>
     ${!isCorrect?`<div style="font-size:12px;color:var(--muted2);">Answer: <strong style="color:var(--text)">${correct}</strong></div>`:''}
   </div>
-  <div style="margin-top:12px;text-align:center;"><button class="btn btn-gold" onclick="spinState.phase='wheel';spinState.quizAnswered=false;spinState.quizIdx++;renderSpin();">🎰 Spin the Wheel!</button></div>`;
+  <div style="margin-top:12px;text-align:center;"><button class="btn btn-gold" onclick="spinState.phase='wheel';spinState.quizAnswered=false;spinState.currentQ=null;renderSpin();">🎰 Spin the Wheel!</button></div>`;
 }
 
 function drawWheel(highlight=-1) {
@@ -1901,7 +1946,6 @@ function spinWheel() {
   wheelAnim=requestAnimationFrame(step);
 }
 
-function shuffleArr(arr) { return arr.sort(() => Math.random()-0.5); }
 
 function copyReferral(btn) {
   const code = document.getElementById('referral-code').textContent;
