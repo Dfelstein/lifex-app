@@ -125,13 +125,7 @@ html, body {
     <div class="sb-body">Tap <strong>Share → Add to Home Screen</strong> (iPhone) or <strong>Menu → Add to Home Screen</strong> (Android) so you can open your results anytime without hunting for the link.</div>
     <div class="sb-url">lifex.xgym.com.au</div>
   </div>
-  <div style="text-align:center;margin-top:12px;">
-    <div style="font-size:11px;color:var(--muted);margin-bottom:10px;letter-spacing:0.5px;">Staff access</div>
-    <button onclick="signInToMarketing()" style="display:inline-block;width:100%;padding:13px;background:rgba(245,200,66,0.08);border:1px solid rgba(245,200,66,0.25);border-radius:8px;color:var(--gold);font-family:'Outfit',sans-serif;font-size:14px;font-weight:600;cursor:pointer;transition:all 0.15s;" onmouseover="this.style.background='rgba(245,200,66,0.15)'" onmouseout="this.style.background='rgba(245,200,66,0.08)'">
-      🎯 Marketing Hub
-    </button>
-  </div>
-  <div style="text-align:center;margin-top:12px;">
+  <div style="text-align:center;margin-top:20px;">
     <div style="font-size:11px;color:var(--muted);margin-bottom:10px;letter-spacing:0.5px;">Don't have an account yet?</div>
     <a href="guest.html" style="display:inline-block;width:100%;padding:13px;background:transparent;border:1px solid var(--border2);border-radius:8px;color:var(--muted2);font-family:'Outfit',sans-serif;font-size:14px;font-weight:600;text-decoration:none;transition:all 0.15s;" onmouseover="this.style.borderColor='var(--gold)';this.style.color='var(--text)'" onmouseout="this.style.borderColor='var(--border2)';this.style.color='var(--muted2)'">
       Try Free Estimate &rarr;
@@ -176,21 +170,8 @@ sb.auth.onAuthStateChange((event, session) => {
 })();
 
 async function redirect(uid) {
-  const mktRedirect = sessionStorage.getItem('lifex_mkt_login');
-  if (mktRedirect) {
-    sessionStorage.removeItem('lifex_mkt_login');
-    const { data } = await sb.from('profiles').select('is_staff').eq('id', uid).single();
-    if (data?.is_staff) { window.location.href = 'marketing.html'; return; }
-  }
   const { data } = await sb.from('profiles').select('is_staff').eq('id', uid).single();
-  window.location.href = data?.is_staff ? 'staff.html' : 'dashboard.html';
-}
-
-function signInToMarketing() {
-  sessionStorage.setItem('lifex_mkt_login', '1');
-  document.getElementById('login-card').scrollIntoView({ behavior: 'smooth' });
-  document.getElementById('email').focus();
-  document.getElementById('btn').textContent = 'Sign In to Marketing Hub';
+  window.location.href = data?.is_staff ? 'portal.html' : 'dashboard.html';
 }
 
 async function signIn() {

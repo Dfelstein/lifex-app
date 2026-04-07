@@ -1,0 +1,124 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Life X — Portal</title>
+<link rel="manifest" href="manifest.json">
+<meta name="theme-color" content="#08090b">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<link rel="apple-touch-icon" href="icons/icon-192.png">
+<link href="https://fonts.googleapis.com/css2?family=Bebas+Neue&family=Outfit:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+<style>
+:root {
+  --bg: #08090b; --surface: #0f1114; --surface2: #161a1f;
+  --border: rgba(255,255,255,0.06); --border2: rgba(255,255,255,0.12);
+  --gold: #f5c842; --gold2: #e8a020; --blue: #4da6ff;
+  --text: #eef0f3; --muted: #5a6272; --muted2: #8a94a6;
+}
+*, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+html, body {
+  height: 100%; background: var(--bg); color: var(--text);
+  font-family: 'Outfit', sans-serif;
+  display: flex; align-items: center; justify-content: center;
+}
+#loading { position:fixed;inset:0;background:var(--bg);display:flex;flex-direction:column;align-items:center;justify-content:center;gap:16px;z-index:100; }
+.loading-mark { width:64px;height:64px;background:var(--gold);border-radius:16px;display:flex;align-items:center;justify-content:center;font-family:'Bebas Neue',sans-serif;font-size:30px;color:#000;animation:pulse 1.2s ease-in-out infinite; }
+@keyframes pulse{0%,100%{opacity:1}50%{opacity:0.4}}
+
+.wrap { width:100%;max-width:560px;padding:24px;display:none; }
+
+.logo { text-align:center;margin-bottom:40px; }
+.logo-mark { width:56px;height:56px;background:var(--gold);border-radius:14px;display:inline-flex;align-items:center;justify-content:center;font-family:'Bebas Neue',sans-serif;font-size:26px;color:#000;margin-bottom:12px; }
+.logo-name { font-family:'Bebas Neue',sans-serif;font-size:36px;letter-spacing:5px;line-height:1; }
+.logo-sub { font-size:11px;color:var(--muted2);letter-spacing:2px;text-transform:uppercase;margin-top:5px; }
+
+.greeting { text-align:center;margin-bottom:32px; }
+.greeting-name { font-family:'Bebas Neue',sans-serif;font-size:28px;letter-spacing:2px;margin-bottom:4px; }
+.greeting-sub { font-size:13px;color:var(--muted2); }
+
+.portal-grid { display:grid;grid-template-columns:1fr 1fr;gap:16px;margin-bottom:24px; }
+@media(max-width:480px) { .portal-grid { grid-template-columns:1fr; } }
+
+.portal-card {
+  background:var(--surface);border:1px solid var(--border2);border-radius:16px;
+  padding:28px 24px;cursor:pointer;transition:all 0.2s;text-align:center;
+  text-decoration:none;display:block;
+}
+.portal-card:hover { transform:translateY(-3px); }
+.portal-card.staff:hover { border-color:var(--blue);background:rgba(77,166,255,0.05); }
+.portal-card.marketing:hover { border-color:var(--gold);background:rgba(245,200,66,0.05); }
+
+.portal-icon { font-size:40px;margin-bottom:16px; }
+.portal-title { font-family:'Bebas Neue',sans-serif;font-size:24px;letter-spacing:2px;margin-bottom:8px; }
+.portal-card.staff .portal-title { color:var(--blue); }
+.portal-card.marketing .portal-title { color:var(--gold); }
+.portal-desc { font-size:12px;color:var(--muted2);line-height:1.5; }
+
+.signout { display:block;text-align:center;font-size:12px;color:var(--muted);cursor:pointer;text-decoration:underline;text-underline-offset:3px;margin-top:8px; }
+.signout:hover { color:var(--muted2); }
+</style>
+</head>
+<body>
+
+<div id="loading">
+  <div class="loading-mark">X</div>
+</div>
+
+<div class="wrap" id="app">
+  <div class="logo">
+    <div class="logo-mark">LX</div>
+    <div class="logo-name">Life X</div>
+    <div class="logo-sub">Body Intelligence</div>
+  </div>
+
+  <div class="greeting">
+    <div class="greeting-name">Welcome back, <span id="staff-name">—</span></div>
+    <div class="greeting-sub">Where would you like to go?</div>
+  </div>
+
+  <div class="portal-grid">
+    <a href="staff.html" class="portal-card staff">
+      <div class="portal-icon">🏥</div>
+      <div class="portal-title">Staff Portal</div>
+      <div class="portal-desc">Appointments, client scans, analytics and all clinic operations</div>
+    </a>
+    <a href="marketing.html" class="portal-card marketing">
+      <div class="portal-icon">🎯</div>
+      <div class="portal-title">Marketing Hub</div>
+      <div class="portal-desc">AI insights, content ideas, booking tracking and campaign data</div>
+    </a>
+  </div>
+
+  <span class="signout" onclick="signOut()">Sign out</span>
+</div>
+
+<script>
+const SUPABASE_URL = 'https://shvpwgrjqskccsdzajkj.supabase.co';
+const SUPABASE_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InNodnB3Z3JqcXNrY2NzZHphamtqIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzM5MDUzNTIsImV4cCI6MjA4OTQ4MTM1Mn0.2dL3J9XbzU8q8ogPPqhwR4w7_vSB0FxVKMzsAOxCgk4';
+const sb = window.supabase.createClient(SUPABASE_URL, SUPABASE_KEY);
+
+async function init() {
+  const { data: { session } } = await sb.auth.getSession();
+  if (!session) { window.location.href = 'index.html'; return; }
+
+  const { data: profile } = await sb.from('profiles').select('is_staff,full_name').eq('id', session.user.id).single();
+  if (!profile?.is_staff) { window.location.href = 'dashboard.html'; return; }
+
+  const firstName = (profile.full_name || '').split(' ')[0] || 'there';
+  document.getElementById('staff-name').textContent = firstName;
+  document.getElementById('loading').style.display = 'none';
+  document.getElementById('app').style.display = 'block';
+}
+
+async function signOut() {
+  await sb.auth.signOut();
+  window.location.href = 'index.html';
+}
+
+init();
+</script>
+</body>
+</html>
