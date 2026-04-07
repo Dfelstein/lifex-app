@@ -4067,6 +4067,7 @@ async function loadAnalytics() {
   );
 
   /* Top suburbs */
+  const AU_STATES = new Set(['nsw','vic','qld','wa','sa','tas','act','nt','australia']);
   const suburbMap = {}; // key: "Suburb||State", value: {suburb, state, count}
   allLeads.forEach(l => {
     if (!l.address) return;
@@ -4074,6 +4075,9 @@ async function loadAnalytics() {
     const suburb = parts.length >= 2 ? parts[1] : parts[0];
     const state  = parts.length >= 3 ? parts[2].replace(/\d/g,'').trim() : '';
     if (!suburb || suburb.length < 2) return;
+    // Skip entries where the "suburb" is just a state code or postcode
+    const suburbClean = suburb.replace(/\d/g,'').trim().toLowerCase();
+    if (AU_STATES.has(suburbClean) || suburbClean.length < 2) return;
     const key = `${suburb}||${state}`;
     if (!suburbMap[key]) suburbMap[key] = { suburb, state, count: 0 };
     suburbMap[key].count++;
@@ -4131,7 +4135,7 @@ function countToColor(count, max) {
   else               return { fill: '#ff7043', border: '#e05a30', opacity: 0.90 }; // orange-red
 }
 
-const POLY_CACHE_KEY = 'lifex_poly_cache_v1';
+const POLY_CACHE_KEY = 'lifex_poly_cache_v2'; // v2: filters out state-level polygons
 let _polyCache = null;
 function loadPolyCache() {
   if (_polyCache) return _polyCache;
@@ -4220,15 +4224,20 @@ function renderSuburbMap(suburbs) {
     fetch(`https://nominatim.openstreetmap.org/search?q=${q}&format=geojson&limit=3&polygon_geojson=1&featureType=settlement`)
       .then(r => r.json())
       .then(data => {
-        // Pick best match: prefer suburb/hamlet/village type, polygon geometry
         const features = data.features || [];
-        const best = features.find(f => f.geometry?.type === 'Polygon' || f.geometry?.type === 'MultiPolygon')
-                  || features[0];
+        // Pick best match: has a polygon AND a small enough bounding box (< 0.5° = suburb level)
+        const isSuburbSize = f => {
+          const bb = f.bbox; // [minLng, minLat, maxLng, maxLat]
+          if (!bb) return true; // no bbox info — allow it
+          return (bb[2] - bb[0]) < 0.5 && (bb[3] - bb[1]) < 0.5;
+        };
+        const best = features
+          .filter(f => (f.geometry?.type === 'Polygon' || f.geometry?.type === 'MultiPolygon') && isSuburbSize(f))[0]
+          || features.filter(isSuburbSize)[0];
         if (best?.geometry) {
           _polyCache[key] = best.geometry;
           savePolyCache();
           addPolygon(suburb, state, count, best.geometry);
-          // Re-fit after new polygon added
           if (allBounds.length) {
             const combined = allBounds.reduce((acc, b) => acc.extend(b), L.latLngBounds(allBounds[0]));
             _leafletMap.fitBounds(combined, { padding: [24, 24] });
