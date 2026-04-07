@@ -127,6 +127,14 @@ async function sendResultsEmail(sb: any, clientId: string, scanType: string, par
 
   const resultsList = bodyLines.map(l => `<p style="margin:4px 0;font-size:15px;color:#222">${l}</p>`).join('\n');
 
+  const introLine = scanType === 'DEXA'
+    ? `Your DEXA report has been uploaded to your Life X profile. You can also download the <a href="https://lifex.xgym.com.au/dexa-interpretation-guide.pdf" style="color:#b8860b;font-weight:600">DEXA Interpretation Guide</a> for help understanding your results.`
+    : scanType === 'RMR'
+    ? `Your RMR (Resting Metabolic Rate) results have been uploaded to your Life X profile. These show how your body burns fuel at rest — a great starting point for dialling in your nutrition.`
+    : scanType === 'BLOOD'
+    ? `Your blood panel results have been uploaded to your Life X profile. Full marker detail, ranges, and context are all in the app.`
+    : `Your hormone panel results have been uploaded to your Life X profile. Full marker detail and ranges are in the app.`;
+
   const html = `<!DOCTYPE html>
 <html>
 <head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"></head>
@@ -137,7 +145,7 @@ async function sendResultsEmail(sb: any, clientId: string, scanType: string, par
         <tr>
           <td style="padding:28px 32px 0">
             <p style="margin:0 0 20px;font-size:15px;color:#222;line-height:1.7">Hi ${firstName},</p>
-            <p style="margin:0 0 16px;font-size:15px;color:#222;line-height:1.7">Your DEXA report has been uploaded to your Life X profile. You can also download the <a href="https://lifex.xgym.com.au/dexa-interpretation-guide.pdf" style="color:#b8860b;font-weight:600">DEXA Interpretation Guide</a> for help understanding your results.</p>
+            <p style="margin:0 0 16px;font-size:15px;color:#222;line-height:1.7">${introLine}</p>
             <p style="margin:0 0 12px;font-size:15px;color:#222;line-height:1.7">Here's a quick look at your key numbers:</p>
             <div style="background:#f9f9f9;border-left:3px solid #C9A84C;padding:14px 18px;margin-bottom:20px;border-radius:0 4px 4px 0">
               ${resultsList}
