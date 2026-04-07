@@ -254,8 +254,9 @@ html, body { height: 100%; background: var(--bg); color: var(--text); font-famil
       <div class="integration-bar">
         <div class="int-badge connected"><div class="int-dot"></div> GA4 Active</div>
         <div class="int-badge connected"><div class="int-dot"></div> Search Console Active</div>
-        <div class="int-badge partial"><div class="int-dot"></div> Meta Pixel — Setup needed</div>
-        <div class="int-badge disconnected"><div class="int-dot"></div> Google Ads — Setup needed</div>
+        <div class="int-badge connected"><div class="int-dot"></div> Meta Pixel Active</div>
+        <div class="int-badge connected"><div class="int-dot"></div> Google Ads Connected</div>
+        <div class="int-badge connected"><div class="int-dot"></div> Acuity Webhook Active</div>
         <div class="int-badge disconnected"><div class="int-dot"></div> Meta Ads — Setup needed</div>
       </div>
 
@@ -294,6 +295,11 @@ html, body { height: 100%; background: var(--bg); color: var(--text); font-famil
           <div class="kpi-value" id="kpi-blood">—</div>
           <div class="kpi-sub">Blood panel services</div>
         </div>
+        <div class="kpi-card">
+          <div class="kpi-label">Tracked Bookings This Month</div>
+          <div class="kpi-value" id="kpi-tracked-bookings">—</div>
+          <div class="kpi-sub" id="kpi-tracked-sub">Via Acuity webhook</div>
+        </div>
       </div>
 
       <!-- Scan trend chart -->
@@ -316,6 +322,18 @@ html, body { height: 100%; background: var(--bg); color: var(--text); font-famil
         </div>
         <div id="ai-summary-block">
           <div class="loading-insights"><div class="spinner"></div>Analysing your data…</div>
+        </div>
+      </div>
+    </div>
+
+      <!-- Recent bookings -->
+      <div class="card">
+        <div class="card-title" style="display:flex;justify-content:space-between;align-items:center;">
+          <span>RECENT TRACKED BOOKINGS</span>
+          <span style="font-size:11px;color:var(--muted2);">Via Acuity webhook</span>
+        </div>
+        <div id="recent-bookings-list">
+          <div style="color:var(--muted2);font-size:13px;padding:10px 0;">Loading…</div>
         </div>
       </div>
     </div>
@@ -507,25 +525,21 @@ html, body { height: 100%; background: var(--bg); color: var(--text); font-famil
         </div>
 
         <!-- Meta Pixel -->
-        <div class="setup-card partial">
+        <div class="setup-card done">
           <div class="setup-header">
-            <div class="setup-icon" style="background:rgba(77,166,255,0.08);">📘</div>
+            <div class="setup-icon" style="background:rgba(57,224,122,0.1);">📘</div>
             <div>
               <div class="setup-name">Meta Pixel</div>
-              <div class="setup-status-text partial">⚡ Partially set up</div>
+              <div class="setup-status-text done">✓ Live on xgym.com.au</div>
             </div>
           </div>
           <ul class="setup-steps">
-            <li>Go to Meta Business Suite → Events Manager → Create Pixel</li>
-            <li>Install PixelYourSite plugin on WordPress</li>
-            <li>Paste your Pixel ID into PixelYourSite settings</li>
-            <li>Add booking-confirmed page as a conversion event</li>
+            <li class="done-step">Pixel ID: 1529714340852241</li>
+            <li class="done-step">Installed via WPCode on xgym.com.au</li>
+            <li class="done-step">Purchase event fires on Acuity booking confirmation</li>
+            <li>Set up Meta Ads retargeting campaign (next step)</li>
           </ul>
-          <div class="field" style="margin-top:12px;">
-            <label>Meta Pixel ID (paste when ready)</label>
-            <input type="text" id="meta-pixel-id" placeholder="e.g. 1234567890123456" oninput="saveIntegrationSetting('meta_pixel_id', this.value)">
-          </div>
-          <div style="font-size:12px;color:var(--muted2);">Once installed, Meta can track who visits from your ads and build retargeting audiences.</div>
+          <div style="font-size:12px;color:var(--muted2);">Meta is now building an audience of xgym.com.au visitors. Ready to run retargeting ads.</div>
         </div>
 
         <!-- Google Ads -->
@@ -635,6 +649,7 @@ async function init() {
   loadInsights();
   loadSnapshots();
   loadSavedDrafts();
+  loadRecentBookings();
 }
 
 // ─── PANEL NAV ─────────────────────────────────────────────────────────────
@@ -747,6 +762,51 @@ async function loadKPIs() {
       }
     }
   });
+}
+
+// ─── RECENT BOOKINGS ───────────────────────────────────────────────────────
+async function loadRecentBookings() {
+  const now = new Date();
+  const thisMonthStart = new Date(now.getFullYear(), now.getMonth(), 1).toISOString();
+
+  const { data: bookings, count } = await sb.from('marketing_conversions')
+    .select('*', { count: 'exact' })
+    .eq('action', 'scheduled')
+    .gte('booked_at', thisMonthStart)
+    .order('booked_at', { ascending: false })
+    .limit(8);
+
+  // Update KPI
+  document.getElementById('kpi-tracked-bookings').textContent = count ?? 0;
+  document.getElementById('kpi-tracked-sub').textContent = `Tracked bookings this month`;
+
+  const el = document.getElementById('recent-bookings-list');
+  if (!bookings || !bookings.length) {
+    el.innerHTML = '<div style="color:var(--muted2);font-size:13px;padding:10px 0;">No tracked bookings yet — will appear here as bookings come in.</div>';
+    return;
+  }
+
+  const serviceColour = { dexa:'var(--blue)', rmr:'var(--orange)', blood:'var(--red)', bone:'var(--teal)', other:'var(--muted2)' };
+  const serviceBg = { dexa:'rgba(77,166,255,0.12)', rmr:'rgba(255,159,67,0.12)', blood:'rgba(255,85,85,0.12)', bone:'rgba(45,212,191,0.12)', other:'rgba(255,255,255,0.06)' };
+
+  el.innerHTML = bookings.map(b => {
+    const st = b.service_type || 'other';
+    const date = new Date(b.booked_at).toLocaleDateString('en-AU', { day:'numeric', month:'short', hour:'2-digit', minute:'2-digit' });
+    const name = b.client_name || 'Unknown';
+    const type = b.appointment_type || st.toUpperCase();
+    const price = b.price ? `$${b.price}` : '';
+    return `
+      <div style="display:flex;align-items:center;gap:12px;padding:10px 0;border-bottom:1px solid var(--border);">
+        <div style="width:8px;height:8px;border-radius:50%;background:${serviceColour[st]};flex-shrink:0;"></div>
+        <div style="flex:1;min-width:0;">
+          <div style="font-weight:600;font-size:13px;">${name}</div>
+          <div style="font-size:11px;color:var(--muted2);">${type}</div>
+        </div>
+        ${price ? `<div style="font-size:13px;font-weight:600;color:var(--green);">${price}</div>` : ''}
+        <div style="font-size:11px;color:var(--muted2);text-align:right;flex-shrink:0;">${date}</div>
+        <span style="font-size:10px;font-weight:700;padding:2px 8px;border-radius:10px;background:${serviceBg[st]};color:${serviceColour[st]};">${st.toUpperCase()}</span>
+      </div>`;
+  }).join('') + (count > 8 ? `<div style="font-size:12px;color:var(--muted2);padding:10px 0;text-align:center;">+ ${count - 8} more this month</div>` : '');
 }
 
 // ─── AI INSIGHTS ───────────────────────────────────────────────────────────
