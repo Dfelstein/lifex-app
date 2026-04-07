@@ -11,6 +11,7 @@ create table if not exists public.profiles (
   member_level  text    not null default 'Standard',
   points        integer not null default 0,
   is_staff      boolean not null default false,
+  sex           text,
   created_at    timestamptz not null default now()
 );
 
@@ -177,3 +178,18 @@ create policy "rmr_select" on public.rmr_tests for select using (client_id = aut
 create policy "rmr_insert" on public.rmr_tests for insert with check (is_staff());
 create policy "rmr_update" on public.rmr_tests for update using (is_staff());
 create policy "rmr_delete" on public.rmr_tests for delete using (is_staff());
+
+-- Marketing conversions (Acuity webhook bookings)
+CREATE TABLE IF NOT EXISTS marketing_conversions (
+  id uuid DEFAULT gen_random_uuid() PRIMARY KEY,
+  acuity_appointment_id text UNIQUE,
+  action text,
+  service_type text,
+  appointment_type text,
+  client_email text,
+  client_name text,
+  booked_at timestamptz,
+  raw_payload jsonb,
+  created_at timestamptz DEFAULT now()
+);
+GRANT ALL ON marketing_conversions TO anon, authenticated, service_role;
