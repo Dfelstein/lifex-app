@@ -101,6 +101,7 @@ const SUPABASE_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZ
 const sb = window.supabase.createClient(SUPABASE_URL, SUPABASE_KEY);
 
 async function init() {
+  try {
   const { data: { session } } = await sb.auth.getSession();
   if (!session) { window.location.href = 'index.html'; return; }
 
@@ -114,6 +115,9 @@ async function init() {
   document.getElementById('staff-name').textContent = firstName;
   document.getElementById('loading').style.display = 'none';
   document.getElementById('app').style.display = 'block';
+  } catch(e) {
+    document.getElementById('loading').innerHTML = '<div class="loading-mark" style="animation:none">!</div><div style="font-size:13px;color:var(--muted2);text-align:center">Something went wrong.<br><a href="index.html" style="color:var(--gold)">Return to login</a></div>';
+  }
 }
 
 async function signOut() {

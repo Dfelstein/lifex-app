@@ -624,11 +624,13 @@ let trendChart = null;
 
 // ─── AUTH ──────────────────────────────────────────────────────────────────
 async function init() {
+  try {
   const { data: { session } } = await sb.auth.getSession();
   if (!session) { window.location.href = 'index.html'; return; }
 
-  const { data: profile } = await sb.from('profiles').select('is_staff,full_name').eq('id', session.user.id).single();
+  const { data: profile } = await sb.from('profiles').select('is_staff,is_marketing,full_name').eq('id', session.user.id).single();
   if (!profile?.is_staff) { window.location.href = 'dashboard.html'; return; }
+  if (!profile?.is_marketing) { window.location.href = 'staff.html'; return; }
 
   document.getElementById('app').style.display = 'flex';
   document.getElementById('loading').style.display = 'none';
@@ -650,6 +652,9 @@ async function init() {
   loadSnapshots();
   loadSavedDrafts();
   loadRecentBookings();
+  } catch(e) {
+    document.getElementById('loading').innerHTML = '<div class="loading-mark" style="animation:none">!</div><div style="font-size:13px;color:var(--muted2);text-align:center">Something went wrong loading the Marketing Hub.<br><a href="index.html" style="color:var(--gold)">Return to login</a></div>';
+  }
 }
 
 // ─── PANEL NAV ─────────────────────────────────────────────────────────────
