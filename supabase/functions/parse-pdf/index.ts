@@ -4,6 +4,7 @@ import { createClient } from 'https://esm.sh/@supabase/supabase-js@2';
 const ANTHROPIC_KEY = Deno.env.get('ANTHROPIC_KEY')!;
 const SUPABASE_URL = Deno.env.get('SUPABASE_URL')!;
 const SUPABASE_SERVICE_KEY = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!;
+const RESEND_API_KEY = Deno.env.get('RESEND_API_KEY');
 
 function cors(body: string, status = 200) {
   return new Response(body, {
@@ -28,6 +29,164 @@ function toNum(v: any): number | null {
 function toInt(v: any): number | null {
   const n = toNum(v);
   return n !== null ? Math.round(n) : null;
+}
+
+async function sendResultsEmail(sb: any, clientId: string, scanType: string, parsed: any) {
+  if (!RESEND_API_KEY) return;
+
+  const { data: { user }, error: userErr } = await sb.auth.admin.getUserById(clientId);
+  if (userErr || !user?.email) return;
+
+  const { data: profile } = await sb.from('profiles').select('full_name').eq('id', clientId).single();
+  const firstName = profile?.full_name?.split(' ')[0] || 'there';
+
+  let subject = '';
+  let bodyLines: string[] = [];
+
+  if (scanType === 'DEXA') {
+    subject = 'Your DEXA Scan Results — XGYM Castle Hill';
+
+    // Pull previous scan to show change if available
+    const { data: prev } = await sb
+      .from('dexa_scans')
+      .select('fat_pct, lean_g, vat_area_cm2')
+      .eq('client_id', clientId)
+      .lt('scan_date', parsed.scan_date)
+      .order('scan_date', { ascending: false })
+      .limit(1)
+      .maybeSingle();
+
+    // Body fat line
+    if (parsed.fat_pct != null) {
+      const fat = Number(parsed.fat_pct).toFixed(1);
+      let fatNote = '';
+      if (prev?.fat_pct != null) {
+        const diff = Number(parsed.fat_pct) - Number(prev.fat_pct);
+        if (Math.abs(diff) >= 0.1) fatNote = diff < 0 ? ` (down ${Math.abs(diff).toFixed(1)}% from last time)` : ` (up ${diff.toFixed(1)}% from last time)`;
+      }
+      bodyLines.push(`• Body fat: <strong>${fat}%</strong>${fatNote}`);
+    }
+
+    // Lean mass line
+    if (parsed.lean_g != null) {
+      const leanKg = (parsed.lean_g / 1000).toFixed(1);
+      let leanNote = '';
+      if (prev?.lean_g != null) {
+        const diffG = parsed.lean_g - prev.lean_g;
+        if (Math.abs(diffG) >= 100) leanNote = diffG > 0 ? ` (up ${(diffG/1000).toFixed(1)} kg)` : ` (down ${(Math.abs(diffG)/1000).toFixed(1)} kg)`;
+      }
+      bodyLines.push(`• Lean mass: <strong>${leanKg} kg</strong>${leanNote}`);
+    }
+
+    // VAT line with plain-English status
+    if (parsed.vat_area_cm2 != null) {
+      const vat = Number(parsed.vat_area_cm2);
+      const vatStatus = vat < 100 ? 'in the healthy range' : vat <= 160 ? 'borderline — worth keeping an eye on' : 'elevated — something to work on';
+      bodyLines.push(`• VAT area: <strong>${vat} cm²</strong> — ${vatStatus}`);
+    }
+
+  } else if (scanType === 'RMR') {
+    subject = 'Your RMR Results — XGYM Castle Hill';
+
+    if (parsed.kcal != null) {
+      bodyLines.push(`• Resting metabolic rate: <strong>${parsed.kcal} kcal/day</strong>`);
+    }
+    if (parsed.fat_pct != null) {
+      const fatBurn = Number(parsed.fat_pct).toFixed(0);
+      const fatNote = Number(parsed.fat_pct) >= 80 ? ' — excellent fat burning' : Number(parsed.fat_pct) >= 65 ? ' — good, aim for 80%+' : ' — room to improve';
+      bodyLines.push(`• Fat burning: <strong>${fatBurn}%</strong>${fatNote}`);
+    }
+    if (parsed.glucose_pct != null) {
+      bodyLines.push(`• Glucose reliance: <strong>${Number(parsed.glucose_pct).toFixed(0)}%</strong>`);
+    }
+
+  } else if (scanType === 'BLOOD') {
+    subject = 'Your Blood Panel Results — XGYM Castle Hill';
+    const markers = parsed.markers || [];
+    const outOfRange = markers.filter((m: any) => m.status === 'high' || m.status === 'low');
+    if (outOfRange.length === 0) {
+      bodyLines.push(`All ${markers.length} markers came back within range — good result.`);
+    } else {
+      const names = outOfRange.slice(0, 3).map((m: any) => m.name).join(', ');
+      bodyLines.push(`${markers.length} markers tested — ${outOfRange.length} flagged (${names}${outOfRange.length > 3 ? ' and more' : ''}). Full detail is in the app.`);
+    }
+
+  } else if (scanType === 'HORMONES') {
+    subject = 'Your Hormone Panel Results — XGYM Castle Hill';
+    const markers = parsed.markers || [];
+    const outOfRange = markers.filter((m: any) => m.status === 'high' || m.status === 'low');
+    if (outOfRange.length === 0) {
+      bodyLines.push(`All ${markers.length} markers came back within range.`);
+    } else {
+      const names = outOfRange.slice(0, 3).map((m: any) => m.name).join(', ');
+      bodyLines.push(`${markers.length} markers tested — ${outOfRange.length} flagged (${names}${outOfRange.length > 3 ? ' and more' : ''}). Full detail is in the app.`);
+    }
+  }
+
+  if (!subject) return;
+
+  const resultsList = bodyLines.map(l => `<p style="margin:4px 0;font-size:15px;color:#222">${l}</p>`).join('\n');
+
+  const html = `<!DOCTYPE html>
+<html>
+<head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"></head>
+<body style="margin:0;padding:0;background:#f4f4f4;font-family:Arial,Helvetica,sans-serif">
+  <table width="100%" cellpadding="0" cellspacing="0" style="background:#f4f4f4">
+    <tr><td align="center" style="padding:32px 16px">
+      <table cellpadding="0" cellspacing="0" style="max-width:560px;width:100%;background:#ffffff;border-radius:4px;border:1px solid #e0e0e0">
+        <tr>
+          <td style="padding:28px 32px 0">
+            <p style="margin:0 0 20px;font-size:15px;color:#222;line-height:1.7">Hi ${firstName},</p>
+            <p style="margin:0 0 16px;font-size:15px;color:#222;line-height:1.7">Your DEXA report has been uploaded to your Life X profile. You can also download the <a href="https://lifex.xgym.com.au/dexa-interpretation-guide.pdf" style="color:#b8860b;font-weight:600">DEXA Interpretation Guide</a> for help understanding your results.</p>
+            <p style="margin:0 0 12px;font-size:15px;color:#222;line-height:1.7">Here's a quick look at your key numbers:</p>
+            <div style="background:#f9f9f9;border-left:3px solid #C9A84C;padding:14px 18px;margin-bottom:20px;border-radius:0 4px 4px 0">
+              ${resultsList}
+            </div>
+            <p style="margin:0 0 16px;font-size:15px;color:#222;line-height:1.7">
+              You can view your full results — including bone density, regional breakdown, and comparisons with previous scans — in the Life X app:<br>
+              <a href="https://lifex.xgym.com.au/dashboard.html" style="color:#b8860b;font-weight:600">lifex.xgym.com.au</a>
+            </p>
+            <p style="margin:0 0 16px;font-size:15px;color:#222;line-height:1.7">
+              If you were happy with your appointment today, feel free to leave a Google review — it only takes a minute:<br>
+              <a href="https://g.page/r/CaGLAWIoh-6oEBM/review" style="color:#b8860b">https://g.page/r/CaGLAWIoh-6oEBM/review</a>
+            </p>
+            <p style="margin:0 0 28px;font-size:15px;color:#222;line-height:1.7">If you have any questions, just reply to this email.</p>
+            <p style="margin:0 0 4px;font-size:15px;color:#222">Thanks!</p>
+          </td>
+        </tr>
+        <tr>
+          <td style="padding:20px 32px 28px;border-top:1px solid #ebebeb;margin-top:16px">
+            <p style="margin:0 0 2px;font-size:13px;color:#555;font-weight:600">The Life X Team</p>
+            <p style="margin:0 0 2px;font-size:13px;color:#555">DEXA Scan Technician — XGYM Castle Hill</p>
+            <p style="margin:0 0 2px;font-size:13px;color:#555">website <a href="https://xgym.com.au/dexa-scan" style="color:#b8860b;text-decoration:none">xgym.com.au/dexa-scan</a></p>
+            <p style="margin:0 0 2px;font-size:13px;color:#555">phone: 0424 023 601</p>
+            <p style="margin:0;font-size:13px;color:#555">location: 5/9 Salisbury Rd, Castle Hill NSW 2154</p>
+          </td>
+        </tr>
+      </table>
+    </td></tr>
+  </table>
+</body>
+</html>`;
+
+  try {
+    await fetch('https://api.resend.com/emails', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'Authorization': `Bearer ${RESEND_API_KEY}`,
+      },
+      body: JSON.stringify({
+        from: 'DEXA XGYM Castle Hill <dexa@xgym.com.au>',
+        to: [user.email],
+        reply_to: 'dexa@xgym.com.au',
+        subject,
+        html,
+      }),
+    });
+  } catch {
+    // non-fatal
+  }
 }
 
 Deno.serve(async (req) => {
@@ -179,6 +338,7 @@ Return ONLY the JSON, no other text.`,
         pdf_path: pdfPath,
       }, { onConflict: 'client_id,scan_date' });
       if (error) return cors(JSON.stringify({ error: error.message }), 500);
+      sendResultsEmail(sb, clientId, 'DEXA', parsed);
 
     } else if (scanType === 'RMR') {
       const { error } = await sb.from('rmr_tests').insert({
@@ -194,6 +354,7 @@ Return ONLY the JSON, no other text.`,
         pdf_path: pdfPath,
       });
       if (error) return cors(JSON.stringify({ error: error.message }), 500);
+      sendResultsEmail(sb, clientId, 'RMR', parsed);
 
     } else if (scanType === 'BLOOD') {
       const { data: panel, error: panelErr } = await sb.from('blood_panels').insert({
@@ -218,6 +379,7 @@ Return ONLY the JSON, no other text.`,
       }));
       const { error: markersErr } = await sb.from('blood_markers').insert(markers);
       if (markersErr) return cors(JSON.stringify({ error: markersErr.message }), 500);
+      sendResultsEmail(sb, clientId, 'BLOOD', parsed);
 
     } else if (scanType === 'HORMONES') {
       const { data: panel, error: panelErr } = await sb.from('hormone_panels').insert({
@@ -241,6 +403,7 @@ Return ONLY the JSON, no other text.`,
       }));
       const { error: markersErr } = await sb.from('hormone_markers').insert(markers);
       if (markersErr) return cors(JSON.stringify({ error: markersErr.message }), 500);
+      sendResultsEmail(sb, clientId, 'HORMONES', parsed);
     }
 
     if (scanType === 'UNKNOWN') {

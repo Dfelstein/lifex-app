@@ -334,6 +334,11 @@ body { background: var(--bg); color: var(--text); font-family: 'Outfit', sans-se
 <!-- App (hidden until data loads) -->
 <div id="app">
 
+<!-- XGYM X logo — top right -->
+<div style="position:fixed;top:14px;right:16px;z-index:250;opacity:0.55;transition:opacity 0.15s;" onmouseover="this.style.opacity='.9'" onmouseout="this.style.opacity='.55'">
+  <img src="xgym-x.svg" alt="XGYM" style="height:28px;width:auto;filter:brightness(0) invert(1);">
+</div>
+
 <div class="hamburger" id="hamburger" onclick="toggleSidebar()">
   <span></span><span></span><span></span>
 </div>
@@ -617,6 +622,14 @@ let bloodPanelDate = '', hormonePanelDate = '', rmrDate = '';
 let lifexScore = null;
 
 /* ══════════════════════════
+   ACTIVITY LOGGING
+══════════════════════════ */
+function logActivity(event) {
+  if (!profile?.id) return;
+  sb.from('client_activity').insert({ client_id: profile.id, event }).then(() => {});
+}
+
+/* ══════════════════════════
    INIT
 ══════════════════════════ */
 async function init() {
@@ -634,6 +647,12 @@ async function init() {
   ]);
 
   profile = profileRes.data;
+
+  // Log login once per browser session
+  if (profile && !sessionStorage.getItem('lifex_logged_login')) {
+    sessionStorage.setItem('lifex_logged_login', '1');
+    logActivity('login');
+  }
 
   // Sidebar user info
   if (profile) {
@@ -774,7 +793,10 @@ function navigate(id) {
 }
 document.querySelectorAll('.nav-item').forEach(item => {
   item.addEventListener('click', () => {
-    navigate(item.dataset.screen);
+    const screen = item.dataset.screen;
+    navigate(screen);
+    if (screen === 'before-after') logActivity('view_before_after');
+    else if (screen === 'score')   logActivity('view_score');
     // Close sidebar on mobile after navigation
     document.getElementById('sidebar').classList.remove('open');
     document.getElementById('overlay').classList.remove('open');
@@ -1487,6 +1509,7 @@ function renderBeforeAfter() {
 function showScanDetail(i) {
   const s = allScans[i];
   if (!s) return;
+  logActivity('view_scan_detail');
   const isLatest = i === allScans.length - 1;
   document.getElementById('sheetTitle').textContent = `Scan #${s.scan_number || i+1}  ·  ${fmtDate(s.date)}`;
 
@@ -1932,6 +1955,7 @@ function spinWheel() {
       localStorage.setItem('lifex_spin_ts', Date.now().toString());
       // Update points in Supabase
       if (profile) {
+        logActivity('spin');
         const newPoints = (profile.points||0) + won;
         const { error: ptErr } = await sb.from('profiles').update({ points: newPoints }).eq('id', profile.id);
         if (!ptErr) {
