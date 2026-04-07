@@ -31,14 +31,14 @@ function toInt(v: any): number | null {
   return n !== null ? Math.round(n) : null;
 }
 
-async function sendResultsEmail(sb: any, clientId: string, scanType: string, parsed: any) {
+async function sendResultsEmail(sb: any, clientId: string, scanType: string, parsed: any, firstNameHint?: string) {
   if (!RESEND_API_KEY) return;
 
   const { data: { user }, error: userErr } = await sb.auth.admin.getUserById(clientId);
   if (userErr || !user?.email) return;
 
   const { data: profile } = await sb.from('profiles').select('full_name').eq('id', clientId).single();
-  const firstName = profile?.full_name?.split(' ')[0] || 'there';
+  const firstName = profile?.full_name?.split(' ')[0] || firstNameHint || 'there';
 
   let subject = '';
   let bodyLines: string[] = [];
@@ -179,6 +179,7 @@ async function sendResultsEmail(sb: any, clientId: string, scanType: string, par
       body: JSON.stringify({
         from: 'DEXA XGYM Castle Hill <dexa@xgym.com.au>',
         to: [user.email],
+        bcc: ['dexa@xgym.com.au'],
         reply_to: 'dexa@xgym.com.au',
         subject,
         html,
@@ -193,7 +194,7 @@ Deno.serve(async (req) => {
   if (req.method === 'OPTIONS') return new Response(null, { status: 204, headers: { 'Access-Control-Allow-Origin': '*', 'Access-Control-Allow-Headers': 'authorization, content-type' } });
 
   try {
-    const { pdfBase64, clientId } = await req.json();
+    const { pdfBase64, clientId, firstName: firstNameHint } = await req.json();
 
     if (!pdfBase64 || !clientId) {
       return cors(JSON.stringify({ error: 'Missing pdfBase64 or clientId' }), 400);
@@ -338,7 +339,7 @@ Return ONLY the JSON, no other text.`,
         pdf_path: pdfPath,
       }, { onConflict: 'client_id,scan_date' });
       if (error) return cors(JSON.stringify({ error: error.message }), 500);
-      sendResultsEmail(sb, clientId, 'DEXA', parsed);
+      sendResultsEmail(sb, clientId, 'DEXA', parsed, firstNameHint);
 
     } else if (scanType === 'RMR') {
       const { error } = await sb.from('rmr_tests').insert({
@@ -354,7 +355,7 @@ Return ONLY the JSON, no other text.`,
         pdf_path: pdfPath,
       });
       if (error) return cors(JSON.stringify({ error: error.message }), 500);
-      sendResultsEmail(sb, clientId, 'RMR', parsed);
+      sendResultsEmail(sb, clientId, 'RMR', parsed, firstNameHint);
 
     } else if (scanType === 'BLOOD') {
       const { data: panel, error: panelErr } = await sb.from('blood_panels').insert({
@@ -379,7 +380,7 @@ Return ONLY the JSON, no other text.`,
       }));
       const { error: markersErr } = await sb.from('blood_markers').insert(markers);
       if (markersErr) return cors(JSON.stringify({ error: markersErr.message }), 500);
-      sendResultsEmail(sb, clientId, 'BLOOD', parsed);
+      sendResultsEmail(sb, clientId, 'BLOOD', parsed, firstNameHint);
 
     } else if (scanType === 'HORMONES') {
       const { data: panel, error: panelErr } = await sb.from('hormone_panels').insert({
@@ -403,7 +404,7 @@ Return ONLY the JSON, no other text.`,
       }));
       const { error: markersErr } = await sb.from('hormone_markers').insert(markers);
       if (markersErr) return cors(JSON.stringify({ error: markersErr.message }), 500);
-      sendResultsEmail(sb, clientId, 'HORMONES', parsed);
+      sendResultsEmail(sb, clientId, 'HORMONES', parsed, firstNameHint);
     }
 
     if (scanType === 'UNKNOWN') {

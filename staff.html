@@ -1037,20 +1037,31 @@ async function handleDrop(e, appt) {
     const res = await fetch(`${SUPABASE_URL}/functions/v1/parse-pdf`, {
       method: 'POST',
       headers: { 'Authorization': `Bearer ${SUPABASE_KEY}`, 'Content-Type': 'application/json' },
-      body: JSON.stringify({ pdfBase64: base64, clientId: appt.clientId })
+      body: JSON.stringify({ pdfBase64: base64, clientId: appt.clientId, firstName: appt.firstName })
     });
 
     const result = await res.json();
     if (result.error) throw new Error(result.error);
 
     // Track uploaded scans for this card
-    const card = zone.closest('.appt-card');
     const uploadedKey = `uploads-${appt.id}`;
     const uploaded = JSON.parse(sessionStorage.getItem(uploadedKey) || '[]');
     uploaded.push(result.type);
     sessionStorage.setItem(uploadedKey, JSON.stringify(uploaded));
 
-    // Collapse the card after upload
+    // Update zone to success state
+    zone.classList.remove('uploading');
+    zone.innerHTML = `<div class="drop-icon">✅</div><div style="font-weight:600;color:var(--green);">${result.type} saved!</div><div style="font-size:11px;margin-top:4px;opacity:0.7;">Drop another PDF to add more</div>`;
+    // Re-attach listeners so staff can drop another scan
+    setTimeout(() => {
+      zone.innerHTML = `<div class="drop-icon">📄</div><div>Drop another PDF or click to browse</div><div style="font-size:11px;margin-top:4px;opacity:0.6">DEXA · Blood · RMR · Hormones — auto-detected</div>`;
+      zone.addEventListener('dragover', e => { e.preventDefault(); zone.classList.add('drag-over'); });
+      zone.addEventListener('dragleave', () => zone.classList.remove('drag-over'));
+      zone.addEventListener('drop', ev => { ev.preventDefault(); zone.classList.remove('drag-over'); handleDrop(ev, appt); });
+      zone.addEventListener('click', () => { const inp = document.createElement('input'); inp.type='file'; inp.accept='application/pdf'; inp.onchange = ev => handleDrop({ dataTransfer: { files: ev.target.files } }, appt); inp.click(); });
+    }, 2000);
+
+    // Collapse the parent card if it exists
     collapseApptCard(appt, uploaded);
     toast(`${result.type} scan saved for ${appt.firstName}!`, 'success');
 
