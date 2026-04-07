@@ -38,9 +38,19 @@ Deno.serve(async (req) => {
       return cors(JSON.stringify({ success: true, clientId: existingId, fullName }));
     }
 
-    // Check if user already exists with this email
-    const { data: existingList } = await sb.auth.admin.listUsers({ perPage: 1000 });
-    const existing = existingList?.users?.find((u: any) => u.email?.toLowerCase() === email.toLowerCase());
+    // Check if user already exists — page through all users to be safe
+    const findExisting = async () => {
+      let page = 1;
+      while (true) {
+        const { data } = await sb.auth.admin.listUsers({ page, perPage: 1000 });
+        const users = data?.users || [];
+        const found = users.find((u: any) => u.email?.toLowerCase() === email.toLowerCase());
+        if (found) return found;
+        if (users.length < 1000) return null; // last page
+        page++;
+      }
+    };
+    const existing = await findExisting();
     if (existing) {
       return cors(JSON.stringify({ success: true, clientId: existing.id, fullName: existing.user_metadata?.full_name || fullName, alreadyExists: true }));
     }
@@ -50,7 +60,14 @@ Deno.serve(async (req) => {
       data: { full_name: fullName, initials }
     });
 
-    if (userErr) return cors(JSON.stringify({ error: userErr.message }), 500);
+    // If Supabase says already registered, find and return the existing user
+    if (userErr) {
+      if (userErr.message.toLowerCase().includes('already') || userErr.message.toLowerCase().includes('registered')) {
+        const found = await findExisting();
+        if (found) return cors(JSON.stringify({ success: true, clientId: found.id, fullName: found.user_metadata?.full_name || fullName, alreadyExists: true }));
+      }
+      return cors(JSON.stringify({ error: userErr.message }), 500);
+    }
 
     // Profile is auto-created by the handle_new_user trigger using the metadata above
     return cors(JSON.stringify({ success: true, clientId: user.user.id, fullName }));

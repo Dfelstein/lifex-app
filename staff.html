@@ -1904,10 +1904,23 @@ async function createAccountFromAppt(apptId, email, firstName, lastName) {
       }
     }
   } catch (e) {
-    statusEl.style.color = 'var(--red)';
-    statusEl.textContent = `❌ ${e.message}`;
-    btn.disabled = false;
-    btn.textContent = '➕ Create Life X Account';
+    // If Supabase says the user already exists, treat it the same as alreadyExists
+    const msg = (e.message || '').toLowerCase();
+    if (msg.includes('already') || msg.includes('registered')) {
+      statusEl.style.color = 'var(--teal)';
+      statusEl.textContent = `ℹ️ Account already exists — ready to upload`;
+      btn.textContent = '✅ Found';
+      toast(`${firstName} already has a Life X account — drop their PDF below`, 'success');
+      // Still swap to upload zone if we have a clientId from somewhere
+      // (edge function should have caught this — if it reaches here, just reset)
+      btn.disabled = false;
+      btn.textContent = '➕ Create Life X Account';
+    } else {
+      statusEl.style.color = 'var(--red)';
+      statusEl.textContent = `❌ ${e.message}`;
+      btn.disabled = false;
+      btn.textContent = '➕ Create Life X Account';
+    }
   }
 }
 
