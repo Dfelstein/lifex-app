@@ -38,6 +38,13 @@ Deno.serve(async (req) => {
       return cors(JSON.stringify({ success: true, clientId: existingId, fullName }));
     }
 
+    // Check if user already exists with this email
+    const { data: existingList } = await sb.auth.admin.listUsers({ perPage: 1000 });
+    const existing = existingList?.users?.find((u: any) => u.email?.toLowerCase() === email.toLowerCase());
+    if (existing) {
+      return cors(JSON.stringify({ success: true, clientId: existing.id, fullName: existing.user_metadata?.full_name || fullName, alreadyExists: true }));
+    }
+
     // Create auth user and send invite email
     const { data: user, error: userErr } = await sb.auth.admin.inviteUserByEmail(email, {
       data: { full_name: fullName, initials }

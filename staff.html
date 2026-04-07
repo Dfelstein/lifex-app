@@ -1725,13 +1725,35 @@ async function createAccountFromAppt(apptId, email, firstName, lastName) {
     const result = await res.json();
     if (result.error) throw new Error(result.error);
 
-    statusEl.style.color = 'var(--green)';
-    statusEl.textContent = `✅ Account created — invite sent to ${email}`;
-    btn.textContent = '✅ Done';
+    if (result.alreadyExists) {
+      statusEl.style.color = 'var(--teal)';
+      statusEl.textContent = `ℹ️ Account already exists`;
+      btn.textContent = '✅ Found';
+      toast(`${firstName} already has a Life X account — ready to upload scans`, 'success');
+    } else {
+      statusEl.style.color = 'var(--green)';
+      statusEl.textContent = `✅ Account created — invite sent to ${email}`;
+      btn.textContent = '✅ Done';
+      toast(`Account created for ${firstName} ${lastName}!`, 'success');
+    }
 
-    // Reload appointments to show drop zone
-    setTimeout(() => loadTodayAppointments(), 2000);
-    toast(`Account created for ${firstName} ${lastName}!`, 'success');
+    // Swap the row to show the upload drop zone using the found/created clientId
+    const detailEl = btn.closest('.appt-row-detail');
+    if (detailEl && result.clientId) {
+      detailEl.innerHTML = `
+        <div class="drop-zone" id="drop-${apptId}" data-client-id="${result.clientId}" data-first-name="${firstName}" style="margin-top:12px;">
+          <div class="drop-icon">📄</div>
+          <div>Drop PDF here or click to browse</div>
+          <div style="font-size:11px;margin-top:4px;opacity:0.6">DEXA · Blood · RMR · Hormones — auto-detected</div>
+        </div>`;
+      const zone = document.getElementById(`drop-${apptId}`);
+      if (zone) {
+        zone.addEventListener('dragover', e => { e.preventDefault(); zone.classList.add('drag-over'); });
+        zone.addEventListener('dragleave', () => zone.classList.remove('drag-over'));
+        zone.addEventListener('drop', e => { e.preventDefault(); zone.classList.remove('drag-over'); handleDrop(e, { id: apptId, clientId: result.clientId, firstName }); });
+        zone.addEventListener('click', () => { const inp = document.createElement('input'); inp.type='file'; inp.accept='application/pdf'; inp.onchange = ev => handleDrop({ dataTransfer: { files: ev.target.files } }, { id: apptId, clientId: result.clientId, firstName }); inp.click(); });
+      }
+    }
   } catch (e) {
     statusEl.style.color = 'var(--red)';
     statusEl.textContent = `❌ ${e.message}`;
