@@ -888,7 +888,33 @@ async function loadTodayAppointments() {
         <div><div class="today-stat-num" style="color:var(--orange);">${noAccount}</div><div class="today-stat-label">No account yet</div></div>
       </div>`;
 
+    // Merge cached clientIds (discovered via alreadyExists flow) into appts
+    appts.forEach(a => {
+      if (!a.clientId) {
+        const cached = localStorage.getItem(`lifex_appt_client_${a.id}`);
+        if (cached) try { const c = JSON.parse(cached); a.clientId = c.clientId; } catch {}
+      }
+    });
+
     grid.innerHTML = appts.map(a => renderTodayRow(a, hasScansSet)).join('');
+
+    // Restore uploaded scan badges and zone state from sessionStorage
+    appts.forEach(a => {
+      const uploaded = JSON.parse(localStorage.getItem(`uploads-${a.id}`) || sessionStorage.getItem(`uploads-${a.id}`) || '[]');
+      if (uploaded.length) {
+        const badgeEl = document.getElementById(`badges-${a.id}`);
+        if (badgeEl) badgeEl.innerHTML = uploaded.map(t => `<span class="scan-badge done">✅ ${t}</span>`).join('');
+        // Update drop zone to show uploaded state + allow more
+        const zone = document.getElementById(`drop-${a.id}`);
+        if (zone) {
+          zone.innerHTML = `
+            <div style="display:flex;align-items:center;gap:10px;flex-wrap:wrap;">
+              ${uploaded.map(t => `<span style="font-size:12px;color:var(--green);font-weight:600;">✅ ${t} uploaded</span>`).join('')}
+            </div>
+            <div style="font-size:11px;margin-top:6px;opacity:0.7;">Drop another PDF to add more</div>`;
+        }
+      }
+    });
 
     // Wire drag & drop on detail zones
     appts.forEach(a => {
@@ -1043,11 +1069,12 @@ async function handleDrop(e, appt) {
     const result = await res.json();
     if (result.error) throw new Error(result.error);
 
-    // Track uploaded scans for this card
+    // Track uploaded scans — persist in both sessionStorage and localStorage
     const uploadedKey = `uploads-${appt.id}`;
-    const uploaded = JSON.parse(sessionStorage.getItem(uploadedKey) || '[]');
-    uploaded.push(result.type);
+    const uploaded = JSON.parse(localStorage.getItem(uploadedKey) || sessionStorage.getItem(uploadedKey) || '[]');
+    if (!uploaded.includes(result.type)) uploaded.push(result.type);
     sessionStorage.setItem(uploadedKey, JSON.stringify(uploaded));
+    localStorage.setItem(uploadedKey, JSON.stringify(uploaded));
 
     // Update zone to success state
     zone.classList.remove('uploading');
@@ -1884,6 +1911,11 @@ async function createAccountFromAppt(apptId, email, firstName, lastName) {
     });
     const result = await res.json();
     if (result.error) throw new Error(result.error);
+
+    // Persist clientId so it survives page reloads
+    if (result.clientId) {
+      localStorage.setItem(`lifex_appt_client_${apptId}`, JSON.stringify({ clientId: result.clientId }));
+    }
 
     if (result.alreadyExists) {
       statusEl.style.color = 'var(--teal)';
