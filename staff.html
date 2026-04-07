@@ -4135,7 +4135,7 @@ function countToColor(count, max) {
   else               return { fill: '#ff7043', border: '#e05a30', opacity: 0.90 }; // orange-red
 }
 
-const POLY_CACHE_KEY = 'lifex_poly_cache_v3'; // v3: rejects LGA/shire boundaries
+const POLY_CACHE_KEY = 'lifex_poly_cache_v4'; // v4: fix category vs class field name
 let _polyCache = null;
 function loadPolyCache() {
   if (_polyCache) return _polyCache;
@@ -4225,17 +4225,19 @@ function renderSuburbMap(suburbs) {
       .then(r => r.json())
       .then(data => {
         const features = data.features || [];
-        // Accept only suburb-level results: right class/type AND small bounding box
-        const PLACE_TYPES = new Set(['suburb','neighbourhood','hamlet','village','town','quarter','city_district','residential']);
+        // Accept only suburb-level results: right category/type AND small bounding box
+        // Nominatim GeoJSON uses "category" (not "class") in feature properties
+        const PLACE_TYPES = new Set(['suburb','neighbourhood','hamlet','village','quarter','city_district','residential']);
         const isSuburbLevel = f => {
           const p = f.properties || {};
-          // Reject administrative boundaries (LGAs, shires, states, countries)
-          if (p.class === 'boundary' && p.type === 'administrative') return false;
-          // Prefer place types that are suburb-sized
-          if (p.class === 'place' && !PLACE_TYPES.has(p.type)) return false;
-          // Bounding box must be suburb-sized (< 0.25° ≈ 25 km)
+          const cat  = p.category || p.class || '';
+          const type = p.type || '';
+          // Hard reject: administrative boundaries (LGAs, shires, cities, states)
+          if (cat === 'boundary') return false;
+          if (cat === 'place' && !PLACE_TYPES.has(type)) return false;
+          // Bounding box must be suburb-sized (< 0.2° ≈ 20 km)
           const bb = f.bbox;
-          if (bb && ((bb[2] - bb[0]) > 0.25 || (bb[3] - bb[1]) > 0.25)) return false;
+          if (bb && ((bb[2] - bb[0]) > 0.2 || (bb[3] - bb[1]) > 0.2)) return false;
           return true;
         };
         const best = features
