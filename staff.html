@@ -1664,22 +1664,85 @@ async function viewClientProfile(clientId, firstName, lastName) {
       const circumference = 2 * Math.PI * 65;
       const offset = circumference * (1 - lifexScore / 100);
       const scoreColour = lifexScore >= 80 ? 'var(--green)' : lifexScore >= 60 ? 'var(--gold)' : 'var(--orange)';
-      html += `<div class="card" style="margin-bottom:20px;display:flex;align-items:center;gap:32px;flex-wrap:wrap;">
-        <div style="display:flex;align-items:center;justify-content:center;position:relative;flex-shrink:0;">
-          <svg width="120" height="120" viewBox="0 0 160 160">
-            <circle cx="80" cy="80" r="65" fill="none" stroke="var(--surface3)" stroke-width="10"/>
-            <circle cx="80" cy="80" r="65" fill="none" stroke="${scoreColour}" stroke-width="10"
-              stroke-dasharray="${circumference.toFixed(1)}" stroke-dashoffset="${offset.toFixed(1)}" stroke-linecap="round" transform="rotate(-90 80 80)"/>
-          </svg>
-          <div style="position:absolute;text-align:center;">
-            <div style="font-family:'Bebas Neue',sans-serif;font-size:36px;line-height:1;color:${scoreColour};">${lifexScore}</div>
-            <div style="font-size:10px;color:var(--muted2);letter-spacing:1px;">LIFE X SCORE</div>
+      const scoreLabel = lifexScore >= 90 ? 'Exceptional' : lifexScore >= 76 ? 'Good' : lifexScore >= 60 ? 'Fair' : 'Needs attention';
+
+      // DEXA breakdown factors
+      const dexaFactors = [];
+      if (dexa?.fat_pct != null) {
+        const fp = dexa.fat_pct;
+        const label = fp <= 12 ? '✅ Elite body fat' : fp <= 17 ? '✅ Athletic range' : fp <= 22 ? '🟡 Healthy range' : fp <= 27 ? '🟠 Above average' : '🔴 Elevated body fat';
+        dexaFactors.push(`${label} — ${fp}%`);
+      }
+      if (dexa?.vat_area_cm2 != null) {
+        const v = dexa.vat_area_cm2;
+        dexaFactors.push(v < 100 ? `✅ VAT healthy — ${v} cm²` : v < 160 ? `🟡 VAT borderline — ${v} cm²` : `🔴 VAT elevated — ${v} cm²`);
+      }
+      if (dexa?.t_score != null) {
+        dexaFactors.push(dexa.t_score >= -1 ? `✅ Bone density normal (T ${dexa.t_score})` : dexa.t_score >= -2.5 ? `🟡 Osteopenia (T ${dexa.t_score})` : `🔴 Osteoporosis (T ${dexa.t_score})`);
+      }
+      // Lean mass trend across scans
+      if (dexaScans.length >= 2) {
+        const oldest = dexaScans[0], latest = dexaScans[dexaScans.length - 1];
+        if (oldest.lean_g != null && latest.lean_g != null) {
+          const diff = ((latest.lean_g - oldest.lean_g) / 1000).toFixed(1);
+          dexaFactors.push(diff >= 0 ? `✅ Lean mass +${diff} kg vs first scan` : `🔴 Lean mass ${diff} kg vs first scan`);
+        }
+      }
+
+      // Blood breakdown factors
+      const bloodFactors = [];
+      if (bm.length) {
+        const opt = bm.filter(m => m.status === 'optimal').length;
+        const nor = bm.filter(m => m.status === 'normal').length;
+        const flagged = bm.filter(m => m.status === 'high' || m.status === 'low');
+        bloodFactors.push(`${opt} optimal · ${nor} normal · ${flagged.length} flagged out of ${bm.length} markers`);
+        if (flagged.length) bloodFactors.push(`🔴 Flagged: ${flagged.map(m => m.name).join(', ')}`);
+        else bloodFactors.push('✅ All markers within range');
+      }
+
+      // RMR breakdown factors
+      const rmrFactors = [];
+      if (rmr?.fat_pct != null) {
+        const fp = rmr.fat_pct;
+        rmrFactors.push(fp >= 80 ? `✅ Fat burning ${fp}% — excellent` : fp >= 65 ? `🟡 Fat burning ${fp}% — room to improve` : `🔴 Fat burning ${fp}% — low`);
+      }
+      if (rmr?.kcal != null) rmrFactors.push(`RMR ${rmr.kcal} kcal/day`);
+      if (rmr?.glucose_pct != null) rmrFactors.push(`Glucose reliance ${rmr.glucose_pct}%${rmr.glucose_pct <= 25 ? ' ✅' : ' 🟡'}`);
+
+      const factorRow = (label, score, color, factors) => score === null ? '' : `
+        <div style="background:var(--surface2);border-radius:10px;padding:14px 16px;">
+          <div style="display:flex;align-items:center;gap:10px;margin-bottom:10px;">
+            <div style="font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:1px;color:var(--muted2);width:44px;">${label}</div>
+            <div style="flex:1;height:8px;background:var(--surface3);border-radius:4px;overflow:hidden;">
+              <div style="width:${score}%;height:100%;background:${color};border-radius:4px;"></div>
+            </div>
+            <div style="font-family:'Bebas Neue',sans-serif;font-size:20px;color:${color};width:28px;text-align:right;">${score}</div>
+          </div>
+          ${factors.map(f => `<div style="font-size:12px;color:var(--muted2);padding:2px 0;line-height:1.5;">${f}</div>`).join('')}
+        </div>`;
+
+      html += `<div class="card" style="margin-bottom:20px;">
+        <div style="display:flex;align-items:center;gap:24px;margin-bottom:20px;flex-wrap:wrap;">
+          <div style="display:flex;align-items:center;justify-content:center;position:relative;flex-shrink:0;">
+            <svg width="110" height="110" viewBox="0 0 160 160">
+              <circle cx="80" cy="80" r="65" fill="none" stroke="var(--surface3)" stroke-width="10"/>
+              <circle cx="80" cy="80" r="65" fill="none" stroke="${scoreColour}" stroke-width="10"
+                stroke-dasharray="${circumference.toFixed(1)}" stroke-dashoffset="${offset.toFixed(1)}" stroke-linecap="round" transform="rotate(-90 80 80)"/>
+            </svg>
+            <div style="position:absolute;text-align:center;">
+              <div style="font-family:'Bebas Neue',sans-serif;font-size:34px;line-height:1;color:${scoreColour};">${lifexScore}</div>
+              <div style="font-size:9px;color:var(--muted2);letter-spacing:1px;">LIFE X</div>
+            </div>
+          </div>
+          <div>
+            <div style="font-family:'Bebas Neue',sans-serif;font-size:22px;letter-spacing:1px;color:${scoreColour};">${scoreLabel}</div>
+            <div style="font-size:12px;color:var(--muted2);margin-top:2px;">Composite of ${scores.length} data source${scores.length !== 1 ? 's' : ''}</div>
           </div>
         </div>
-        <div style="flex:1;display:flex;flex-direction:column;gap:10px;min-width:180px;">
-          ${dexaScore !== null ? `<div style="display:flex;align-items:center;gap:10px;"><div style="width:40px;font-size:11px;color:var(--muted2);">DEXA</div><div style="flex:1;height:8px;background:var(--surface3);border-radius:4px;overflow:hidden;"><div style="width:${dexaScore}%;height:100%;background:var(--blue);border-radius:4px;"></div></div><div style="width:24px;font-size:12px;font-weight:600;text-align:right;">${dexaScore}</div></div>` : ''}
-          ${bloodScore !== null ? `<div style="display:flex;align-items:center;gap:10px;"><div style="width:40px;font-size:11px;color:var(--muted2);">Blood</div><div style="flex:1;height:8px;background:var(--surface3);border-radius:4px;overflow:hidden;"><div style="width:${bloodScore}%;height:100%;background:var(--green);border-radius:4px;"></div></div><div style="width:24px;font-size:12px;font-weight:600;text-align:right;">${bloodScore}</div></div>` : ''}
-          ${rmrScore !== null ? `<div style="display:flex;align-items:center;gap:10px;"><div style="width:40px;font-size:11px;color:var(--muted2);">RMR</div><div style="flex:1;height:8px;background:var(--surface3);border-radius:4px;overflow:hidden;"><div style="width:${rmrScore}%;height:100%;background:var(--orange);border-radius:4px;"></div></div><div style="width:24px;font-size:12px;font-weight:600;text-align:right;">${rmrScore}</div></div>` : ''}
+        <div style="display:flex;flex-direction:column;gap:10px;">
+          ${factorRow('DEXA', dexaScore, 'var(--blue)', dexaFactors)}
+          ${factorRow('Blood', bloodScore, 'var(--green)', bloodFactors)}
+          ${factorRow('RMR', rmrScore, 'var(--orange)', rmrFactors)}
         </div>
       </div>`;
     }
