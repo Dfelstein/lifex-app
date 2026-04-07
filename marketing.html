@@ -1,0 +1,1058 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Life X — Marketing Hub</title>
+<link rel="manifest" href="manifest.json">
+<meta name="theme-color" content="#08090b">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<meta name="apple-mobile-web-app-title" content="Life X">
+<link rel="apple-touch-icon" href="icons/icon-192.png">
+<link href="https://fonts.googleapis.com/css2?family=Bebas+Neue&family=Outfit:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+<script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
+<style>
+:root {
+  --bg: #08090b; --surface: #0f1114; --surface2: #161a1f; --surface3: #1c2128;
+  --border: rgba(255,255,255,0.06); --border2: rgba(255,255,255,0.1);
+  --gold: #f5c842; --gold2: #e8a020; --green: #39e07a; --red: #ff5555;
+  --blue: #4da6ff; --orange: #ff9f43; --teal: #2dd4bf; --purple: #a78bfa;
+  --text: #eef0f3; --muted: #5a6272; --muted2: #8a94a6;
+}
+*, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+html, body { height: 100%; background: var(--bg); color: var(--text); font-family: 'Outfit', sans-serif; font-size: 14px; display: flex; }
+::-webkit-scrollbar { width: 4px; } ::-webkit-scrollbar-track { background: transparent; } ::-webkit-scrollbar-thumb { background: var(--surface3); border-radius: 2px; }
+
+#loading { position:fixed;inset:0;background:var(--bg);display:flex;flex-direction:column;align-items:center;justify-content:center;gap:16px;z-index:100; }
+.loading-mark { width:64px;height:64px;background:var(--gold);border-radius:16px;display:flex;align-items:center;justify-content:center;font-family:'Bebas Neue',sans-serif;font-size:30px;color:#000;animation:pulse 1.2s ease-in-out infinite; }
+@keyframes pulse{0%,100%{opacity:1}50%{opacity:0.4}}
+#app { display:none;width:100%; }
+
+/* SIDEBAR */
+.sidebar { width:220px;min-width:220px;background:var(--surface);border-right:1px solid var(--border);display:flex;flex-direction:column;height:100vh;overflow-y:auto; }
+.sidebar-logo { display:flex;align-items:center;gap:10px;padding:20px 16px 16px;border-bottom:1px solid var(--border); }
+.logo-mark { width:32px;height:32px;background:var(--gold);border-radius:8px;display:flex;align-items:center;justify-content:center;font-family:'Bebas Neue',sans-serif;font-size:16px;color:#000; }
+.logo-text { font-family:'Bebas Neue',sans-serif;font-size:22px;letter-spacing:3px; }
+.logo-sub { font-size:9px;color:var(--muted2);letter-spacing:1px;text-transform:uppercase;margin-top:1px; }
+.mkt-badge { display:inline-block;padding:2px 8px;background:rgba(245,200,66,0.15);color:var(--gold);border-radius:10px;font-size:10px;font-weight:700;letter-spacing:0.5px;margin-top:8px; }
+.sidebar-nav { flex:1;padding:8px 0; }
+.nav-group-label { font-size:9px;font-weight:600;letter-spacing:1.5px;text-transform:uppercase;color:var(--muted);padding:12px 16px 4px; }
+.nav-item { display:flex;align-items:center;gap:10px;padding:9px 16px;cursor:pointer;color:var(--muted2);font-size:13px;transition:all 0.15s;border-left:2px solid transparent; }
+.nav-item:hover { background:var(--surface2);color:var(--text); }
+.nav-item.active { background:rgba(245,200,66,0.08);color:var(--gold);border-left:2px solid var(--gold);font-weight:500; }
+.nav-icon { font-size:15px;width:18px;text-align:center;flex-shrink:0; }
+.sidebar-footer { border-top:1px solid var(--border);padding:12px 16px; }
+.back-btn { width:100%;padding:8px;background:transparent;border:1px solid var(--border2);border-radius:7px;color:var(--muted2);font-family:'Outfit',sans-serif;font-size:12px;cursor:pointer;transition:all 0.15s;text-align:left;display:flex;align-items:center;gap:8px; }
+.back-btn:hover { background:var(--surface2);color:var(--text); }
+
+/* MAIN */
+.main { flex:1;overflow-y:auto;height:100vh; }
+.panel { display:none;padding:28px 32px;min-height:100%; }
+.panel.active { display:block; }
+.page-title { font-family:'Bebas Neue',sans-serif;font-size:32px;letter-spacing:2px;margin-bottom:4px; }
+.page-subtitle { color:var(--muted2);font-size:13px;margin-bottom:24px; }
+
+/* CARDS */
+.card { background:var(--surface);border:1px solid var(--border);border-radius:12px;padding:24px;margin-bottom:20px; }
+.card-title { font-size:11px;font-weight:600;letter-spacing:1px;text-transform:uppercase;color:var(--muted2);margin-bottom:16px; }
+
+/* KPI GRID */
+.kpi-grid { display:grid;grid-template-columns:repeat(auto-fill,minmax(200px,1fr));gap:14px;margin-bottom:20px; }
+.kpi-card { background:var(--surface);border:1px solid var(--border);border-radius:12px;padding:20px; }
+.kpi-label { font-size:11px;font-weight:600;letter-spacing:0.8px;text-transform:uppercase;color:var(--muted2);margin-bottom:8px; }
+.kpi-value { font-family:'Bebas Neue',sans-serif;font-size:36px;letter-spacing:1px;line-height:1; }
+.kpi-sub { font-size:12px;color:var(--muted2);margin-top:6px; }
+.kpi-trend { display:inline-flex;align-items:center;gap:4px;font-size:11px;font-weight:600;padding:2px 8px;border-radius:10px;margin-top:8px; }
+.kpi-trend.up { background:rgba(57,224,122,0.12);color:var(--green); }
+.kpi-trend.down { background:rgba(255,85,85,0.12);color:var(--red); }
+.kpi-trend.flat { background:rgba(255,255,255,0.06);color:var(--muted2); }
+
+/* INTEGRATION STATUS */
+.integration-bar { display:flex;gap:8px;flex-wrap:wrap;margin-bottom:24px; }
+.int-badge { display:flex;align-items:center;gap:6px;padding:6px 12px;border-radius:20px;font-size:11px;font-weight:600;border:1px solid; }
+.int-badge.connected { background:rgba(57,224,122,0.08);border-color:rgba(57,224,122,0.3);color:var(--green); }
+.int-badge.partial { background:rgba(245,200,66,0.08);border-color:rgba(245,200,66,0.3);color:var(--gold); }
+.int-badge.disconnected { background:rgba(255,255,255,0.04);border-color:rgba(255,255,255,0.1);color:var(--muted2); }
+.int-dot { width:6px;height:6px;border-radius:50%;flex-shrink:0; }
+.int-badge.connected .int-dot { background:var(--green); }
+.int-badge.partial .int-dot { background:var(--gold); }
+.int-badge.disconnected .int-dot { background:var(--muted); }
+
+/* AI INSIGHTS */
+.insights-summary { background:rgba(245,200,66,0.06);border:1px solid rgba(245,200,66,0.15);border-radius:12px;padding:20px;margin-bottom:20px; }
+.insights-summary p { font-size:14px;line-height:1.6;color:var(--text); }
+.insights-grid { display:grid;grid-template-columns:repeat(auto-fill,minmax(280px,1fr));gap:14px;margin-bottom:20px; }
+.insight-card { background:var(--surface);border:1px solid var(--border);border-radius:12px;padding:18px; }
+.insight-priority { font-size:9px;font-weight:700;letter-spacing:1px;text-transform:uppercase;padding:2px 8px;border-radius:10px;display:inline-block;margin-bottom:10px; }
+.insight-priority.high { background:rgba(255,85,85,0.12);color:var(--red); }
+.insight-priority.medium { background:rgba(245,200,66,0.12);color:var(--gold); }
+.insight-priority.low { background:rgba(57,224,122,0.12);color:var(--green); }
+.insight-title { font-weight:600;font-size:14px;margin-bottom:6px; }
+.insight-desc { font-size:12px;color:var(--muted2);line-height:1.5;margin-bottom:10px; }
+.insight-action { font-size:12px;color:var(--blue);display:flex;align-items:flex-start;gap:6px; }
+.insight-action::before { content:'→';flex-shrink:0; }
+
+/* CONTENT IDEAS */
+.content-grid { display:grid;grid-template-columns:repeat(auto-fill,minmax(300px,1fr));gap:14px;margin-bottom:20px; }
+.content-card { background:var(--surface);border:1px solid var(--border);border-radius:12px;padding:18px;transition:border-color 0.2s; }
+.content-card:hover { border-color:var(--gold); }
+.content-format { font-size:9px;font-weight:700;letter-spacing:1px;text-transform:uppercase;padding:3px 10px;border-radius:10px;display:inline-block;margin-bottom:10px; }
+.format-reel { background:rgba(167,139,250,0.12);color:var(--purple); }
+.format-story { background:rgba(77,166,255,0.12);color:var(--blue); }
+.format-youtube { background:rgba(255,85,85,0.12);color:var(--red); }
+.format-carousel { background:rgba(45,212,191,0.12);color:var(--teal); }
+.format-post { background:rgba(255,159,67,0.12);color:var(--orange); }
+.content-title { font-weight:600;font-size:14px;margin-bottom:8px; }
+.content-hook { font-size:12px;color:var(--gold);font-style:italic;margin-bottom:8px;line-height:1.4; }
+.content-hook::before { content:'" '; }
+.content-hook::after { content:' "'; }
+.content-why { font-size:12px;color:var(--muted2);line-height:1.5;margin-bottom:10px; }
+.content-cta { font-size:11px;font-weight:600;color:var(--green);display:flex;align-items:center;gap:4px; }
+.content-cta::before { content:'CTA: ';color:var(--muted); }
+.content-actions { display:flex;gap:8px;margin-top:12px;padding-top:12px;border-top:1px solid var(--border); }
+
+/* QUICK WINS */
+.quick-wins-grid { display:grid;grid-template-columns:repeat(auto-fill,minmax(280px,1fr));gap:14px;margin-bottom:20px; }
+.quick-win-card { background:var(--surface2);border:1px solid var(--border);border-radius:12px;padding:18px;display:flex;gap:14px; }
+.qw-icon { width:36px;height:36px;border-radius:10px;background:rgba(57,224,122,0.12);display:flex;align-items:center;justify-content:center;font-size:18px;flex-shrink:0; }
+.qw-title { font-weight:600;font-size:13px;margin-bottom:4px; }
+.qw-action { font-size:12px;color:var(--muted2);line-height:1.5;margin-bottom:6px; }
+.qw-impact { font-size:11px;color:var(--green);font-weight:600; }
+
+/* SETUP PANEL */
+.setup-grid { display:grid;grid-template-columns:repeat(auto-fill,minmax(320px,1fr));gap:16px; }
+.setup-card { background:var(--surface);border:1px solid var(--border);border-radius:12px;padding:22px; }
+.setup-card.done { border-color:rgba(57,224,122,0.3); }
+.setup-card.partial { border-color:rgba(245,200,66,0.3); }
+.setup-header { display:flex;align-items:center;gap:12px;margin-bottom:14px; }
+.setup-icon { width:42px;height:42px;border-radius:12px;display:flex;align-items:center;justify-content:center;font-size:22px;flex-shrink:0; }
+.setup-name { font-weight:600;font-size:15px; }
+.setup-status-text { font-size:11px;margin-top:2px; }
+.setup-status-text.done { color:var(--green); }
+.setup-status-text.partial { color:var(--gold); }
+.setup-status-text.todo { color:var(--muted2); }
+.setup-steps { list-style:none;margin-bottom:16px; }
+.setup-steps li { font-size:12px;color:var(--muted2);padding:5px 0;padding-left:20px;position:relative;line-height:1.4; }
+.setup-steps li::before { content:'·';position:absolute;left:6px;color:var(--muted); }
+.setup-steps li.done-step { color:var(--green); }
+.setup-steps li.done-step::before { content:'✓';color:var(--green); }
+
+/* CHART */
+.chart-wrap { position:relative;height:200px; }
+
+/* SCAN PACE */
+.pace-bar-wrap { background:var(--surface2);border-radius:8px;height:10px;overflow:hidden;margin:8px 0 4px; }
+.pace-bar { height:100%;border-radius:8px;background:var(--gold);transition:width 0.6s; }
+.pace-label { display:flex;justify-content:space-between;font-size:11px;color:var(--muted2); }
+
+/* WATCH OUT */
+.watch-out { background:rgba(255,159,67,0.08);border:1px solid rgba(255,159,67,0.2);border-radius:10px;padding:14px 18px;display:flex;align-items:flex-start;gap:12px;margin-bottom:20px; }
+.watch-out-icon { font-size:18px;flex-shrink:0;margin-top:1px; }
+.watch-out-text { font-size:13px;line-height:1.5;color:var(--text); }
+
+/* TRACKER */
+.tracker-row { display:flex;align-items:center;gap:12px;padding:12px 0;border-bottom:1px solid var(--border); }
+.tracker-row:last-child { border-bottom:none; }
+.tracker-platform { width:28px;height:28px;border-radius:8px;display:flex;align-items:center;justify-content:center;font-size:14px;flex-shrink:0; }
+.tracker-name { flex:1;font-size:13px;font-weight:500; }
+.tracker-value { font-family:'Bebas Neue',sans-serif;font-size:20px;color:var(--text); }
+.tracker-label { font-size:11px;color:var(--muted2); }
+.tracker-trend { font-size:11px;font-weight:600;min-width:50px;text-align:right; }
+.tracker-trend.up { color:var(--green); }
+.tracker-trend.down { color:var(--red); }
+
+/* BUTTONS */
+.btn { display:inline-flex;align-items:center;gap:8px;padding:9px 18px;border-radius:8px;font-family:'Outfit',sans-serif;font-size:13px;font-weight:600;cursor:pointer;border:none;transition:all 0.15s; }
+.btn-gold { background:var(--gold);color:#000; }
+.btn-gold:hover { background:var(--gold2); }
+.btn-outline { background:transparent;color:var(--text);border:1px solid var(--border2); }
+.btn-outline:hover { background:var(--surface2); }
+.btn-sm { padding:6px 12px;font-size:12px; }
+.btn-green { background:rgba(57,224,122,0.12);color:var(--green);border:1px solid rgba(57,224,122,0.3); }
+.btn-green:hover { background:rgba(57,224,122,0.2); }
+
+/* TOAST */
+.toast { position:fixed;bottom:24px;right:24px;padding:12px 20px;border-radius:10px;font-size:13px;font-weight:500;z-index:1000;transition:all 0.3s;transform:translateY(20px);opacity:0; }
+.toast.show { transform:translateY(0);opacity:1; }
+.toast.success { background:rgba(57,224,122,0.15);border:1px solid rgba(57,224,122,0.3);color:var(--green); }
+.toast.error   { background:rgba(255,85,85,0.15);border:1px solid rgba(255,85,85,0.3);color:var(--red); }
+
+/* LOADING STATE */
+.skeleton { background:var(--surface2);border-radius:8px;animation:pulse 1.2s ease-in-out infinite; }
+.loading-insights { display:flex;flex-direction:column;align-items:center;justify-content:center;padding:40px;gap:12px;color:var(--muted2);font-size:13px; }
+.spinner { width:28px;height:28px;border:2px solid var(--border2);border-top-color:var(--gold);border-radius:50%;animation:spin 0.8s linear infinite; }
+@keyframes spin { to { transform:rotate(360deg); } }
+
+/* FIELD */
+.field { display:flex;flex-direction:column;gap:5px;margin-bottom:12px; }
+.field label { font-size:11px;font-weight:600;text-transform:uppercase;letter-spacing:0.8px;color:var(--muted2); }
+.field input, .field select, .field textarea { background:var(--surface2);border:1px solid var(--border2);border-radius:8px;padding:10px 12px;color:var(--text);font-family:'Outfit',sans-serif;font-size:13px;outline:none;transition:border-color 0.15s;width:100%; }
+.field input:focus { border-color:var(--gold); }
+.field textarea { resize:vertical;min-height:80px; }
+
+/* CONTENT SAVED ITEM */
+.saved-content-item { background:var(--surface2);border-radius:10px;padding:14px;margin-bottom:10px;display:flex;gap:12px;align-items:flex-start; }
+.sci-platform { width:30px;height:30px;border-radius:8px;display:flex;align-items:center;justify-content:center;font-size:14px;flex-shrink:0;background:var(--surface3); }
+.sci-body { flex:1;min-width:0; }
+.sci-text { font-size:13px;line-height:1.5;margin-bottom:6px; }
+.sci-meta { font-size:11px;color:var(--muted2); }
+.sci-actions { display:flex;gap:6px;flex-shrink:0; }
+
+.two-col { display:grid;grid-template-columns:1fr 1fr;gap:20px; }
+@media(max-width:900px) { .two-col { grid-template-columns:1fr; } }
+
+.divider { border:none;border-top:1px solid var(--border);margin:20px 0; }
+</style>
+</head>
+<body>
+
+<div id="loading">
+  <div class="loading-mark">X</div>
+  <div style="font-size:13px;color:var(--muted2);">Loading marketing hub…</div>
+</div>
+
+<div id="app">
+  <!-- SIDEBAR -->
+  <div class="sidebar">
+    <div class="sidebar-logo">
+      <div class="logo-mark">X</div>
+      <div>
+        <div class="logo-text">LIFE X</div>
+        <div class="logo-sub">Marketing Hub</div>
+        <div class="mkt-badge">MARKETING</div>
+      </div>
+    </div>
+    <div class="sidebar-nav">
+      <div class="nav-group-label">Dashboard</div>
+      <div class="nav-item active" data-panel="overview" onclick="showPanel('overview')"><span class="nav-icon">🎯</span> Overview</div>
+      <div class="nav-item" data-panel="insights" onclick="showPanel('insights')"><span class="nav-icon">🧠</span> AI Insights</div>
+
+      <div class="nav-group-label">Content</div>
+      <div class="nav-item" data-panel="content-ideas" onclick="showPanel('content-ideas')"><span class="nav-icon">💡</span> Content Ideas</div>
+      <div class="nav-item" data-panel="content-saved" onclick="showPanel('content-saved')"><span class="nav-icon">📋</span> Saved Content</div>
+
+      <div class="nav-group-label">Data</div>
+      <div class="nav-item" data-panel="tracker" onclick="showPanel('tracker')"><span class="nav-icon">📈</span> Weekly Tracker</div>
+      <div class="nav-item" data-panel="setup" onclick="showPanel('setup')"><span class="nav-icon">⚙️</span> Integrations</div>
+    </div>
+    <div class="sidebar-footer">
+      <button class="back-btn" onclick="window.location.href='staff.html'">← Back to Staff Portal</button>
+    </div>
+  </div>
+
+  <!-- MAIN -->
+  <div class="main">
+
+    <!-- OVERVIEW PANEL -->
+    <div id="panel-overview" class="panel active">
+      <div class="page-title">COMMAND CENTRE</div>
+      <div class="page-subtitle" id="overview-date">Loading…</div>
+
+      <!-- Integration status bar -->
+      <div class="integration-bar">
+        <div class="int-badge connected"><div class="int-dot"></div> GA4 Active</div>
+        <div class="int-badge connected"><div class="int-dot"></div> Search Console Active</div>
+        <div class="int-badge partial"><div class="int-dot"></div> Meta Pixel — Setup needed</div>
+        <div class="int-badge disconnected"><div class="int-dot"></div> Google Ads — Setup needed</div>
+        <div class="int-badge disconnected"><div class="int-dot"></div> Meta Ads — Setup needed</div>
+      </div>
+
+      <!-- KPI grid -->
+      <div class="kpi-grid" id="kpi-grid">
+        <div class="kpi-card">
+          <div class="kpi-label">DEXA Scans This Month</div>
+          <div class="kpi-value" id="kpi-dexa-month">—</div>
+          <div class="kpi-sub" id="kpi-dexa-sub">Loading…</div>
+          <div id="kpi-dexa-trend" class="kpi-trend flat">…</div>
+        </div>
+        <div class="kpi-card">
+          <div class="kpi-label">Weekly Scan Pace</div>
+          <div class="kpi-value" id="kpi-weekly-pace">—</div>
+          <div class="pace-bar-wrap"><div class="pace-bar" id="pace-bar" style="width:0%"></div></div>
+          <div class="pace-label"><span>0</span><span>Target: 25</span></div>
+        </div>
+        <div class="kpi-card">
+          <div class="kpi-label">New Clients This Month</div>
+          <div class="kpi-value" id="kpi-new-clients">—</div>
+          <div class="kpi-sub">Total clients: <span id="kpi-total-clients">—</span></div>
+        </div>
+        <div class="kpi-card">
+          <div class="kpi-label">Warm Leads (Guest Tool)</div>
+          <div class="kpi-value" id="kpi-leads">—</div>
+          <div class="kpi-sub">Used free estimate, no booking yet</div>
+          <div id="kpi-leads-action" style="margin-top:8px;"></div>
+        </div>
+        <div class="kpi-card">
+          <div class="kpi-label">RMR Tests This Month</div>
+          <div class="kpi-value" id="kpi-rmr">—</div>
+          <div class="kpi-sub">Metabolic testing</div>
+        </div>
+        <div class="kpi-card">
+          <div class="kpi-label">Blood Panels This Month</div>
+          <div class="kpi-value" id="kpi-blood">—</div>
+          <div class="kpi-sub">Blood panel services</div>
+        </div>
+      </div>
+
+      <!-- Scan trend chart -->
+      <div class="card">
+        <div class="card-title">DEXA Scan Volume — Last 6 Months</div>
+        <div class="chart-wrap"><canvas id="trend-chart"></canvas></div>
+      </div>
+
+      <!-- Watch out -->
+      <div id="watch-out-block" style="display:none;" class="watch-out">
+        <div class="watch-out-icon">⚠️</div>
+        <div class="watch-out-text" id="watch-out-text"></div>
+      </div>
+
+      <!-- AI summary -->
+      <div class="card">
+        <div class="card-title" style="display:flex;justify-content:space-between;align-items:center;">
+          <span>AI WEEKLY SUMMARY</span>
+          <button class="btn btn-outline btn-sm" onclick="loadInsights()">↻ Refresh</button>
+        </div>
+        <div id="ai-summary-block">
+          <div class="loading-insights"><div class="spinner"></div>Analysing your data…</div>
+        </div>
+      </div>
+    </div>
+
+    <!-- AI INSIGHTS PANEL -->
+    <div id="panel-insights" class="panel">
+      <div class="page-title">AI INSIGHTS</div>
+      <div class="page-subtitle">What's working, what to prioritise, and where to focus this week</div>
+
+      <div id="insights-content">
+        <div class="loading-insights"><div class="spinner"></div>Loading insights…</div>
+      </div>
+    </div>
+
+    <!-- CONTENT IDEAS PANEL -->
+    <div id="panel-content-ideas" class="panel">
+      <div class="page-title">CONTENT IDEAS</div>
+      <div class="page-subtitle">AI-generated ideas based on what drives bookings for Life X</div>
+
+      <div style="display:flex;gap:10px;margin-bottom:20px;flex-wrap:wrap;">
+        <button class="btn btn-gold" onclick="loadInsights()">↻ Generate New Ideas</button>
+        <button class="btn btn-outline" onclick="showPanel('content-saved')">📋 Saved Content</button>
+      </div>
+
+      <div id="content-ideas-block">
+        <div class="loading-insights"><div class="spinner"></div>Generating content ideas…</div>
+      </div>
+    </div>
+
+    <!-- SAVED CONTENT PANEL -->
+    <div id="panel-content-saved" class="panel">
+      <div class="page-title">SAVED CONTENT</div>
+      <div class="page-subtitle">Content drafts approved and ready to post</div>
+
+      <div class="two-col">
+        <div>
+          <div class="card">
+            <div class="card-title">ADD CONTENT DRAFT</div>
+            <div class="field">
+              <label>Platform</label>
+              <select id="draft-platform">
+                <option value="instagram">Instagram</option>
+                <option value="facebook">Facebook</option>
+                <option value="youtube">YouTube</option>
+                <option value="email">Email</option>
+                <option value="google-ads">Google Ad</option>
+                <option value="meta-ads">Meta Ad</option>
+              </select>
+            </div>
+            <div class="field">
+              <label>Content Type</label>
+              <select id="draft-type">
+                <option value="reel">Reel / Short Video</option>
+                <option value="post">Static Post</option>
+                <option value="story">Story</option>
+                <option value="caption">Caption</option>
+                <option value="ad-copy">Ad Copy</option>
+                <option value="email">Email</option>
+              </select>
+            </div>
+            <div class="field">
+              <label>Title / Topic</label>
+              <input type="text" id="draft-title" placeholder="e.g. Why DEXA beats the bathroom scale">
+            </div>
+            <div class="field">
+              <label>Content / Caption</label>
+              <textarea id="draft-body" placeholder="Paste or write content here…"></textarea>
+            </div>
+            <div class="field">
+              <label>Notes for Jasmine</label>
+              <input type="text" id="draft-notes" placeholder="e.g. Use Wednesday meeting footage">
+            </div>
+            <button class="btn btn-gold" onclick="saveDraft()">Save Draft</button>
+          </div>
+        </div>
+        <div>
+          <div class="card-title" style="margin-bottom:12px;">SAVED DRAFTS</div>
+          <div id="saved-drafts-list">
+            <div style="color:var(--muted2);font-size:13px;padding:20px 0;text-align:center;">No saved drafts yet</div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- WEEKLY TRACKER PANEL -->
+    <div id="panel-tracker" class="panel">
+      <div class="page-title">WEEKLY TRACKER</div>
+      <div class="page-subtitle">Log weekly metrics from your ad platforms — used to feed AI insights</div>
+
+      <div class="two-col">
+        <div class="card">
+          <div class="card-title">LOG THIS WEEK</div>
+          <div class="field">
+            <label>Week ending</label>
+            <input type="date" id="tracker-week" />
+          </div>
+          <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px;">
+            <div class="field">
+              <label>DEXA Bookings</label>
+              <input type="number" id="t-dexa" placeholder="0" min="0">
+            </div>
+            <div class="field">
+              <label>Website Sessions</label>
+              <input type="number" id="t-sessions" placeholder="0" min="0">
+            </div>
+            <div class="field">
+              <label>Google Ads Spend ($)</label>
+              <input type="number" id="t-google-spend" placeholder="0.00" step="0.01">
+            </div>
+            <div class="field">
+              <label>Google Ads Clicks</label>
+              <input type="number" id="t-google-clicks" placeholder="0" min="0">
+            </div>
+            <div class="field">
+              <label>Meta Ads Spend ($)</label>
+              <input type="number" id="t-meta-spend" placeholder="0.00" step="0.01">
+            </div>
+            <div class="field">
+              <label>Meta Ads Reach</label>
+              <input type="number" id="t-meta-reach" placeholder="0" min="0">
+            </div>
+            <div class="field">
+              <label>Instagram Followers</label>
+              <input type="number" id="t-ig-followers" placeholder="0" min="0">
+            </div>
+            <div class="field">
+              <label>Best Post Reach</label>
+              <input type="number" id="t-best-reach" placeholder="0" min="0">
+            </div>
+          </div>
+          <div class="field" style="margin-top:4px;">
+            <label>Notes</label>
+            <textarea id="t-notes" placeholder="What ran this week? Any campaigns, posts that did well?"></textarea>
+          </div>
+          <button class="btn btn-gold" onclick="saveWeeklySnapshot()">Save Snapshot</button>
+        </div>
+
+        <div>
+          <div class="card-title" style="margin-bottom:12px;">RECENT SNAPSHOTS</div>
+          <div id="snapshots-list">
+            <div style="color:var(--muted2);font-size:13px;padding:20px 0;text-align:center;">No snapshots yet — log your first week above</div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- SETUP / INTEGRATIONS PANEL -->
+    <div id="panel-setup" class="panel">
+      <div class="page-title">INTEGRATIONS</div>
+      <div class="page-subtitle">Connect your marketing platforms to get full data in the hub</div>
+
+      <div class="setup-grid">
+
+        <!-- GA4 -->
+        <div class="setup-card done">
+          <div class="setup-header">
+            <div class="setup-icon" style="background:rgba(57,224,122,0.1);">📊</div>
+            <div>
+              <div class="setup-name">Google Analytics 4</div>
+              <div class="setup-status-text done">✓ Connected via Site Kit</div>
+            </div>
+          </div>
+          <ul class="setup-steps">
+            <li class="done-step">Site Kit plugin installed on xgym.com.au</li>
+            <li class="done-step">GA4 tracking active</li>
+            <li>Set up DEXA booking conversion event</li>
+            <li>Create /booking-confirmed thank-you page</li>
+            <li>Set Acuity redirect to /booking-confirmed</li>
+          </ul>
+          <div style="font-size:12px;color:var(--muted2);">Next: Add conversion tracking so we can see which channel drives bookings.</div>
+        </div>
+
+        <!-- Search Console -->
+        <div class="setup-card done">
+          <div class="setup-header">
+            <div class="setup-icon" style="background:rgba(77,166,255,0.1);">🔍</div>
+            <div>
+              <div class="setup-name">Google Search Console</div>
+              <div class="setup-status-text done">✓ Connected via Site Kit</div>
+            </div>
+          </div>
+          <ul class="setup-steps">
+            <li class="done-step">Domain verified</li>
+            <li class="done-step">Search performance tracking active</li>
+            <li>Review top queries driving traffic</li>
+            <li>Identify pages with high impressions but low CTR</li>
+          </ul>
+          <div style="font-size:12px;color:var(--muted2);">Check Site Kit → Search Console to see which keywords bring people to xgym.com.au.</div>
+        </div>
+
+        <!-- Meta Pixel -->
+        <div class="setup-card partial">
+          <div class="setup-header">
+            <div class="setup-icon" style="background:rgba(77,166,255,0.08);">📘</div>
+            <div>
+              <div class="setup-name">Meta Pixel</div>
+              <div class="setup-status-text partial">⚡ Partially set up</div>
+            </div>
+          </div>
+          <ul class="setup-steps">
+            <li>Go to Meta Business Suite → Events Manager → Create Pixel</li>
+            <li>Install PixelYourSite plugin on WordPress</li>
+            <li>Paste your Pixel ID into PixelYourSite settings</li>
+            <li>Add booking-confirmed page as a conversion event</li>
+          </ul>
+          <div class="field" style="margin-top:12px;">
+            <label>Meta Pixel ID (paste when ready)</label>
+            <input type="text" id="meta-pixel-id" placeholder="e.g. 1234567890123456" oninput="saveIntegrationSetting('meta_pixel_id', this.value)">
+          </div>
+          <div style="font-size:12px;color:var(--muted2);">Once installed, Meta can track who visits from your ads and build retargeting audiences.</div>
+        </div>
+
+        <!-- Google Ads -->
+        <div class="setup-card">
+          <div class="setup-header">
+            <div class="setup-icon" style="background:rgba(245,200,66,0.08);">🎯</div>
+            <div>
+              <div class="setup-name">Google Ads</div>
+              <div class="setup-status-text todo">Not connected</div>
+            </div>
+          </div>
+          <ul class="setup-steps">
+            <li>Create or sign into Google Ads account (ads.google.com)</li>
+            <li>In GA4 → Admin → Google Ads Links → Link your account</li>
+            <li>Import GA4 conversion events into Google Ads</li>
+            <li>Set DEXA booking as a primary conversion</li>
+          </ul>
+          <div class="field" style="margin-top:12px;">
+            <label>Google Ads Customer ID (when ready)</label>
+            <input type="text" id="google-ads-id" placeholder="e.g. 123-456-7890" oninput="saveIntegrationSetting('google_ads_id', this.value)">
+          </div>
+          <div style="font-size:12px;color:var(--muted2);">Linking Google Ads to GA4 lets you see cost-per-booking directly in your reports.</div>
+        </div>
+
+        <!-- Meta Ads -->
+        <div class="setup-card">
+          <div class="setup-header">
+            <div class="setup-icon" style="background:rgba(167,139,250,0.08);">📣</div>
+            <div>
+              <div class="setup-name">Meta Ads (Facebook/Instagram)</div>
+              <div class="setup-status-text todo">Not connected</div>
+            </div>
+          </div>
+          <ul class="setup-steps">
+            <li>Set up Meta Pixel first (above)</li>
+            <li>In Meta Business Suite → Ads Manager → Create campaign</li>
+            <li>Use Conversion objective targeting DEXA booking page</li>
+            <li>Set up Custom Audiences from website visitors</li>
+          </ul>
+          <div class="field" style="margin-top:12px;">
+            <label>Meta Ad Account ID (when ready)</label>
+            <input type="text" id="meta-ads-id" placeholder="e.g. act_1234567890" oninput="saveIntegrationSetting('meta_ads_id', this.value)">
+          </div>
+          <div style="font-size:12px;color:var(--muted2);">Once Meta Pixel is firing, you can create retargeting ads for people who visited the DEXA page but didn't book.</div>
+        </div>
+
+        <!-- Acuity Conversion -->
+        <div class="setup-card partial">
+          <div class="setup-header">
+            <div class="setup-icon" style="background:rgba(45,212,191,0.08);">📅</div>
+            <div>
+              <div class="setup-name">Booking Conversion Tracking</div>
+              <div class="setup-status-text partial">⚡ Action needed</div>
+            </div>
+          </div>
+          <ul class="setup-steps">
+            <li>Create /booking-confirmed page in WordPress</li>
+            <li>In Acuity → Business Settings → Scheduling Page Settings</li>
+            <li>Set confirmation redirect to: xgym.com.au/booking-confirmed</li>
+            <li>In GA4 → Mark this page as a conversion event</li>
+            <li>In PixelYourSite → Mark as Meta conversion event</li>
+          </ul>
+          <div style="font-size:12px;color:var(--muted2);margin-top:8px;">This is the most important setup step — without it we can't track which ads drive bookings.</div>
+        </div>
+
+      </div>
+    </div>
+
+  </div><!-- /main -->
+</div><!-- /app -->
+
+<div class="toast" id="toast"></div>
+
+<script>
+const SUPABASE_URL = 'https://shvpwgrjqskccsdzajkj.supabase.co';
+const SUPABASE_ANON = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InNodnB3Z3JqcXNrY2NzZHphamtqIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzM5MDUzNTIsImV4cCI6MjA4OTQ4MTM1Mn0.2dL3J9XbzU8q8ogPPqhwR4w7_vSB0FxVKMzsAOxCgk4';
+const sb = supabase.createClient(SUPABASE_URL, SUPABASE_ANON);
+const EDGE = `${SUPABASE_URL}/functions/v1`;
+
+let insightsData = null;
+let trendChart = null;
+
+// ─── AUTH ──────────────────────────────────────────────────────────────────
+async function init() {
+  const { data: { session } } = await sb.auth.getSession();
+  if (!session) { window.location.href = 'index.html'; return; }
+
+  const { data: profile } = await sb.from('profiles').select('is_staff,full_name').eq('id', session.user.id).single();
+  if (!profile?.is_staff) { window.location.href = 'dashboard.html'; return; }
+
+  document.getElementById('app').style.display = 'flex';
+  document.getElementById('loading').style.display = 'none';
+
+  const now = new Date();
+  document.getElementById('overview-date').textContent =
+    now.toLocaleDateString('en-AU', { weekday:'long', day:'numeric', month:'long', year:'numeric' });
+
+  // Set default date for tracker
+  const today = now.toISOString().split('T')[0];
+  document.getElementById('tracker-week').value = today;
+
+  // Load integration settings from localStorage
+  loadIntegrationSettings();
+
+  // Load data
+  await loadKPIs();
+  loadInsights();
+  loadSnapshots();
+  loadSavedDrafts();
+}
+
+// ─── PANEL NAV ─────────────────────────────────────────────────────────────
+function showPanel(id) {
+  document.querySelectorAll('.panel').forEach(p => p.classList.remove('active'));
+  document.querySelectorAll('.nav-item').forEach(n => n.classList.remove('active'));
+  document.getElementById(`panel-${id}`).classList.add('active');
+  document.querySelector(`[data-panel="${id}"]`).classList.add('active');
+}
+
+// ─── KPIs ──────────────────────────────────────────────────────────────────
+async function loadKPIs() {
+  const now = new Date();
+  const thisMonthStart = new Date(now.getFullYear(), now.getMonth(), 1).toISOString();
+  const lastMonthStart = new Date(now.getFullYear(), now.getMonth() - 1, 1).toISOString();
+  const lastMonthEnd   = new Date(now.getFullYear(), now.getMonth(), 0, 23, 59, 59).toISOString();
+  const sixMonthsAgo   = new Date(now.getFullYear(), now.getMonth() - 5, 1).toISOString();
+
+  const [
+    { count: dexaThis },
+    { count: dexaLast },
+    { count: rmrThis },
+    { count: bloodThis },
+    { count: totalClients },
+    { count: newClients },
+    { count: leads },
+    { data: trendRaw }
+  ] = await Promise.all([
+    sb.from('dexa_scans').select('*',{count:'exact',head:true}).gte('scan_date', thisMonthStart),
+    sb.from('dexa_scans').select('*',{count:'exact',head:true}).gte('scan_date', lastMonthStart).lte('scan_date', lastMonthEnd),
+    sb.from('rmr_tests').select('*',{count:'exact',head:true}).gte('test_date', thisMonthStart),
+    sb.from('blood_panels').select('*',{count:'exact',head:true}).gte('panel_date', thisMonthStart),
+    sb.from('profiles').select('*',{count:'exact',head:true}).eq('is_staff', false),
+    sb.from('profiles').select('*',{count:'exact',head:true}).eq('is_staff', false).gte('created_at', thisMonthStart),
+    sb.from('zoho_intake_pending').select('*',{count:'exact',head:true}),
+    sb.from('dexa_scans').select('scan_date').gte('scan_date', sixMonthsAgo).order('scan_date', {ascending:true}),
+  ]);
+
+  // DEXA month
+  document.getElementById('kpi-dexa-month').textContent = dexaThis ?? 0;
+  const dayOfMonth = now.getDate();
+  const daysInMonth = new Date(now.getFullYear(), now.getMonth() + 1, 0).getDate();
+  const runRate = Math.round(((dexaThis ?? 0) / dayOfMonth) * daysInMonth);
+  document.getElementById('kpi-dexa-sub').textContent = `Run-rate: ~${runRate} for the month`;
+
+  const diff = (dexaThis ?? 0) - (dexaLast ?? 0);
+  const trendEl = document.getElementById('kpi-dexa-trend');
+  if (diff > 0) { trendEl.className='kpi-trend up'; trendEl.textContent=`↑ ${diff} vs last month`; }
+  else if (diff < 0) { trendEl.className='kpi-trend down'; trendEl.textContent=`↓ ${Math.abs(diff)} vs last month`; }
+  else { trendEl.className='kpi-trend flat'; trendEl.textContent=`Same as last month`; }
+
+  // Weekly pace
+  const weeksElapsed = Math.max(dayOfMonth / 7, 0.5);
+  const weeklyPace = Math.round((dexaThis ?? 0) / weeksElapsed);
+  document.getElementById('kpi-weekly-pace').textContent = weeklyPace + ' / wk';
+  const pacePercent = Math.min((weeklyPace / 25) * 100, 100);
+  document.getElementById('pace-bar').style.width = pacePercent + '%';
+  document.getElementById('pace-bar').style.background = pacePercent >= 100 ? 'var(--green)' : pacePercent >= 70 ? 'var(--gold)' : 'var(--red)';
+
+  // Others
+  document.getElementById('kpi-new-clients').textContent = newClients ?? 0;
+  document.getElementById('kpi-total-clients').textContent = totalClients ?? 0;
+  document.getElementById('kpi-rmr').textContent = rmrThis ?? 0;
+  document.getElementById('kpi-blood').textContent = bloodThis ?? 0;
+
+  // Leads
+  document.getElementById('kpi-leads').textContent = leads ?? 0;
+  if ((leads ?? 0) > 10) {
+    document.getElementById('kpi-leads-action').innerHTML = `<span style="font-size:11px;color:var(--gold);">⚡ ${leads} leads ready to follow up</span>`;
+  }
+
+  // Trend chart
+  const monthCounts = {};
+  (trendRaw || []).forEach(s => {
+    const key = s.scan_date.substring(0, 7);
+    monthCounts[key] = (monthCounts[key] || 0) + 1;
+  });
+
+  const labels = [];
+  const values = [];
+  for (let i = 5; i >= 0; i--) {
+    const d = new Date(now.getFullYear(), now.getMonth() - i, 1);
+    const key = d.toISOString().substring(0, 7);
+    labels.push(d.toLocaleDateString('en-AU', { month: 'short', year: '2-digit' }));
+    values.push(monthCounts[key] || 0);
+  }
+
+  if (trendChart) trendChart.destroy();
+  const ctx = document.getElementById('trend-chart').getContext('2d');
+  trendChart = new Chart(ctx, {
+    type: 'bar',
+    data: {
+      labels,
+      datasets: [{
+        label: 'DEXA Scans',
+        data: values,
+        backgroundColor: 'rgba(245,200,66,0.3)',
+        borderColor: 'rgba(245,200,66,0.8)',
+        borderWidth: 1,
+        borderRadius: 4,
+      }]
+    },
+    options: {
+      responsive: true,
+      maintainAspectRatio: false,
+      plugins: { legend: { display: false } },
+      scales: {
+        x: { grid: { color: 'rgba(255,255,255,0.04)' }, ticks: { color: '#8a94a6', font: { family: 'Outfit' } } },
+        y: { grid: { color: 'rgba(255,255,255,0.04)' }, ticks: { color: '#8a94a6', font: { family: 'Outfit' }, stepSize: 5 }, beginAtZero: true }
+      }
+    }
+  });
+}
+
+// ─── AI INSIGHTS ───────────────────────────────────────────────────────────
+async function loadInsights() {
+  const loadingHTML = '<div class="loading-insights"><div class="spinner"></div>Analysing your data with AI…</div>';
+  document.getElementById('ai-summary-block').innerHTML = loadingHTML;
+  document.getElementById('insights-content').innerHTML = loadingHTML;
+  document.getElementById('content-ideas-block').innerHTML = loadingHTML;
+
+  try {
+    const res = await fetch(`${EDGE}/marketing-insights`, {
+      method: 'POST',
+      headers: {
+        'Authorization': `Bearer ${SUPABASE_ANON}`,
+        'Content-Type': 'application/json'
+      },
+      body: JSON.stringify({ external: {} })
+    });
+
+    const json = await res.json();
+    if (json.error) throw new Error(json.error);
+
+    insightsData = json;
+    const ins = json.insights || {};
+
+    renderOverviewInsights(ins);
+    renderInsightsPanel(ins);
+    renderContentIdeas(ins);
+
+  } catch (e) {
+    const err = `<div style="color:var(--muted2);font-size:13px;padding:20px;">Could not load insights: ${e.message}</div>`;
+    document.getElementById('ai-summary-block').innerHTML = err;
+    document.getElementById('insights-content').innerHTML = err;
+    document.getElementById('content-ideas-block').innerHTML = err;
+  }
+}
+
+function renderOverviewInsights(ins) {
+  if (ins.watch_out) {
+    document.getElementById('watch-out-text').textContent = ins.watch_out;
+    document.getElementById('watch-out-block').style.display = 'flex';
+  }
+
+  if (ins.summary) {
+    document.getElementById('ai-summary-block').innerHTML = `
+      <p style="font-size:14px;line-height:1.7;color:var(--text);margin-bottom:16px;">${ins.summary}</p>
+      ${(ins.quick_wins || []).map(qw => `
+        <div style="display:flex;align-items:flex-start;gap:10px;margin-bottom:10px;">
+          <span style="color:var(--green);font-size:16px;flex-shrink:0;">⚡</span>
+          <div>
+            <div style="font-weight:600;font-size:13px;">${qw.title}</div>
+            <div style="font-size:12px;color:var(--muted2);margin-top:2px;">${qw.action}</div>
+          </div>
+        </div>
+      `).join('')}
+    `;
+  } else {
+    document.getElementById('ai-summary-block').innerHTML = '<div style="color:var(--muted2);font-size:13px;">No summary available.</div>';
+  }
+}
+
+function renderInsightsPanel(ins) {
+  let html = '';
+
+  if (ins.summary) {
+    html += `<div class="insights-summary"><p>${ins.summary}</p></div>`;
+  }
+
+  if ((ins.focus_areas || []).length) {
+    html += `<div class="card-title" style="margin-bottom:12px;">FOCUS AREAS THIS WEEK</div>`;
+    html += `<div class="insights-grid">`;
+    ins.focus_areas.forEach(f => {
+      html += `
+        <div class="insight-card">
+          <span class="insight-priority ${f.priority || 'medium'}">${(f.priority || 'medium').toUpperCase()}</span>
+          <div class="insight-title">${f.title}</div>
+          <div class="insight-desc">${f.description}</div>
+          <div class="insight-action">${f.action}</div>
+        </div>`;
+    });
+    html += `</div>`;
+  }
+
+  if ((ins.quick_wins || []).length) {
+    html += `<div class="card-title" style="margin-bottom:12px;margin-top:4px;">QUICK WINS</div>`;
+    html += `<div class="quick-wins-grid">`;
+    ins.quick_wins.forEach(qw => {
+      html += `
+        <div class="quick-win-card">
+          <div class="qw-icon">⚡</div>
+          <div>
+            <div class="qw-title">${qw.title}</div>
+            <div class="qw-action">${qw.action}</div>
+            <div class="qw-impact">${qw.expected_impact}</div>
+          </div>
+        </div>`;
+    });
+    html += `</div>`;
+  }
+
+  document.getElementById('insights-content').innerHTML = html || '<div style="color:var(--muted2);font-size:13px;padding:20px;">No insights available yet.</div>';
+}
+
+function renderContentIdeas(ins) {
+  if (!(ins.content_ideas || []).length) {
+    document.getElementById('content-ideas-block').innerHTML = '<div style="color:var(--muted2);font-size:13px;padding:20px;">No content ideas yet — click Generate New Ideas.</div>';
+    return;
+  }
+
+  const formatClass = {
+    'Reel': 'format-reel', 'Story': 'format-story', 'YouTube': 'format-youtube',
+    'Carousel': 'format-carousel', 'Post': 'format-post'
+  };
+
+  let html = `<div class="content-grid">`;
+  ins.content_ideas.forEach((idea, i) => {
+    const fc = formatClass[idea.format] || 'format-post';
+    html += `
+      <div class="content-card">
+        <span class="content-format ${fc}">${idea.format}</span>
+        <div class="content-title">${idea.title}</div>
+        <div class="content-hook">${idea.hook}</div>
+        <div class="content-why">${idea.why_it_works}</div>
+        <div class="content-cta">${idea.cta}</div>
+        <div class="content-actions">
+          <button class="btn btn-outline btn-sm" onclick="saveIdeaAsDraft(${i})">Save as Draft</button>
+        </div>
+      </div>`;
+  });
+  html += `</div>`;
+
+  document.getElementById('content-ideas-block').innerHTML = html;
+}
+
+function saveIdeaAsDraft(idx) {
+  const idea = insightsData?.insights?.content_ideas?.[idx];
+  if (!idea) return;
+  const drafts = getDrafts();
+  drafts.push({
+    id: Date.now(),
+    platform: idea.format === 'YouTube' ? 'youtube' : 'instagram',
+    type: idea.format.toLowerCase(),
+    title: idea.title,
+    body: `Hook: ${idea.hook}\n\nCTA: ${idea.cta}`,
+    notes: idea.why_it_works,
+    saved: new Date().toISOString()
+  });
+  saveDrafts(drafts);
+  loadSavedDrafts();
+  toast('Saved to drafts', 'success');
+}
+
+// ─── DRAFTS ────────────────────────────────────────────────────────────────
+function getDrafts() {
+  try { return JSON.parse(localStorage.getItem('lifex_mkt_drafts') || '[]'); } catch { return []; }
+}
+function saveDrafts(d) { localStorage.setItem('lifex_mkt_drafts', JSON.stringify(d)); }
+
+function saveDraft() {
+  const platform = document.getElementById('draft-platform').value;
+  const type = document.getElementById('draft-type').value;
+  const title = document.getElementById('draft-title').value.trim();
+  const body = document.getElementById('draft-body').value.trim();
+  const notes = document.getElementById('draft-notes').value.trim();
+
+  if (!title || !body) { toast('Add a title and content first', 'error'); return; }
+
+  const drafts = getDrafts();
+  drafts.unshift({ id: Date.now(), platform, type, title, body, notes, saved: new Date().toISOString() });
+  saveDrafts(drafts);
+  loadSavedDrafts();
+
+  document.getElementById('draft-title').value = '';
+  document.getElementById('draft-body').value = '';
+  document.getElementById('draft-notes').value = '';
+  toast('Draft saved', 'success');
+}
+
+function deleteDraft(id) {
+  saveDrafts(getDrafts().filter(d => d.id !== id));
+  loadSavedDrafts();
+}
+
+function loadSavedDrafts() {
+  const drafts = getDrafts();
+  const el = document.getElementById('saved-drafts-list');
+  if (!drafts.length) {
+    el.innerHTML = '<div style="color:var(--muted2);font-size:13px;padding:20px 0;text-align:center;">No saved drafts yet</div>';
+    return;
+  }
+  const platformEmoji = { instagram:'📸', facebook:'👍', youtube:'▶️', email:'📧', 'google-ads':'🎯', 'meta-ads':'📣' };
+  el.innerHTML = drafts.map(d => `
+    <div class="saved-content-item">
+      <div class="sci-platform">${platformEmoji[d.platform] || '📄'}</div>
+      <div class="sci-body">
+        <div style="font-weight:600;font-size:13px;margin-bottom:4px;">${d.title}</div>
+        <div class="sci-text">${d.body.substring(0, 120)}${d.body.length > 120 ? '…' : ''}</div>
+        ${d.notes ? `<div class="sci-meta">📝 ${d.notes}</div>` : ''}
+        <div class="sci-meta" style="margin-top:4px;">${d.platform} · ${d.type} · ${new Date(d.saved).toLocaleDateString('en-AU')}</div>
+      </div>
+      <div class="sci-actions">
+        <button class="btn btn-outline btn-sm" onclick="copyDraft(${d.id})" title="Copy">📋</button>
+        <button class="btn btn-outline btn-sm" style="color:var(--red);" onclick="deleteDraft(${d.id})" title="Delete">✕</button>
+      </div>
+    </div>
+  `).join('');
+}
+
+function copyDraft(id) {
+  const d = getDrafts().find(x => x.id === id);
+  if (!d) return;
+  navigator.clipboard.writeText(`${d.title}\n\n${d.body}`).then(() => toast('Copied to clipboard', 'success'));
+}
+
+// ─── WEEKLY SNAPSHOTS ──────────────────────────────────────────────────────
+function getSnapshots() {
+  try { return JSON.parse(localStorage.getItem('lifex_mkt_snapshots') || '[]'); } catch { return []; }
+}
+function saveSnapshotData(s) {
+  const snaps = getSnapshots();
+  snaps.unshift(s);
+  localStorage.setItem('lifex_mkt_snapshots', JSON.stringify(snaps.slice(0, 52))); // keep 1 year
+}
+
+function saveWeeklySnapshot() {
+  const week = document.getElementById('tracker-week').value;
+  if (!week) { toast('Set a week ending date', 'error'); return; }
+
+  const snap = {
+    id: Date.now(),
+    week,
+    dexa: parseInt(document.getElementById('t-dexa').value) || 0,
+    sessions: parseInt(document.getElementById('t-sessions').value) || 0,
+    google_spend: parseFloat(document.getElementById('t-google-spend').value) || 0,
+    google_clicks: parseInt(document.getElementById('t-google-clicks').value) || 0,
+    meta_spend: parseFloat(document.getElementById('t-meta-spend').value) || 0,
+    meta_reach: parseInt(document.getElementById('t-meta-reach').value) || 0,
+    ig_followers: parseInt(document.getElementById('t-ig-followers').value) || 0,
+    best_reach: parseInt(document.getElementById('t-best-reach').value) || 0,
+    notes: document.getElementById('t-notes').value.trim(),
+    saved: new Date().toISOString()
+  };
+
+  saveSnapshotData(snap);
+  loadSnapshots();
+  toast('Snapshot saved', 'success');
+
+  // Clear fields
+  ['t-dexa','t-sessions','t-google-spend','t-google-clicks','t-meta-spend','t-meta-reach','t-ig-followers','t-best-reach','t-notes'].forEach(id => {
+    document.getElementById(id).value = '';
+  });
+}
+
+function loadSnapshots() {
+  const snaps = getSnapshots();
+  const el = document.getElementById('snapshots-list');
+  if (!snaps.length) {
+    el.innerHTML = '<div style="color:var(--muted2);font-size:13px;padding:20px 0;text-align:center;">No snapshots yet</div>';
+    return;
+  }
+
+  el.innerHTML = snaps.slice(0, 10).map(s => {
+    const totalSpend = (s.google_spend || 0) + (s.meta_spend || 0);
+    const cpp = s.dexa > 0 && totalSpend > 0 ? `$${(totalSpend / s.dexa).toFixed(0)} / booking` : '';
+    return `
+      <div style="background:var(--surface2);border-radius:10px;padding:14px;margin-bottom:10px;">
+        <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:8px;">
+          <div style="font-weight:600;font-size:13px;">Week of ${new Date(s.week).toLocaleDateString('en-AU',{day:'numeric',month:'short'})}</div>
+          ${cpp ? `<div style="font-size:11px;color:var(--gold);font-weight:600;">${cpp}</div>` : ''}
+        </div>
+        <div style="display:grid;grid-template-columns:repeat(4,1fr);gap:8px;margin-bottom:${s.notes?'8px':'0'};">
+          <div><div style="font-size:10px;color:var(--muted2);text-transform:uppercase;letter-spacing:0.5px;">DEXA</div><div style="font-family:'Bebas Neue';font-size:20px;">${s.dexa}</div></div>
+          <div><div style="font-size:10px;color:var(--muted2);text-transform:uppercase;letter-spacing:0.5px;">Sessions</div><div style="font-family:'Bebas Neue';font-size:20px;">${s.sessions||'—'}</div></div>
+          <div><div style="font-size:10px;color:var(--muted2);text-transform:uppercase;letter-spacing:0.5px;">Ad Spend</div><div style="font-family:'Bebas Neue';font-size:20px;">${totalSpend?'$'+totalSpend.toFixed(0):'—'}</div></div>
+          <div><div style="font-size:10px;color:var(--muted2);text-transform:uppercase;letter-spacing:0.5px;">Meta Reach</div><div style="font-family:'Bebas Neue';font-size:20px;">${s.meta_reach||'—'}</div></div>
+        </div>
+        ${s.notes ? `<div style="font-size:12px;color:var(--muted2);line-height:1.4;">${s.notes}</div>` : ''}
+      </div>
+    `;
+  }).join('');
+}
+
+// ─── INTEGRATION SETTINGS ──────────────────────────────────────────────────
+function saveIntegrationSetting(key, value) {
+  const settings = JSON.parse(localStorage.getItem('lifex_mkt_settings') || '{}');
+  settings[key] = value;
+  localStorage.setItem('lifex_mkt_settings', JSON.stringify(settings));
+}
+
+function loadIntegrationSettings() {
+  const settings = JSON.parse(localStorage.getItem('lifex_mkt_settings') || '{}');
+  if (settings.meta_pixel_id) document.getElementById('meta-pixel-id').value = settings.meta_pixel_id;
+  if (settings.google_ads_id) document.getElementById('google-ads-id').value = settings.google_ads_id;
+  if (settings.meta_ads_id) document.getElementById('meta-ads-id').value = settings.meta_ads_id;
+}
+
+// ─── TOAST ─────────────────────────────────────────────────────────────────
+function toast(msg, type = 'success') {
+  const t = document.getElementById('toast');
+  t.textContent = msg;
+  t.className = `toast ${type} show`;
+  setTimeout(() => t.classList.remove('show'), 2800);
+}
+
+// ─── START ─────────────────────────────────────────────────────────────────
+init();
+</script>
+</body>
+</html>
