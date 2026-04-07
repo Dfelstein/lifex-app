@@ -339,7 +339,7 @@ html, body { height: 100%; background: var(--bg); color: var(--text); font-famil
 
     <div class="nav-group-label" style="margin-top:8px;">Insights</div>
     <div class="nav-item" data-panel="analytics" onclick="showPanel('analytics')"><span class="nav-icon">📊</span> Analytics</div>
-    <div class="nav-item" onclick="window.location.href='marketing.html'" style="color:var(--gold);"><span class="nav-icon">🎯</span> Marketing Hub</div>
+    <div class="nav-item" id="nav-marketing" onclick="window.location.href='marketing.html'" style="color:var(--gold);display:none;"><span class="nav-icon">🎯</span> Marketing Hub</div>
 
     <div class="nav-group-label" style="margin-top:8px;">Data</div>
     <div class="nav-item" data-panel="merge-profiles" onclick="showPanel('merge-profiles')"><span class="nav-icon">🔀</span> Merge Profiles</div>
@@ -824,6 +824,7 @@ async function init() {
   const { data: profile } = await sb.from('profiles').select('*').eq('id', currentUserId).single();
 
   document.getElementById('staff-name').textContent = profile?.full_name || 'Staff';
+  if (profile?.is_marketing) document.getElementById('nav-marketing').style.display = 'flex';
   await Promise.all([loadClients(), loadTodayAppointments()]);
 
   document.getElementById('loading').style.display = 'none';
