@@ -12,8 +12,6 @@
 <link rel="apple-touch-icon" href="icons/icon-192.png">
 <link href="https://fonts.googleapis.com/css2?family=Bebas+Neue&family=Outfit:wght@300;400;500;600;700&display=swap" rel="stylesheet">
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
-<link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css"/>
-<script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
 <style>
 :root {
   --bg: #08090b; --surface: #0f1114; --surface2: #161a1f; --surface3: #1c2128;
@@ -750,7 +748,10 @@ html, body { height: 100%; background: var(--bg); color: var(--text); font-famil
     <div class="card" style="margin-bottom:20px;">
       <div class="card-title">Client Origin Map</div>
       <div style="font-size:12px;color:var(--muted2);margin-bottom:12px;">Circle size = number of clients from that suburb</div>
-      <div id="an-map" style="height:520px;border-radius:8px;overflow:hidden;background:var(--surface3);"></div>
+      <div id="an-map" style="position:relative;height:520px;border-radius:8px;overflow:hidden;background:#0d1117;">
+        <canvas id="an-map-canvas" style="display:block;width:100%;height:100%;"></canvas>
+        <div id="an-map-tooltip" style="position:absolute;display:none;background:rgba(10,12,16,0.92);border:1px solid rgba(255,255,255,0.12);border-radius:6px;padding:7px 12px;font-size:12px;color:#eef0f3;pointer-events:none;white-space:nowrap;z-index:10;"></div>
+      </div>
     </div>
 
     <div class="card">
@@ -3955,7 +3956,7 @@ async function loadAnalytics() {
     </div>`;
 }
 
-let anLeafletMap = null;
+let _mapPoints = []; // cached for tooltip hit-testing
 
 // Pre-baked Australian suburb coordinates — instant lookup, no API call needed
 const AUS_SUBURBS = {"castle hill||nsw":{lat:-33.7322,lng:151.0043},"baulkham hills||nsw":{lat:-33.7593,lng:150.9869},"kellyville||nsw":{lat:-33.7216,lng:150.9612},"rouse hill||nsw":{lat:-33.6883,lng:150.9163},"norwest||nsw":{lat:-33.7293,lng:150.9699},"bella vista||nsw":{lat:-33.7352,lng:150.9535},"winston hills||nsw":{lat:-33.7772,lng:150.9756},"seven hills||nsw":{lat:-33.7746,lng:150.9381},"blacktown||nsw":{lat:-33.7718,lng:150.9057},"penrith||nsw":{lat:-33.7512,lng:150.6942},"parramatta||nsw":{lat:-33.8148,lng:151.0017},"westmead||nsw":{lat:-33.8037,lng:150.9878},"pennant hills||nsw":{lat:-33.7359,lng:151.0706},"cherrybrook||nsw":{lat:-33.7291,lng:151.0467},"carlingford||nsw":{lat:-33.7779,lng:151.0477},"beecroft||nsw":{lat:-33.7495,lng:151.0618},"epping||nsw":{lat:-33.7721,lng:151.0814},"hornsby||nsw":{lat:-33.7022,lng:151.0997},"wahroonga||nsw":{lat:-33.7178,lng:151.1192},"pymble||nsw":{lat:-33.7452,lng:151.1407},"gordon||nsw":{lat:-33.7568,lng:151.1499},"st ives||nsw":{lat:-33.7375,lng:151.1682},"chatswood||nsw":{lat:-33.7974,lng:151.1806},"lane cove||nsw":{lat:-33.8152,lng:151.1687},"north sydney||nsw":{lat:-33.8404,lng:151.2073},"sydney||nsw":{lat:-33.8688,lng:151.2093},"manly||nsw":{lat:-33.7969,lng:151.2864},"dee why||nsw":{lat:-33.7494,lng:151.2848},"brookvale||nsw":{lat:-33.7708,lng:151.2698},"mosman||nsw":{lat:-33.8269,lng:151.2437},"bondi||nsw":{lat:-33.8915,lng:151.2767},"bondi junction||nsw":{lat:-33.8931,lng:151.2527},"surry hills||nsw":{lat:-33.8872,lng:151.2104},"newtown||nsw":{lat:-33.8977,lng:151.1795},"glebe||nsw":{lat:-33.8796,lng:151.1861},"leichhardt||nsw":{lat:-33.8833,lng:151.1574},"burwood||nsw":{lat:-33.8773,lng:151.1033},"strathfield||nsw":{lat:-33.8743,lng:151.0813},"merrylands||nsw":{lat:-33.8355,lng:150.9911},"liverpool||nsw":{lat:-33.9200,lng:150.9236},"campbelltown||nsw":{lat:-34.0667,lng:150.8144},"sutherland||nsw":{lat:-34.0324,lng:151.0569},"cronulla||nsw":{lat:-34.0548,lng:151.1527},"miranda||nsw":{lat:-34.0281,lng:151.1027},"kogarah||nsw":{lat:-33.9653,lng:151.1341},"hurstville||nsw":{lat:-33.9665,lng:151.1014},"bankstown||nsw":{lat:-33.9174,lng:151.0333},"fairfield||nsw":{lat:-33.8714,lng:150.9586},"cabramatta||nsw":{lat:-33.8935,lng:150.9413},"richmond||nsw":{lat:-33.5998,lng:150.7529},"windsor||nsw":{lat:-33.6134,lng:150.8126},"quakers hill||nsw":{lat:-33.7326,lng:150.8805},"stanhope gardens||nsw":{lat:-33.7160,lng:150.9207},"glenwood||nsw":{lat:-33.7282,lng:150.9286},"beaumont hills||nsw":{lat:-33.6992,lng:150.9443},"box hill||nsw":{lat:-33.6613,lng:150.9286},"schofields||nsw":{lat:-33.6924,lng:150.8804},"marsden park||nsw":{lat:-33.6957,lng:150.8466},"agnes banks||nsw":{lat:-33.5953,lng:150.7785},"cobbitty||nsw":{lat:-34.0218,lng:150.7108},"narellan||nsw":{lat:-34.0443,lng:150.7378},"camden||nsw":{lat:-34.0572,lng:150.6973},"wollongong||nsw":{lat:-34.4278,lng:150.8931},"newcastle||nsw":{lat:-32.9283,lng:151.7817},"maitland||nsw":{lat:-32.7333,lng:151.5500},"gosford||nsw":{lat:-33.4280,lng:151.3411},"wyong||nsw":{lat:-33.2833,lng:151.4167},"charlestown||nsw":{lat:-33.0192,lng:151.6917},"tuggerah||nsw":{lat:-33.2994,lng:151.3847},"central coast||nsw":{lat:-33.3300,lng:151.3600},"coffs harbour||nsw":{lat:-30.2963,lng:153.1135},"port macquarie||nsw":{lat:-31.4333,lng:152.9000},"tamworth||nsw":{lat:-31.0833,lng:150.9167},"orange||nsw":{lat:-33.2833,lng:149.1000},"dubbo||nsw":{lat:-32.2569,lng:148.6011},"albury||nsw":{lat:-36.0806,lng:146.9158},"wagga wagga||nsw":{lat:-35.1081,lng:147.3686},"melbourne||vic":{lat:-37.8136,lng:144.9631},"richmond||vic":{lat:-37.8183,lng:145.0019},"south yarra||vic":{lat:-37.8388,lng:144.9946},"fitzroy||vic":{lat:-37.8013,lng:144.9798},"carlton||vic":{lat:-37.8001,lng:144.9665},"st kilda||vic":{lat:-37.8676,lng:144.9820},"prahran||vic":{lat:-37.8510,lng:144.9971},"hawthorn||vic":{lat:-37.8217,lng:145.0280},"balwyn||vic":{lat:-37.8125,lng:145.0779},"box hill||vic":{lat:-37.8196,lng:145.1212},"ringwood||vic":{lat:-37.8157,lng:145.2282},"dandenong||vic":{lat:-37.9891,lng:145.2150},"frankston||vic":{lat:-38.1447,lng:145.1313},"geelong||vic":{lat:-38.1499,lng:144.3617},"ballarat||vic":{lat:-37.5622,lng:143.8503},"bendigo||vic":{lat:-36.7570,lng:144.2794},"brisbane||qld":{lat:-27.4698,lng:153.0251},"gold coast||qld":{lat:-28.0167,lng:153.4000},"sunshine coast||qld":{lat:-26.6500,lng:153.0667},"cairns||qld":{lat:-16.9186,lng:145.7781},"townsville||qld":{lat:-19.2589,lng:146.8169},"toowoomba||qld":{lat:-27.5598,lng:151.9507},"ipswich||qld":{lat:-27.6167,lng:152.7667},"springwood||qld":{lat:-27.6166,lng:153.1120},"chermside||qld":{lat:-27.3864,lng:153.0283},"perth||wa":{lat:-31.9505,lng:115.8605},"fremantle||wa":{lat:-32.0569,lng:115.7439},"joondalup||wa":{lat:-31.7436,lng:115.7660},"mandurah||wa":{lat:-32.5275,lng:115.7228},"rockingham||wa":{lat:-32.2803,lng:115.7292},"subiaco||wa":{lat:-31.9471,lng:115.8267},"adelaide||sa":{lat:-34.9285,lng:138.6007},"glenelg||sa":{lat:-34.9818,lng:138.5150},"norwood||sa":{lat:-34.9228,lng:138.6268},"unley||sa":{lat:-34.9500,lng:138.5975},"darwin||nt":{lat:-12.4634,lng:130.8456},"canberra||act":{lat:-35.2809,lng:149.1300},"belconnen||act":{lat:-35.2370,lng:149.0786},"tuggeranong||act":{lat:-35.4183,lng:149.0671},"hobart||tas":{lat:-42.8821,lng:147.3272},"launceston||tas":{lat:-41.4332,lng:147.1441}};
@@ -3969,108 +3970,143 @@ function countToColor(count, max) {
   else               return { fill: '#ff7043', border: '#e05a30', opacity: 0.90 }; // orange-red
 }
 
-async function renderSuburbMap(suburbs) {
-  const mapEl = document.getElementById('an-map');
-  if (!mapEl) return;
-  if (anLeafletMap) { anLeafletMap.remove(); anLeafletMap = null; }
+function renderSuburbMap(suburbs) {
+  const canvas = document.getElementById('an-map-canvas');
+  const tooltip = document.getElementById('an-map-tooltip');
+  if (!canvas) return;
 
-  anLeafletMap = L.map('an-map', { zoomControl: true }).setView([-33.73, 151.0], 10);
-  L.tileLayer('https://{s}.basemaps.cartocdn.com/dark_matter/{z}/{x}/{y}{r}.png', {
-    attribution: '© OpenStreetMap © CARTO',
-    subdomains: 'abcd', maxZoom: 18,
-  }).addTo(anLeafletMap);
-
-  if (!suburbs.length) return;
-
-  const maxCount = suburbs[0].count;
-  const allBounds = [];
-
+  // Resolve coordinates from pre-baked table + localStorage cache
   const GEO_CACHE_KEY = 'lifex_geocache_v2';
   let geoCache = {};
   try { geoCache = JSON.parse(localStorage.getItem(GEO_CACHE_KEY) || '{}'); } catch {}
 
-  const addToMap = (lat, lng, suburb, state, count) => {
-    allBounds.push([lat, lng]);
-    const { fill, border, opacity } = countToColor(count, maxCount);
-    // Scale radius: 8px base, up to 36px for most popular
-    const radius = 8 + Math.round((count / maxCount) * 28);
-    const circle = L.circleMarker([lat, lng], {
-      radius, fillColor: fill, color: border, weight: 2, opacity: 1, fillOpacity: opacity,
-    }).addTo(anLeafletMap);
-    // Always show label for top-25%, always show count
-    if (count / maxCount >= 0.25) {
-      L.marker([lat, lng], {
-        icon: L.divIcon({
-          className: '',
-          html: `<div style="background:rgba(0,0,0,0.8);color:#fff;font-size:10px;font-weight:700;padding:2px 6px;border-radius:4px;white-space:nowrap;pointer-events:none;margin-top:${-radius-20}px;">${suburb} · ${count}</div>`,
-          iconSize: [0, 0],
-        }),
-        interactive: false,
-      }).addTo(anLeafletMap);
-    }
-    circle.bindTooltip(`<b>${suburb}</b>${state ? ', '+state : ''}<br><span style="color:#f5c842;font-weight:700;">${count} client${count !== 1 ? 's' : ''}</span>`, {
-      permanent: false, direction: 'top', offset: [0, -radius],
-    });
-  };
-
-  // Phase 1: instant — check pre-baked table and localStorage cache
-  const uncached = [];
+  const points = [];
   for (const { suburb, state, count } of suburbs) {
-    const cacheKey = `${suburb}||${state}`.toLowerCase();
-    const baked = AUS_SUBURBS[cacheKey];
-    if (baked) {
-      addToMap(baked.lat, baked.lng, suburb, state, count);
-    } else if (geoCache[cacheKey]) {
-      addToMap(geoCache[cacheKey].lat, geoCache[cacheKey].lng, suburb, state, count);
-    } else {
-      uncached.push({ suburb, state, count });
-    }
+    const key = `${suburb}||${state}`.toLowerCase();
+    const coords = AUS_SUBURBS[key] || geoCache[key];
+    if (coords) points.push({ lat: coords.lat, lng: coords.lng, suburb, state, count });
   }
 
-  // Fit map to all known points immediately
-  if (allBounds.length > 1) anLeafletMap.fitBounds(allBounds, { padding: [50, 50] });
-  else if (allBounds.length === 1) anLeafletMap.setView(allBounds[0], 12);
+  if (!points.length) return;
 
-  // Phase 2: background geocode only truly unknown suburbs — 1/sec Nominatim limit
-  if (uncached.length) {
-    (async () => {
-      for (const { suburb, state, count } of uncached) {
-        const cacheKey = `${suburb}||${state}`.toLowerCase();
-        const query = [suburb, state, 'Australia'].filter(Boolean).join(', ');
-        try {
-          const res = await fetch(
-            `https://nominatim.openstreetmap.org/search?q=${encodeURIComponent(query)}&format=json&limit=1`,
-            { headers: { 'Accept-Language': 'en' } }
-          );
-          const data = await res.json();
-          if (data.length) {
-            const lat = parseFloat(data[0].lat);
-            const lng = parseFloat(data[0].lon);
-            geoCache[cacheKey] = { lat, lng };
-            try { localStorage.setItem(GEO_CACHE_KEY, JSON.stringify(geoCache)); } catch {}
-            addToMap(lat, lng, suburb, state, count);
-            if (allBounds.length > 1 && anLeafletMap) anLeafletMap.fitBounds(allBounds, { padding: [50, 50] });
-          }
-        } catch { /* skip */ }
-        await new Promise(r => setTimeout(r, 1100));
-      }
-    })();
+  // Size canvas to container
+  const container = canvas.parentElement;
+  const W = container.clientWidth  || 800;
+  const H = container.clientHeight || 520;
+  canvas.width  = W;
+  canvas.height = H;
+
+  const PAD = 48;
+  const lats = points.map(p => p.lat), lngs = points.map(p => p.lng);
+  let minLat = Math.min(...lats), maxLat = Math.max(...lats);
+  let minLng = Math.min(...lngs), maxLng = Math.max(...lngs);
+
+  // Add padding so edge circles don't clip
+  const latSpan = maxLat - minLat || 0.5;
+  const lngSpan = maxLng - minLng || 0.5;
+  minLat -= latSpan * 0.15; maxLat += latSpan * 0.15;
+  minLng -= lngSpan * 0.15; maxLng += lngSpan * 0.15;
+
+  // Mercator-ish projection (accurate enough for city-scale)
+  const project = (lat, lng) => ({
+    x: PAD + (lng - minLng) / (maxLng - minLng) * (W - PAD * 2),
+    y: PAD + (maxLat - lat)  / (maxLat - minLat) * (H - PAD * 2),
+  });
+
+  const ctx = canvas.getContext('2d');
+
+  // Background
+  ctx.fillStyle = '#0d1117';
+  ctx.fillRect(0, 0, W, H);
+
+  // Subtle grid lines
+  ctx.strokeStyle = 'rgba(255,255,255,0.04)';
+  ctx.lineWidth = 1;
+  for (let i = 0; i <= 8; i++) {
+    const x = PAD + i * (W - PAD*2) / 8;
+    const y = PAD + i * (H - PAD*2) / 8;
+    ctx.beginPath(); ctx.moveTo(x, PAD); ctx.lineTo(x, H-PAD); ctx.stroke();
+    ctx.beginPath(); ctx.moveTo(PAD, y); ctx.lineTo(W-PAD, y); ctx.stroke();
+  }
+
+  const maxCount = Math.max(...points.map(p => p.count));
+  _mapPoints = [];
+
+  // Sort so largest circles are drawn first (smaller ones on top)
+  const sorted = [...points].sort((a, b) => b.count - a.count);
+
+  for (const pt of sorted) {
+    const { x, y } = project(pt.lat, pt.lng);
+    const ratio = pt.count / maxCount;
+    const radius = 7 + Math.round(ratio * 30);
+    const { fill, border } = countToColor(pt.count, maxCount);
+
+    // Glow
+    const grd = ctx.createRadialGradient(x, y, 0, x, y, radius * 1.8);
+    grd.addColorStop(0, fill + '55');
+    grd.addColorStop(1, fill + '00');
+    ctx.beginPath(); ctx.arc(x, y, radius * 1.8, 0, Math.PI*2);
+    ctx.fillStyle = grd; ctx.fill();
+
+    // Circle
+    ctx.beginPath(); ctx.arc(x, y, radius, 0, Math.PI*2);
+    ctx.fillStyle = fill + 'cc';
+    ctx.strokeStyle = border;
+    ctx.lineWidth = 1.5;
+    ctx.fill(); ctx.stroke();
+
+    // Label for top suburbs
+    if (ratio >= 0.25) {
+      ctx.font = `700 10px "Outfit",Arial,sans-serif`;
+      ctx.fillStyle = '#ffffff';
+      ctx.textAlign = 'center';
+      ctx.textBaseline = 'bottom';
+      ctx.fillText(`${pt.suburb} · ${pt.count}`, x, y - radius - 4);
+    }
+
+    _mapPoints.push({ x, y, radius, suburb: pt.suburb, state: pt.state, count: pt.count });
   }
 
   // Legend
-  const legend = L.control({ position: 'bottomright' });
-  legend.onAdd = () => {
-    const div = L.DomUtil.create('div');
-    div.innerHTML = `<div style="background:rgba(15,17,20,0.9);border:1px solid rgba(255,255,255,0.1);border-radius:8px;padding:10px 14px;font-size:11px;color:#eef0f3;">
-      <div style="font-weight:600;margin-bottom:6px;letter-spacing:0.5px;">CLIENTS</div>
-      <div style="display:flex;align-items:center;gap:6px;margin-bottom:4px;"><div style="width:12px;height:12px;border-radius:50%;background:#ff7043;"></div> Most (75–100%)</div>
-      <div style="display:flex;align-items:center;gap:6px;margin-bottom:4px;"><div style="width:12px;height:12px;border-radius:50%;background:#f5c842;"></div> High (50–75%)</div>
-      <div style="display:flex;align-items:center;gap:6px;margin-bottom:4px;"><div style="width:12px;height:12px;border-radius:50%;background:#2dd4bf;"></div> Medium (25–50%)</div>
-      <div style="display:flex;align-items:center;gap:6px;"><div style="width:12px;height:12px;border-radius:50%;background:#4da6ff;"></div> Few (0–25%)</div>
-    </div>`;
-    return div;
+  ctx.font = '600 10px "Outfit",Arial,sans-serif';
+  ctx.textAlign = 'left';
+  ctx.textBaseline = 'middle';
+  const legendItems = [
+    { color:'#ff7043', label:'Most (75–100%)' },
+    { color:'#f5c842', label:'High (50–75%)' },
+    { color:'#2dd4bf', label:'Medium (25–50%)' },
+    { color:'#4da6ff', label:'Few (0–25%)' },
+  ];
+  const lx = W - 145, ly = H - 20 - legendItems.length * 20;
+  ctx.fillStyle = 'rgba(10,12,16,0.88)';
+  ctx.beginPath();
+  ctx.roundRect(lx - 10, ly - 10, 148, legendItems.length * 20 + 20, 6);
+  ctx.fill();
+  legendItems.forEach(({ color, label }, i) => {
+    ctx.beginPath(); ctx.arc(lx + 5, ly + i*20 + 5, 5, 0, Math.PI*2);
+    ctx.fillStyle = color; ctx.fill();
+    ctx.fillStyle = '#eef0f3';
+    ctx.fillText(label, lx + 15, ly + i*20 + 5);
+  });
+
+  // Hover tooltips
+  canvas.onmousemove = (e) => {
+    const rect = canvas.getBoundingClientRect();
+    const mx = (e.clientX - rect.left) * (W / rect.width);
+    const my = (e.clientY - rect.top)  * (H / rect.height);
+    const hit = _mapPoints.find(p => Math.hypot(p.x - mx, p.y - my) <= p.radius + 4);
+    if (hit) {
+      tooltip.style.display = 'block';
+      tooltip.style.left = (e.clientX - container.getBoundingClientRect().left + 12) + 'px';
+      tooltip.style.top  = (e.clientY - container.getBoundingClientRect().top  - 36) + 'px';
+      tooltip.innerHTML = `<strong>${hit.suburb}</strong>${hit.state ? ', '+hit.state : ''} &nbsp;<span style="color:#f5c842;font-weight:700;">${hit.count} client${hit.count!==1?'s':''}</span>`;
+      canvas.style.cursor = 'pointer';
+    } else {
+      tooltip.style.display = 'none';
+      canvas.style.cursor = 'default';
+    }
   };
-  legend.addTo(anLeafletMap);
+  canvas.onmouseleave = () => { tooltip.style.display = 'none'; };
 }
 
 function anBarChart(entries, color, total, colors) {
