@@ -329,7 +329,7 @@ html, body { height: 100%; background: var(--bg); color: var(--text); font-famil
     <div class="nav-group-label">Today</div>
     <div class="nav-item active" data-panel="today" onclick="showPanel('today')"><span class="nav-icon">📅</span> Today's Appointments</div>
 
-    <div class="nav-item" data-panel="previous" onclick="showPanel('previous')"><span class="nav-icon">🗓️</span> Previous Appointments</div>
+    <div class="nav-item" data-panel="previous" onclick="showPanel('previous')"><span class="nav-icon">🗓️</span> All Appointments</div>
 
     <div class="nav-group-label" style="margin-top:8px;">Clients</div>
     <div class="nav-item" data-panel="client-profile" id="nav-client-profile" onclick="showPanel('client-profile')" style="display:none;"><span class="nav-icon">👤</span> <span id="nav-client-name">Client Profile</span></div>
@@ -339,6 +339,7 @@ html, body { height: 100%; background: var(--bg); color: var(--text); font-famil
 
     <div class="nav-group-label" style="margin-top:8px;">Insights</div>
     <div class="nav-item" data-panel="analytics" onclick="showPanel('analytics')"><span class="nav-icon">📊</span> Analytics</div>
+    <div class="nav-item" onclick="window.location.href='marketing.html'" style="color:var(--gold);"><span class="nav-icon">🎯</span> Marketing Hub</div>
 
     <div class="nav-group-label" style="margin-top:8px;">Data</div>
     <div class="nav-item" data-panel="merge-profiles" onclick="showPanel('merge-profiles')"><span class="nav-icon">🔀</span> Merge Profiles</div>
@@ -372,7 +373,7 @@ html, body { height: 100%; background: var(--bg); color: var(--text); font-famil
 
   <!-- ── PREVIOUS APPOINTMENTS ── -->
   <div id="panel-previous" class="panel">
-    <div class="page-title">Previous Appointments</div>
+    <div class="page-title">All Appointments</div>
     <div class="page-subtitle" id="prev-subtitle" style="margin-bottom:16px;">Select a day to view appointments</div>
     <div class="view-toggle">
       <button class="view-toggle-btn active" id="btn-week-view" onclick="setPrevView('week')">Week</button>
@@ -2390,7 +2391,11 @@ function showPanel(id) {
   document.getElementById('panel-' + id).classList.add('active');
   document.querySelector(`[data-panel="${id}"]`)?.classList.add('active');
   if (id === 'previous') setPrevView('week');
-  if (id === 'analytics') loadAnalytics();
+  if (id === 'analytics') {
+    loadAnalytics();
+    // Leaflet needs the container to be visible before it can measure it
+    setTimeout(() => { if (_leafletMap) _leafletMap.invalidateSize(); }, 100);
+  }
   if (id === 'all-scans') loadAllScans();
 }
 
