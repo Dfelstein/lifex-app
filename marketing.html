@@ -762,16 +762,8 @@ html, body { height: 100%; background: var(--bg); color: var(--text); font-famil
       </div>
       <div class="page-subtitle">Search Console performance, website changes, and ranking impact</div>
 
-      <div id="sc-block">
-        <div class="loading-insights"><div class="spinner"></div>Loading Search Console data…</div>
-      </div>
-
-      <div style="margin:28px 0 12px;">
-        <div style="font-size:11px;font-weight:600;letter-spacing:1px;text-transform:uppercase;color:var(--muted2);">SEO CHANGE LOG</div>
-      </div>
-
-      <div id="add-change-form" style="display:none;">
-        <div class="card" style="margin-bottom:20px;">
+      <div id="add-change-form" style="display:none;margin-bottom:20px;">
+        <div class="card">
           <div class="card-title">LOG A WEBSITE / SEO CHANGE</div>
           <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px;">
             <div class="field">
@@ -815,6 +807,14 @@ html, body { height: 100%; background: var(--bg); color: var(--text); font-famil
             <button class="btn btn-outline" onclick="toggleAddChange()">Cancel</button>
           </div>
         </div>
+      </div>
+
+      <div id="sc-block" style="margin-bottom:28px;">
+        <div class="loading-insights"><div class="spinner"></div>Loading Search Console data…</div>
+      </div>
+
+      <div style="margin-bottom:12px;">
+        <div style="font-size:11px;font-weight:600;letter-spacing:1px;text-transform:uppercase;color:var(--muted2);">SEO CHANGE LOG</div>
       </div>
 
       <div id="seo-changes-list">
