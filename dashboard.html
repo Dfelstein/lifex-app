@@ -2065,7 +2065,7 @@ function spinWheel() {
   const btn=document.getElementById('spin-btn'); if(btn)btn.disabled=true;
   spinState.spinning=true; wheelVelocity=0.25+Math.random()*0.2;
   const decel=0.004+Math.random()*0.002; if(wheelAnim)cancelAnimationFrame(wheelAnim);
-  function step() {
+  async function step() {
     wheelAngle+=wheelVelocity; wheelVelocity-=decel;
     if (wheelVelocity<=0) {
       wheelVelocity=0; spinState.spinning=false;
