@@ -750,6 +750,10 @@ html, body { height: 100%; background: var(--bg); color: var(--text); font-famil
             <div class="card-title">ACUITY TRACKED BOOKINGS THIS MONTH</div>
             <div id="rev-conversions-list"><div style="color:var(--muted2);font-size:13px;">Loading…</div></div>
           </div>
+          <div class="card">
+            <div class="card-title">BOOKINGS BY SOURCE</div>
+            <div id="channel-breakdown-list"><div style="color:var(--muted2);font-size:13px;">Loading…</div></div>
+          </div>
         </div>
       </div>
     </div>
@@ -1456,6 +1460,60 @@ function loadRevenue() {
   }
 
   updateROI();
+  loadChannelBreakdown();
+}
+
+async function loadChannelBreakdown() {
+  const el = document.getElementById('channel-breakdown-list');
+  const now = new Date();
+  const thisMonthStart = new Date(now.getFullYear(), now.getMonth(), 1).toISOString();
+
+  const { data } = await sb.from('marketing_conversions')
+    .select('attributed_channel, price')
+    .gte('booked_at', thisMonthStart);
+
+  if (!data || !data.length) {
+    el.innerHTML = '<div style="color:var(--muted2);font-size:13px;">No attributed bookings yet — attribution tracking will populate this once the WPCode snippets are live.</div>';
+    return;
+  }
+
+  const channelLabel = {
+    paid_search:    { label: 'Paid Search (Google)', icon: '🎯', color: 'var(--blue)' },
+    seo:            { label: 'SEO / Organic Search',  icon: '🔍', color: 'var(--green)' },
+    paid_social:    { label: 'Paid Social (Meta)',     icon: '📣', color: 'var(--purple)' },
+    organic_social: { label: 'Organic Social',         icon: '📱', color: 'var(--orange)' },
+    email:          { label: 'Email',                  icon: '📧', color: 'var(--teal)' },
+    referral:       { label: 'Referral',               icon: '🔗', color: 'var(--muted2)' },
+    direct:         { label: 'Direct / Unknown',       icon: '⬜', color: 'var(--muted2)' },
+    other:          { label: 'Other',                  icon: '•',  color: 'var(--muted2)' },
+  };
+
+  const byChannel = {};
+  data.forEach(r => {
+    const ch = r.attributed_channel || 'direct';
+    if (!byChannel[ch]) byChannel[ch] = { count: 0, revenue: 0 };
+    byChannel[ch].count++;
+    byChannel[ch].revenue += parseFloat(r.price) || 0;
+  });
+
+  const total = data.length;
+  const sorted = Object.entries(byChannel).sort((a, b) => b[1].count - a[1].count);
+
+  el.innerHTML = sorted.map(([ch, d]) => {
+    const meta = channelLabel[ch] || { label: ch, icon: '•', color: 'var(--muted2)' };
+    const pct = Math.round((d.count / total) * 100);
+    return `
+      <div style="margin-bottom:14px;">
+        <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:5px;">
+          <span style="font-size:13px;">${meta.icon} ${meta.label}</span>
+          <span style="font-size:12px;color:var(--muted2);">${d.count} booking${d.count!==1?'s':''} · <strong style="color:var(--gold);">$${d.revenue.toLocaleString('en-AU')}</strong></span>
+        </div>
+        <div style="background:var(--surface2);border-radius:4px;height:6px;overflow:hidden;">
+          <div style="height:100%;border-radius:4px;background:${meta.color};width:${pct}%;transition:width 0.6s;"></div>
+        </div>
+        <div style="font-size:10px;color:var(--muted);margin-top:3px;">${pct}% of bookings this month</div>
+      </div>`;
+  }).join('');
 }
 
 function updateROI() {

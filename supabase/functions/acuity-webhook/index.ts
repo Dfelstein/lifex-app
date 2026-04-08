@@ -86,6 +86,12 @@ Deno.serve(async (req) => {
       serviceType = 'bone';
     }
 
+    // Check if attribution data already arrived (from booking-confirmed page)
+    const { data: attrData } = await sb.from('booking_attribution')
+      .select('utm_source,utm_medium,utm_campaign,utm_content,attributed_channel,referrer_url,landing_page')
+      .eq('appointment_id', String(appointmentId))
+      .single();
+
     // Store in marketing_conversions table
     const { error } = await sb.from('marketing_conversions').upsert({
       acuity_appointment_id: String(appointmentId),
@@ -98,6 +104,8 @@ Deno.serve(async (req) => {
       price,
       booked_at: new Date(datetime).toISOString(),
       raw_payload: payload,
+      // Attribution — populated if booking-confirmed page already fired
+      ...(attrData || {}),
     }, { onConflict: 'acuity_appointment_id' });
 
     if (error) {
