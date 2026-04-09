@@ -203,35 +203,18 @@ body { background: var(--bg); color: var(--text); font-family: 'Outfit', sans-se
   .page-title { font-size: 26px; }
 }
 
-/* SCAN DETAIL BOTTOM SHEET */
-.scan-sheet-overlay {
-  display: none; position: fixed; inset: 0; background: rgba(0,0,0,0.7);
-  z-index: 400; backdrop-filter: blur(4px);
+/* SCAN DETAIL — full screen */
+#screen-scan-detail .sd-header {
+  display: flex; align-items: center; gap: 12px;
+  padding: 16px 20px; border-bottom: 1px solid var(--border); flex-shrink: 0;
 }
-.scan-sheet-overlay.open { display: block; }
-.scan-sheet {
-  position: fixed; bottom: 0; left: 0; right: 0; z-index: 401;
-  background: var(--surface); border-radius: 20px 20px 0 0;
-  border-top: 1px solid var(--border2);
-  max-height: 88vh; overflow-y: auto;
-  transform: translateY(100%); transition: transform 0.3s cubic-bezier(0.32,0.72,0,1);
-  padding-bottom: env(safe-area-inset-bottom, 24px);
-}
-.scan-sheet.open { transform: translateY(0); }
-.sheet-handle {
-  width: 40px; height: 4px; background: var(--surface3); border-radius: 2px;
-  margin: 12px auto 0; flex-shrink: 0;
-}
-.sheet-header {
-  display: flex; align-items: center; justify-content: space-between;
-  padding: 16px 20px; border-bottom: 1px solid var(--border);
-}
-.sheet-title { font-family: 'Bebas Neue', sans-serif; font-size: 22px; letter-spacing: 1px; }
-.sheet-close {
-  width: 32px; height: 32px; border-radius: 50%; background: var(--surface2);
+#screen-scan-detail .sd-back {
+  width: 34px; height: 34px; border-radius: 50%; background: var(--surface2);
   border: 1px solid var(--border2); display: flex; align-items: center; justify-content: center;
-  cursor: pointer; font-size: 16px; color: var(--muted2); flex-shrink: 0;
+  cursor: pointer; font-size: 18px; color: var(--muted2); flex-shrink: 0; line-height: 1;
 }
+#screen-scan-detail .sd-back:hover { color: var(--text); }
+.sheet-title { font-family: 'Bebas Neue', sans-serif; font-size: 22px; letter-spacing: 1px; }
 .sheet-body { padding: 20px; }
 .sheet-stat-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 10px; margin-bottom: 16px; }
 @media (max-width: 640px) { .sheet-stat-grid { grid-template-columns: repeat(2, 1fr); } }
@@ -614,6 +597,15 @@ body { background: var(--bg); color: var(--text); font-family: 'Outfit', sans-se
     </div>
   </div>
 
+  <!-- SCAN DETAIL FULL SCREEN -->
+  <div id="screen-scan-detail" class="screen" style="padding:0;display:flex;flex-direction:column;">
+    <div class="sd-header">
+      <div class="sd-back" onclick="closeScanDetail()">←</div>
+      <div class="sheet-title" id="sdTitle">Scan Detail</div>
+    </div>
+    <div class="sheet-body" id="sdBody" style="flex:1;overflow-y:auto;"></div>
+  </div>
+
 </main>
 </div><!-- end #app -->
 
@@ -631,6 +623,7 @@ const sb = window.supabase.createClient(SUPABASE_URL, SUPABASE_KEY);
 let profile = null;
 let scan1 = null, scan2 = null;
 let allScans = [];
+let baIdxA = 0, baIdxB = 0; // Before vs After selected scan indices
 let blood = [], hormones = [], rmr = null, rmrPrev = null, rmrAll = [];
 let bloodPanelDate = '', hormonePanelDate = '', rmrDate = '';
 let lifexScore = null;
@@ -755,17 +748,27 @@ function mapScan(s) {
   };
 }
 
+function calcDexaScore(fat_pct, sex) {
+  if (fat_pct == null) return null;
+  const f = (sex||'').toLowerCase() === 'female';
+  if (f) {
+    if (fat_pct <= 20) return 95;
+    if (fat_pct <= 28) return 85;
+    if (fat_pct <= 32) return 74;
+    if (fat_pct <= 37) return 58;
+    return 42;
+  } else {
+    if (fat_pct <= 12) return 95;
+    if (fat_pct <= 17) return 85;
+    if (fat_pct <= 22) return 74;
+    if (fat_pct <= 27) return 58;
+    return 42;
+  }
+}
+
 function calcLifexScore() {
   const scores = [];
-  if (scan2) {
-    // DEXA score based on body fat %
-    const fp = scan2.fat_pct;
-    if      (fp <= 12) scores.push(95);
-    else if (fp <= 17) scores.push(85);
-    else if (fp <= 22) scores.push(74);
-    else if (fp <= 27) scores.push(58);
-    else               scores.push(42);
-  }
+  if (scan2?.fat_pct != null) scores.push(calcDexaScore(scan2.fat_pct, scan2.sex || profile?.sex));
   if (blood.length) {
     const optimal = blood.filter(m => m.status === 'optimal').length;
     const normal  = blood.filter(m => m.status === 'normal').length;
@@ -892,10 +895,7 @@ function renderDashboard() {
 
   // Calculate DEXA score + blood score + rmr score for breakdown
   let dexaScore = null, bloodScore = null, rmrScore = null;
-  if (scan2) {
-    const fp = scan2.fat_pct;
-    if(fp<=12)dexaScore=95; else if(fp<=17)dexaScore=85; else if(fp<=22)dexaScore=74; else if(fp<=27)dexaScore=58; else dexaScore=42;
-  }
+  if (scan2?.fat_pct != null) dexaScore = calcDexaScore(scan2.fat_pct, scan2.sex || profile?.sex);
   if (blood.length) {
     const optimal = blood.filter(m => m.status==='optimal').length;
     const normal  = blood.filter(m => m.status==='normal').length;
@@ -1485,8 +1485,25 @@ function renderBeforeAfter() {
     return;
   }
 
-  const numPairs = allScans.length - 1;
-  document.getElementById('ba-subtitle').textContent = `${allScans.length} scans · ${numPairs} comparison${numPairs !== 1 ? 's' : ''}`;
+  // Default to first vs last
+  if (baIdxA === baIdxB) { baIdxA = 0; baIdxB = allScans.length - 1; }
+
+  document.getElementById('ba-subtitle').textContent = `${allScans.length} scans — tap any scan above to view details`;
+
+  const scanOptions = allScans.map((s, i) => `<option value="${i}" ${i===baIdxA?'selected':''}>Scan #${s.scan_number||i+1} — ${fmtDate(s.date)}</option>`).join('');
+  const scanOptionsB = allScans.map((s, i) => `<option value="${i}" ${i===baIdxB?'selected':''}>Scan #${s.scan_number||i+1} — ${fmtDate(s.date)}</option>`).join('');
+
+  const selectStyle = 'background:var(--surface2);border:1px solid var(--border2);border-radius:8px;padding:8px 12px;color:var(--text);font-family:\'Outfit\',sans-serif;font-size:13px;outline:none;flex:1;';
+
+  const selectorHtml = `
+    <div class="card mb20">
+      <div class="card-title" style="margin-bottom:12px;">Compare Scans</div>
+      <div style="display:flex;gap:10px;align-items:center;flex-wrap:wrap;">
+        <select style="${selectStyle}" onchange="baIdxA=parseInt(this.value);renderBeforeAfter()">${scanOptions}</select>
+        <span style="color:var(--muted2);font-size:18px;">→</span>
+        <select style="${selectStyle}" onchange="baIdxB=parseInt(this.value);renderBeforeAfter()">${scanOptionsB}</select>
+      </div>
+    </div>`;
 
   const colorMap = { good:'var(--green)', bad:'var(--red)', neutral:'var(--muted2)' };
 
@@ -1536,14 +1553,18 @@ function renderBeforeAfter() {
 }
 
 /* ══════════════════════════
-   SCAN DETAIL SHEET
+   SCAN DETAIL SCREEN
 ══════════════════════════ */
+let scanDetailFromScreen = 'body-comp';
 function showScanDetail(i) {
   const s = allScans[i];
   if (!s) return;
   logActivity('view_scan_detail');
+  // remember where we came from
+  const cur = document.querySelector('.screen.active');
+  if (cur) scanDetailFromScreen = cur.id.replace('screen-', '');
   const isLatest = i === allScans.length - 1;
-  document.getElementById('sheetTitle').textContent = `Scan #${s.scan_number || i+1}  ·  ${fmtDate(s.date)}`;
+  document.getElementById('sdTitle').textContent = `Scan #${s.scan_number || i+1}  ·  ${fmtDate(s.date)}`;
 
   const weightKg = s.total_g ? (s.total_g/1000).toFixed(1) : null;
   const fatKg    = s.fat_g  ? (s.fat_g/1000).toFixed(1)   : null;
@@ -1588,7 +1609,7 @@ function showScanDetail(i) {
     { label: 'Right Leg', fat_pct: s.right_leg_fat_pct, lean_g: s.right_leg_lean_g, fat_g: s.right_leg_fat_g },
   ].filter(r => r.fat_pct != null || r.lean_g != null);
 
-  document.getElementById('sheetBody').innerHTML = `
+  document.getElementById('sdBody').innerHTML = `
     ${isLatest ? '<div style="margin-bottom:12px;"><span style="font-size:11px;background:rgba(245,200,66,0.12);color:var(--gold);border-radius:10px;padding:3px 12px;font-weight:700;letter-spacing:0.5px;">LATEST SCAN</span></div>' : ''}
     <div class="sheet-stat-grid">
       ${mainStats.map(st => `
@@ -1648,15 +1669,11 @@ function showScanDetail(i) {
       </div>` : ''}
   `;
 
-  document.getElementById('scanSheetOverlay').classList.add('open');
-  document.getElementById('scanSheet').classList.add('open');
-  document.body.style.overflow = 'hidden';
+  navigate('scan-detail');
 }
 
 function closeScanDetail() {
-  document.getElementById('scanSheetOverlay').classList.remove('open');
-  document.getElementById('scanSheet').classList.remove('open');
-  document.body.style.overflow = '';
+  navigate(scanDetailFromScreen);
 }
 
 /* ══════════════════════════
@@ -1920,11 +1937,43 @@ function updateStepsTDEE(rmrKcal) {
     ['📈 Lean Bulk',   Math.round(tdee * 1.1),  'var(--green)', '10% surplus above TDEE'],
   ];
 
-  targetsEl.innerHTML = targets.map(([label, kcal, color, note]) => `
-    <div style="display:flex;justify-content:space-between;align-items:center;padding:10px 14px;background:var(--surface2);border-radius:8px;">
-      <div><div style="font-size:13px;font-weight:600;color:var(--text);">${label}</div><div style="font-size:11px;color:var(--muted2);">${note}</div></div>
-      <div style="font-family:'Bebas Neue',sans-serif;font-size:24px;color:${color};letter-spacing:1px;">${fmt(kcal)} <span style="font-size:14px;font-family:'Outfit',sans-serif;color:var(--muted2);">kcal</span></div>
-    </div>`).join('');
+  // Use lean mass from latest scan for protein calc; fall back to rough estimate
+  const leanKg = scan2?.lean_g ? scan2.lean_g / 1000 : null;
+
+  function macros(kcal, goal) {
+    // Protein: 2.2g/kg lean mass (fat loss/bulk) or 1.8g/kg (maintenance); min 120g
+    const proteinMultiplier = goal === 'maintain' ? 1.8 : 2.2;
+    const proteinG = leanKg ? Math.round(leanKg * proteinMultiplier) : Math.round(kcal * 0.30 / 4);
+    const fatG     = Math.round(kcal * (goal === 'loss' ? 0.28 : 0.25) / 9);
+    const carbG    = Math.round((kcal - proteinG * 4 - fatG * 9) / 4);
+    return { proteinG, fatG, carbG: Math.max(0, carbG) };
+  }
+
+  targetsEl.innerHTML = targets.map(([label, kcal, color, note], idx) => {
+    const goal = idx === 0 ? 'loss' : idx === 2 ? 'bulk' : 'maintain';
+    const m = macros(kcal, goal);
+    return `
+    <div style="padding:12px 14px;background:var(--surface2);border-radius:8px;">
+      <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:8px;">
+        <div><div style="font-size:13px;font-weight:600;color:var(--text);">${label}</div><div style="font-size:11px;color:var(--muted2);">${note}</div></div>
+        <div style="font-family:'Bebas Neue',sans-serif;font-size:24px;color:${color};letter-spacing:1px;">${fmt(kcal)} <span style="font-size:14px;font-family:'Outfit',sans-serif;color:var(--muted2);">kcal</span></div>
+      </div>
+      <div style="display:grid;grid-template-columns:repeat(3,1fr);gap:6px;">
+        <div style="background:var(--surface3);border-radius:6px;padding:6px 8px;text-align:center;">
+          <div style="font-size:9px;color:var(--muted2);text-transform:uppercase;letter-spacing:0.6px;">Protein</div>
+          <div style="font-family:'Bebas Neue',sans-serif;font-size:18px;color:var(--green);line-height:1.2;">${m.proteinG}g</div>
+        </div>
+        <div style="background:var(--surface3);border-radius:6px;padding:6px 8px;text-align:center;">
+          <div style="font-size:9px;color:var(--muted2);text-transform:uppercase;letter-spacing:0.6px;">Carbs</div>
+          <div style="font-family:'Bebas Neue',sans-serif;font-size:18px;color:var(--gold);line-height:1.2;">${m.carbG}g</div>
+        </div>
+        <div style="background:var(--surface3);border-radius:6px;padding:6px 8px;text-align:center;">
+          <div style="font-size:9px;color:var(--muted2);text-transform:uppercase;letter-spacing:0.6px;">Fat</div>
+          <div style="font-family:'Bebas Neue',sans-serif;font-size:18px;color:var(--orange);line-height:1.2;">${m.fatG}g</div>
+        </div>
+      </div>
+    </div>`;
+  }).join('');
 }
 
 /* ══════════════════════════
@@ -2707,15 +2756,6 @@ function showBMRegion(rKey) {
 init();
 </script>
 
-<!-- SCAN DETAIL BOTTOM SHEET -->
-<div class="scan-sheet-overlay" id="scanSheetOverlay" onclick="closeScanDetail()"></div>
-<div class="scan-sheet" id="scanSheet">
-  <div class="sheet-handle"></div>
-  <div class="sheet-header">
-    <div class="sheet-title" id="sheetTitle">Scan Detail</div>
-    <div class="sheet-close" onclick="closeScanDetail()">✕</div>
-  </div>
-  <div class="sheet-body" id="sheetBody"></div>
-</div>
+<!-- SCAN DETAIL FULL SCREEN (injected into main content area) -->
 </body>
 </html>
