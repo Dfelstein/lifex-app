@@ -13,7 +13,6 @@
 <link rel="apple-touch-icon" href="icons/icon-192.png">
 <link href="https://fonts.googleapis.com/css2?family=Bebas+Neue&family=Outfit:wght@300;400;500;600;700&display=swap" rel="stylesheet">
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
-<script src="https://cdn.jsdelivr.net/npm/three@0.160.0/build/three.min.js"></script>
 <style>
 :root {
   --bg: #08090b; --surface: #0f1114; --surface2: #161a1f; --surface3: #1c2128;
@@ -284,10 +283,11 @@ body { background: var(--bg); color: var(--text); font-family: 'Outfit', sans-se
 .checkin-delta-neut { font-size:11px;color:var(--muted2); }
 /* BODY MAP — full-height screen override */
 #screen-body-map.active { display:flex !important; }
+#body-map-canvas { display:flex; align-items:center; justify-content:center; overflow:hidden; }
 @media(max-width:640px){
   #bm-layout { flex-direction:column !important; }
-  #body-map-canvas { min-height:55vw !important; }
-  #body-map-panel { width:100% !important; border-left:none !important; border-top:1px solid var(--border); max-height:220px; }
+  #body-map-canvas { min-height:60vw !important; max-height:55vh; }
+  #body-map-panel { width:100% !important; border-left:none !important; border-top:1px solid var(--border); max-height:220px; overflow-y:auto; }
 }
 </style>
 </head>
@@ -421,13 +421,13 @@ body { background: var(--bg); color: var(--text); font-family: 'Outfit', sans-se
     <div style="padding:16px 20px 10px;background:var(--surface);border-bottom:1px solid var(--border);flex-shrink:0;display:flex;align-items:center;justify-content:space-between;">
       <div>
         <div class="page-title" style="font-size:24px;margin-bottom:2px;">3D Body Map</div>
-        <div class="page-subtitle" id="bm-subtitle">Colour = body fat % from your latest DEXA scan · Drag to rotate · Tap a region</div>
+        <div class="page-subtitle" id="bm-subtitle">Colour = body fat % from your latest DEXA scan · Tap a region</div>
       </div>
       <div id="bm-legend" style="display:flex;gap:8px;align-items:center;flex-wrap:wrap;justify-content:flex-end;"></div>
     </div>
     <!-- Main area: canvas + info panel side by side on desktop, stacked on mobile -->
     <div style="flex:1;display:flex;min-height:0;overflow:hidden;" id="bm-layout">
-      <div id="body-map-canvas" style="flex:1;min-height:0;position:relative;cursor:grab;"></div>
+      <div id="body-map-canvas" style="flex:1;min-height:0;position:relative;"></div>
       <div id="body-map-panel" style="width:260px;flex-shrink:0;background:var(--surface);border-left:1px solid var(--border);padding:20px;overflow-y:auto;display:flex;flex-direction:column;gap:0;">
         <div style="font-size:11px;font-weight:600;text-transform:uppercase;letter-spacing:1px;color:var(--muted2);margin-bottom:12px;">Region Detail</div>
         <div id="bm-region-content" style="flex:1;">
@@ -2453,29 +2453,13 @@ function renderCheckins() {
 }
 
 /* ══════════════════════════
-   3D BODY MAP
+   BODY MAP (SVG)
 ══════════════════════════ */
 let bodyMapInited = false;
 
-function fatColor3D(fatPct, isFemale) {
-  if (fatPct == null) return 0x5a6272;
-  const a = isFemale ? 20 : 12;
-  const b = isFemale ? 28 : 17;
-  const c = isFemale ? 32 : 22;
-  const d = isFemale ? 37 : 27;
-  if (fatPct <= a) return 0x4da6ff;   // blue — athletic
-  if (fatPct <= b) return 0x39e07a;   // green — fit
-  if (fatPct <= c) return 0xf5c842;   // gold — average
-  if (fatPct <= d) return 0xff9f43;   // orange — above avg
-  return 0xff5555;                     // red — high
-}
-
 function fatLabel(fatPct, isFemale) {
   if (fatPct == null) return 'No data';
-  const a = isFemale ? 20 : 12;
-  const b = isFemale ? 28 : 17;
-  const c = isFemale ? 32 : 22;
-  const d = isFemale ? 37 : 27;
+  const a = isFemale ? 20 : 12, b = isFemale ? 28 : 17, c = isFemale ? 32 : 22, d = isFemale ? 37 : 27;
   if (fatPct <= a) return 'Athletic';
   if (fatPct <= b) return 'Fit';
   if (fatPct <= c) return 'Average';
@@ -2484,230 +2468,124 @@ function fatLabel(fatPct, isFemale) {
 }
 
 function initBodyMap() {
-  if (bodyMapInited || !window.THREE) return;
-  const container = document.getElementById('body-map-canvas');
-  if (!container) return;
+  if (bodyMapInited) return;
   bodyMapInited = true;
 
   const isFemale = (scan2?.sex || profile?.sex || '').toLowerCase() === 'female';
 
-  // Scene
-  const scene = new THREE.Scene();
-  scene.background = new THREE.Color(0x08090b);
-  scene.fog = new THREE.Fog(0x08090b, 8, 18);
+  function fatColorHex(fatPct) {
+    if (fatPct == null) return '#2a3040';
+    const a = isFemale ? 20 : 12, b = isFemale ? 28 : 17, c = isFemale ? 32 : 22, d = isFemale ? 37 : 27;
+    if (fatPct <= a) return '#4da6ff';
+    if (fatPct <= b) return '#39e07a';
+    if (fatPct <= c) return '#f5c842';
+    if (fatPct <= d) return '#ff9f43';
+    return '#ff5555';
+  }
 
-  const W = container.clientWidth || 400;
-  const H = container.clientHeight || 500;
-  const camera = new THREE.PerspectiveCamera(42, W / H, 0.1, 50);
-  camera.position.set(0, 0.9, 4.2);
-
-  const renderer = new THREE.WebGLRenderer({ antialias: true, alpha: false });
-  renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
-  renderer.setSize(W, H);
-  renderer.shadowMap.enabled = true;
-  container.appendChild(renderer.domElement);
-
-  // Lights
-  scene.add(new THREE.AmbientLight(0xffffff, 0.55));
-  const key = new THREE.DirectionalLight(0xffffff, 0.9);
-  key.position.set(3, 6, 4); key.castShadow = true;
-  scene.add(key);
-  const fill = new THREE.DirectionalLight(0x4da6ff, 0.25);
-  fill.position.set(-4, 1, -3);
-  scene.add(fill);
-  const rim = new THREE.DirectionalLight(0xf5c842, 0.15);
-  rim.position.set(0, -4, -4);
-  scene.add(rim);
-
-  // Floor grid
-  const grid = new THREE.GridHelper(6, 24, 0x1c2128, 0x161a1f);
-  grid.position.y = -1.72;
-  scene.add(grid);
-
-  // Region data from scan
-  const regions = {
-    head:    { fat_pct: null, label: 'Head', detail: null },
-    torso:   { fat_pct: scan2?.trunk_fat_pct,      lean_g: null, fat_g: null,
-               label: 'Trunk',       detail: 'Upper chest and back fat from DEXA.' },
-    belly:   { fat_pct: scan2?.android_fat_pct,    lean_g: null, fat_g: null,
-               label: 'Belly (Android)', detail: 'Android zone — belly fat. Visceral fat (VAT) is stored here. Highest cardiovascular risk.' },
-    hips:    { fat_pct: scan2?.gynoid_fat_pct,     lean_g: null, fat_g: null,
-               label: 'Hips (Gynoid)',   detail: 'Gynoid zone — hips and glutes. Metabolically safer than android fat.' },
-    lArm:    { fat_pct: scan2?.left_arm_fat_pct,   lean_g: scan2?.left_arm_lean_g,   fat_g: scan2?.left_arm_fat_g,
-               label: 'Left Arm',    detail: 'Left arm segmental data from DEXA.' },
-    rArm:    { fat_pct: scan2?.right_arm_fat_pct,  lean_g: scan2?.right_arm_lean_g,  fat_g: scan2?.right_arm_fat_g,
-               label: 'Right Arm',   detail: 'Right arm segmental data from DEXA.' },
-    lLeg:    { fat_pct: scan2?.left_leg_fat_pct,   lean_g: scan2?.left_leg_lean_g,   fat_g: scan2?.left_leg_fat_g,
-               label: 'Left Leg',    detail: 'Left leg segmental data from DEXA.' },
-    rLeg:    { fat_pct: scan2?.right_leg_fat_pct,  lean_g: scan2?.right_leg_lean_g,  fat_g: scan2?.right_leg_fat_g,
-               label: 'Right Leg',   detail: 'Right leg segmental data from DEXA.' },
+  const r = {
+    torso: scan2?.trunk_fat_pct,
+    belly: scan2?.android_fat_pct,
+    hips:  scan2?.gynoid_fat_pct,
+    lArm:  scan2?.left_arm_fat_pct,
+    rArm:  scan2?.right_arm_fat_pct,
+    lLeg:  scan2?.left_leg_fat_pct,
+    rLeg:  scan2?.right_leg_fat_pct,
   };
 
-  function col(key) { return fatColor3D(regions[key]?.fat_pct, isFemale); }
+  function col(k) { return fatColorHex(r[k]); }
+  function lbl(k) { return r[k] != null ? r[k] + '%' : ''; }
+  // dark text on light colours, lighter text on dark no-data regions
+  function tc(k) { return r[k] != null ? 'rgba(0,0,0,0.72)' : '#3a4558'; }
+  const p = `class="bm-part" style="cursor:pointer;"`;
 
-  function makeMat(regionKey) {
-    return new THREE.MeshPhongMaterial({
-      color: col(regionKey), shininess: 45,
-      specular: new THREE.Color(0x333333),
-    });
-  }
+  document.getElementById('body-map-canvas').innerHTML = `
+<svg viewBox="0 0 200 502" xmlns="http://www.w3.org/2000/svg"
+     style="width:100%;max-width:260px;height:100%;max-height:calc(100vh - 120px);display:block;margin:auto;">
+  <style>
+    .bm-part { transition: filter 0.15s ease; }
+    .bm-part:hover { filter: brightness(1.2); }
+    .bm-part.bm-sel { filter: brightness(1.45) drop-shadow(0 0 6px rgba(255,255,255,0.35)); }
+    .bm-lbl { pointer-events:none; font-family:Outfit,sans-serif; font-weight:700; }
+  </style>
 
-  function seg(geo, regionKey, pos, rot) {
-    const m = new THREE.Mesh(geo, makeMat(regionKey));
-    m.castShadow = true;
-    m.userData = { regionKey };
-    if (pos) m.position.set(...pos);
-    if (rot) m.rotation.set(...rot);
-    return m;
-  }
+  <!-- HEAD (no data) -->
+  <ellipse cx="100" cy="40" rx="23" ry="27" fill="#1c2128" stroke="#2e3848" stroke-width="1.5"/>
+  <!-- Ears -->
+  <ellipse cx="76" cy="42" rx="5" ry="7" fill="#1c2128" stroke="#2e3848" stroke-width="1"/>
+  <ellipse cx="124" cy="42" rx="5" ry="7" fill="#1c2128" stroke="#2e3848" stroke-width="1"/>
+  <!-- NECK -->
+  <rect x="93" y="66" width="14" height="13" rx="5" fill="#1a1f28"/>
 
-  const body = new THREE.Group();
+  <!-- LEFT SHOULDER joint (torso region) -->
+  <ellipse cx="63" cy="82" rx="15" ry="10" fill="${col('torso')}" data-region="torso" ${p}/>
+  <!-- RIGHT SHOULDER joint -->
+  <ellipse cx="137" cy="82" rx="15" ry="10" fill="${col('torso')}" data-region="torso" ${p}/>
 
-  // Head
-  body.add(seg(new THREE.SphereGeometry(0.21, 20, 20), 'head', [0, 2.06, 0]));
-  // Neck
-  body.add(seg(new THREE.CylinderGeometry(0.08, 0.10, 0.24, 14), 'torso', [0, 1.84, 0]));
-  // Shoulders (L/R)
-  body.add(seg(new THREE.SphereGeometry(0.105, 14, 14), 'torso', [-0.34, 1.61, 0]));
-  body.add(seg(new THREE.SphereGeometry(0.105, 14, 14), 'torso', [ 0.34, 1.61, 0]));
-  // Chest/upper torso
-  const chestGeo = new THREE.CylinderGeometry(0.255, 0.26, 0.60, 16);
-  body.add(seg(chestGeo, 'torso', [0, 1.30, 0]));
-  // Belly
-  const bellyGeo = new THREE.CylinderGeometry(0.27, 0.24, 0.44, 16);
-  body.add(seg(bellyGeo, 'belly', [0, 0.91, 0]));
-  // Hips
-  const hipGeo = new THREE.CylinderGeometry(0.245, 0.22, 0.34, 16);
-  body.add(seg(hipGeo, 'hips', [0, 0.60, 0]));
+  <!-- UPPER TRUNK (chest/back) -->
+  <path d="M68,77 Q100,72 132,77 L128,176 Q100,180 72,176 Z"
+        fill="${col('torso')}" data-region="torso" ${p}/>
+  <!-- ANDROID BELLY -->
+  <path d="M72,176 Q100,180 128,176 L126,229 Q100,233 74,229 Z"
+        fill="${col('belly')}" data-region="belly" ${p}/>
+  <!-- GYNOID HIPS -->
+  <path d="M74,229 Q100,233 126,229 L133,284 Q100,289 67,284 Z"
+        fill="${col('hips')}" data-region="hips" ${p}/>
 
-  // Upper arms
-  body.add(seg(new THREE.CylinderGeometry(0.08, 0.085, 0.40, 12), 'lArm', [-0.46, 1.35, 0], [0, 0,  0.18]));
-  body.add(seg(new THREE.CylinderGeometry(0.08, 0.085, 0.40, 12), 'rArm', [ 0.46, 1.35, 0], [0, 0, -0.18]));
-  // Elbow joints
-  body.add(seg(new THREE.SphereGeometry(0.075, 12, 12), 'lArm', [-0.53, 1.11, 0]));
-  body.add(seg(new THREE.SphereGeometry(0.075, 12, 12), 'rArm', [ 0.53, 1.11, 0]));
-  // Forearms
-  body.add(seg(new THREE.CylinderGeometry(0.062, 0.078, 0.36, 12), 'lArm', [-0.58, 0.84, 0], [0, 0,  0.22]));
-  body.add(seg(new THREE.CylinderGeometry(0.062, 0.078, 0.36, 12), 'rArm', [ 0.58, 0.84, 0], [0, 0, -0.22]));
+  <!-- LEFT UPPER ARM -->
+  <rect x="44" y="90" width="22" height="76" rx="11" fill="${col('lArm')}" data-region="lArm" ${p}/>
+  <!-- LEFT FOREARM -->
+  <rect x="41" y="168" width="20" height="68" rx="10" fill="${col('lArm')}" data-region="lArm" ${p}/>
+  <!-- LEFT HAND -->
+  <rect x="40" y="238" width="20" height="24" rx="8" fill="${col('lArm')}" data-region="lArm" ${p}/>
 
-  // Thighs
-  body.add(seg(new THREE.CylinderGeometry(0.115, 0.125, 0.52, 14), 'lLeg', [-0.145, 0.17, 0]));
-  body.add(seg(new THREE.CylinderGeometry(0.115, 0.125, 0.52, 14), 'rLeg', [ 0.145, 0.17, 0]));
-  // Knee joints
-  body.add(seg(new THREE.SphereGeometry(0.10, 12, 12), 'lLeg', [-0.145, -0.13, 0]));
-  body.add(seg(new THREE.SphereGeometry(0.10, 12, 12), 'rLeg', [ 0.145, -0.13, 0]));
-  // Calves
-  body.add(seg(new THREE.CylinderGeometry(0.076, 0.095, 0.46, 14), 'lLeg', [-0.145, -0.43, 0]));
-  body.add(seg(new THREE.CylinderGeometry(0.076, 0.095, 0.46, 14), 'rLeg', [ 0.145, -0.43, 0]));
-  // Ankles
-  body.add(seg(new THREE.SphereGeometry(0.065, 10, 10), 'lLeg', [-0.145, -0.69, 0]));
-  body.add(seg(new THREE.SphereGeometry(0.065, 10, 10), 'rLeg', [ 0.145, -0.69, 0]));
-  // Feet
-  body.add(seg(new THREE.BoxGeometry(0.12, 0.07, 0.24), 'lLeg', [-0.145, -0.75, 0.06]));
-  body.add(seg(new THREE.BoxGeometry(0.12, 0.07, 0.24), 'rLeg', [ 0.145, -0.75, 0.06]));
+  <!-- RIGHT UPPER ARM -->
+  <rect x="134" y="90" width="22" height="76" rx="11" fill="${col('rArm')}" data-region="rArm" ${p}/>
+  <!-- RIGHT FOREARM -->
+  <rect x="139" y="168" width="20" height="68" rx="10" fill="${col('rArm')}" data-region="rArm" ${p}/>
+  <!-- RIGHT HAND -->
+  <rect x="140" y="238" width="20" height="24" rx="8" fill="${col('rArm')}" data-region="rArm" ${p}/>
 
-  // Centre the body vertically
-  body.position.y = -0.15;
-  scene.add(body);
+  <!-- LEFT THIGH -->
+  <rect x="67" y="286" width="33" height="97" rx="11" fill="${col('lLeg')}" data-region="lLeg" ${p}/>
+  <!-- LEFT SHIN -->
+  <rect x="69" y="386" width="27" height="88" rx="9" fill="${col('lLeg')}" data-region="lLeg" ${p}/>
+  <!-- LEFT FOOT -->
+  <rect x="62" y="474" width="36" height="14" rx="6" fill="${col('lLeg')}" data-region="lLeg" ${p}/>
 
-  // Rotation state
-  let rotY = 0, rotX = 0.05;
-  let autoRotate = true;
-  let isDragging = false, prevX = 0, prevY = 0;
+  <!-- RIGHT THIGH -->
+  <rect x="100" y="286" width="33" height="97" rx="11" fill="${col('rLeg')}" data-region="rLeg" ${p}/>
+  <!-- RIGHT SHIN -->
+  <rect x="104" y="386" width="27" height="88" rx="9" fill="${col('rLeg')}" data-region="rLeg" ${p}/>
+  <!-- RIGHT FOOT -->
+  <rect x="102" y="474" width="36" height="14" rx="6" fill="${col('rLeg')}" data-region="rLeg" ${p}/>
 
-  // Mouse controls
-  renderer.domElement.addEventListener('mousedown', e => {
-    isDragging = true; autoRotate = false;
-    prevX = e.clientX; prevY = e.clientY;
-    renderer.domElement.style.cursor = 'grabbing';
-  });
-  window.addEventListener('mousemove', e => {
-    if (!isDragging) return;
-    rotY += (e.clientX - prevX) * 0.012;
-    rotX += (e.clientY - prevY) * 0.006;
-    rotX = Math.max(-0.55, Math.min(0.55, rotX));
-    prevX = e.clientX; prevY = e.clientY;
-  });
-  window.addEventListener('mouseup', () => {
-    isDragging = false;
-    renderer.domElement.style.cursor = 'grab';
-  });
+  <!-- FAT % LABELS -->
+  ${lbl('torso') ? `<text x="100" y="134" text-anchor="middle" font-size="10" class="bm-lbl" fill="${tc('torso')}">${lbl('torso')}</text>` : ''}
+  ${lbl('belly') ? `<text x="100" y="207" text-anchor="middle" font-size="9"  class="bm-lbl" fill="${tc('belly')}">${lbl('belly')}</text>` : ''}
+  ${lbl('hips')  ? `<text x="100" y="261" text-anchor="middle" font-size="9"  class="bm-lbl" fill="${tc('hips')}">${lbl('hips')}</text>` : ''}
+  ${lbl('lArm')  ? `<text x="55"  y="168" text-anchor="middle" font-size="8"  class="bm-lbl" fill="${tc('lArm')}">${lbl('lArm')}</text>` : ''}
+  ${lbl('rArm')  ? `<text x="145" y="168" text-anchor="middle" font-size="8"  class="bm-lbl" fill="${tc('rArm')}">${lbl('rArm')}</text>` : ''}
+  ${lbl('lLeg')  ? `<text x="83"  y="340" text-anchor="middle" font-size="8"  class="bm-lbl" fill="${tc('lLeg')}">${lbl('lLeg')}</text>` : ''}
+  ${lbl('rLeg')  ? `<text x="117" y="340" text-anchor="middle" font-size="8"  class="bm-lbl" fill="${tc('rLeg')}">${lbl('rLeg')}</text>` : ''}
+</svg>`;
 
-  // Touch controls
-  renderer.domElement.addEventListener('touchstart', e => {
-    autoRotate = false;
-    prevX = e.touches[0].clientX;
-    prevY = e.touches[0].clientY;
-  }, { passive: true });
-  renderer.domElement.addEventListener('touchmove', e => {
-    rotY += (e.touches[0].clientX - prevX) * 0.014;
-    rotX += (e.touches[0].clientY - prevY) * 0.007;
-    rotX = Math.max(-0.55, Math.min(0.55, rotX));
-    prevX = e.touches[0].clientX;
-    prevY = e.touches[0].clientY;
-  }, { passive: true });
-
-  // Click / tap to select region
-  const raycaster = new THREE.Raycaster();
-  const mouse2 = new THREE.Vector2();
-  let selectedMeshes = [];
-
-  function onBodyClick(e) {
-    const rect = renderer.domElement.getBoundingClientRect();
-    const cx = e.clientX ?? e.changedTouches?.[0]?.clientX;
-    const cy = e.clientY ?? e.changedTouches?.[0]?.clientY;
-    if (cx == null) return;
-    mouse2.x = ((cx - rect.left) / rect.width) * 2 - 1;
-    mouse2.y = -((cy - rect.top) / rect.height) * 2 + 1;
-    raycaster.setFromCamera(mouse2, camera);
-    const meshes = [];
-    body.traverse(c => { if (c.isMesh) meshes.push(c); });
-    const hits = raycaster.intersectObjects(meshes);
-    if (!hits.length) return;
-    const hit = hits[0].object;
-    const rKey = hit.userData.regionKey;
-    if (!rKey || rKey === 'head') return;
-
-    // Highlight all meshes for this region
-    meshes.forEach(m => {
-      m.material.emissive = new THREE.Color(0x000000);
-    });
-    body.traverse(c => {
-      if (c.isMesh && c.userData.regionKey === rKey) {
-        c.material.emissive = new THREE.Color(0x333333);
-      }
-    });
+  // Click handler
+  document.getElementById('body-map-canvas').addEventListener('click', e => {
+    const part = e.target.closest('[data-region]');
+    if (!part) return;
+    const rKey = part.dataset.region;
+    document.querySelectorAll('.bm-part').forEach(el => el.classList.remove('bm-sel'));
+    document.querySelectorAll(`[data-region="${rKey}"]`).forEach(el => el.classList.add('bm-sel'));
     showBMRegion(rKey);
-  }
-  renderer.domElement.addEventListener('click', onBodyClick);
-  renderer.domElement.addEventListener('touchend', onBodyClick, { passive: true });
-
-  // Animate
-  let raf;
-  function animate() {
-    raf = requestAnimationFrame(animate);
-    if (autoRotate) rotY += 0.008;
-    body.rotation.y = rotY;
-    body.rotation.x = rotX;
-    renderer.render(scene, camera);
-  }
-  animate();
-
-  // Resize
-  const ro = new ResizeObserver(() => {
-    const w = container.clientWidth;
-    const h = container.clientHeight;
-    if (!w || !h) return;
-    camera.aspect = w / h;
-    camera.updateProjectionMatrix();
-    renderer.setSize(w, h);
   });
-  ro.observe(container);
 
-  // Clean up when leaving screen
-  document.querySelector('[data-screen="body-map"]')?.addEventListener('click', () => {
-    // Already handled by navigate()
-  });
+  // Auto-select first region that has data
+  const first = ['torso','belly','hips','lArm','rArm','lLeg','rLeg'].find(k => r[k] != null);
+  if (first) {
+    document.querySelectorAll(`[data-region="${first}"]`).forEach(el => el.classList.add('bm-sel'));
+    showBMRegion(first);
+  }
 }
 
 function showBMRegion(rKey) {
