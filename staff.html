@@ -3435,7 +3435,7 @@ function renderAllScans(rows) {
         <div style="padding:10px 16px;border-bottom:1px solid var(--border);">Account</div>
       </div>
       ${rows.map((s, idx) => {
-        const name     = s.profile?.full_name || '—';
+        const name     = s.profile?.full_name || s.patient_name || '—';
         const hasProfile = !!s.profile;
         const isLast   = idx === rows.length - 1;
         const border   = isLast ? '' : 'border-bottom:1px solid var(--border);';
@@ -3451,7 +3451,7 @@ function renderAllScans(rows) {
             ${hasProfile
               ? `<span style="font-size:11px;padding:2px 8px;background:rgba(80,200,120,0.12);color:var(--green);border-radius:4px;font-weight:600;">Linked</span>`
               : `<span style="font-size:11px;padding:2px 8px;background:rgba(255,170,50,0.12);color:var(--orange);border-radius:4px;font-weight:600;">No Account</span>
-                 <button onclick="event.stopPropagation();openLinkModal('${s.client_id}','${(name).replace(/'/g,"\\'")}','${s.scan_date||''}')" style="font-size:11px;padding:3px 8px;background:transparent;border:1px solid var(--border2);border-radius:4px;color:var(--muted2);cursor:pointer;font-family:'Outfit',sans-serif;" onmouseover="this.style.borderColor='var(--blue)';this.style.color='var(--blue)'" onmouseout="this.style.borderColor='var(--border2)';this.style.color='var(--muted2)'">Link</button>`
+                 <button onclick="event.stopPropagation();openLinkModal('${s.client_id}','${(name).replace(/'/g,"\\'")}','${s.scan_date||''}','${(s.patient_name||'').replace(/'/g,"\\'")}' )" style="font-size:11px;padding:3px 8px;background:transparent;border:1px solid var(--border2);border-radius:4px;color:var(--muted2);cursor:pointer;font-family:'Outfit',sans-serif;" onmouseover="this.style.borderColor='var(--blue)';this.style.color='var(--blue)'" onmouseout="this.style.borderColor='var(--border2)';this.style.color='var(--muted2)'">Link</button>`
             }
           </div>`;
       }).join('')}
@@ -3473,13 +3473,16 @@ function openScanRow(clientId, name, hasEmail) {
 
 let linkModalScanClientId = null;
 
-function openLinkModal(clientId, name, scanDate) {
+function openLinkModal(clientId, name, scanDate, patientName) {
   linkModalScanClientId = clientId;
   document.getElementById('link-modal-title').textContent = 'Link Scan to Client';
-  document.getElementById('link-modal-subtitle').textContent = `Scan: ${name}${scanDate ? ' · ' + scanDate : ''} — choose an existing client to reassign this scan to, or create a new profile.`;
-  document.getElementById('link-client-search').value = '';
+  const displayName = patientName || name;
+  document.getElementById('link-modal-subtitle').textContent = `Scan: ${displayName}${scanDate ? ' · ' + scanDate : ''} — choose an existing client to reassign this scan to, or create a new profile.`;
+  const searchEl = document.getElementById('link-client-search');
+  searchEl.value = patientName || '';
   document.getElementById('link-client-results').innerHTML = '';
   document.getElementById('link-scan-modal').style.display = 'flex';
+  if (patientName) searchLinkClients();
 }
 
 function closeLinkModal() {
