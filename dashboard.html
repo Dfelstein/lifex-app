@@ -247,6 +247,18 @@ body { background: var(--bg); color: var(--text); font-family: 'Outfit', sans-se
 .info-modal-box p { font-size:13px;color:var(--muted2);line-height:1.7;margin-bottom:10px; }
 .info-modal-box ul { font-size:13px;color:var(--muted2);line-height:2;padding-left:18px;margin-bottom:14px; }
 .info-modal-close { width:100%;padding:10px;background:var(--surface2);border:1px solid var(--border2);border-radius:8px;color:var(--text);font-family:'Outfit',sans-serif;font-size:13px;cursor:pointer; }
+/* COMPARE SCANS */
+.cmp-chip { padding:8px 14px;border-radius:20px;cursor:pointer;font-size:12px;font-weight:600;border:1.5px solid var(--border2);background:var(--surface2);color:var(--muted2);transition:all 0.15s;text-align:center;line-height:1.4; }
+.cmp-chip.sel { border-color:var(--gold);background:rgba(245,200,66,0.1);color:var(--gold); }
+.cmp-chip.disabled { opacity:0.35;cursor:default; }
+.cmp-table-wrap { overflow-x:auto;border-radius:12px;border:1px solid var(--border);margin-top:16px; }
+.cmp-table { width:100%;border-collapse:collapse;background:var(--surface2); }
+.cmp-table th { padding:11px 14px;font-size:10px;font-weight:700;letter-spacing:0.8px;text-transform:uppercase;color:var(--muted2);background:var(--surface2);white-space:nowrap; }
+.cmp-table td { padding:10px 14px;font-size:13px;font-weight:600;text-align:center;border-top:1px solid var(--border);white-space:nowrap; }
+.cmp-table .cmp-label { text-align:left;font-size:12px;font-weight:500;color:var(--muted2);position:sticky;left:0;background:var(--surface2);z-index:1;min-width:110px; }
+.cmp-table thead th:first-child { position:sticky;left:0;z-index:2; }
+.cmp-section-hd td { font-size:9px;font-weight:700;letter-spacing:1px;text-transform:uppercase;color:var(--gold);padding:14px 14px 4px;background:var(--surface2);position:sticky;left:0; }
+.cmp-up { color:var(--green); } .cmp-down { color:var(--red); } .cmp-neut { color:var(--muted2); }
 /* GP BLOOD ENTRY MODAL */
 .gp-overlay { display:none;position:fixed;inset:0;background:rgba(0,0,0,0.7);z-index:500;backdrop-filter:blur(4px); }
 .gp-overlay.open { display:block; }
@@ -369,6 +381,7 @@ body { background: var(--bg); color: var(--text); font-family: 'Outfit', sans-se
       <div class="nav-item" data-screen="body-map"><span class="nav-icon">🧬</span> 3D Body Map</div>
       <div class="nav-item" data-screen="bone"><span class="nav-icon">🦴</span> Bone Density</div>
       <div class="nav-item" data-screen="before-after"><span class="nav-icon">📈</span> Before vs After</div>
+      <div class="nav-item" data-screen="compare"><span class="nav-icon">⚖️</span> Compare Scans</div>
     </div>
     <div class="nav-group">
       <div class="nav-group-label">Blood &amp; Hormones</div>
@@ -483,6 +496,15 @@ body { background: var(--bg); color: var(--text); font-family: 'Outfit', sans-se
       <div id="ba-subtitle" class="page-subtitle"></div>
     </div>
     <div id="before-after-content"></div>
+  </div>
+
+  <!-- COMPARE SCANS -->
+  <div id="screen-compare" class="screen">
+    <div class="page-header">
+      <div class="page-title">Compare Scans</div>
+      <div class="page-subtitle">Select 2–5 scans to see your progress side by side</div>
+    </div>
+    <div id="compare-content"></div>
   </div>
 
   <!-- BLOOD PANEL -->
@@ -1697,6 +1719,150 @@ function closeScanDetail() {
 }
 
 /* ══════════════════════════
+   COMPARE SCANS
+══════════════════════════ */
+let compareSelected = []; // indices into allScans
+
+function renderCompare() {
+  const el = document.getElementById('compare-content');
+  if (!el) return;
+  if (!allScans.length) {
+    el.innerHTML = noData('⚖️','No Scans Yet','Complete your first DEXA scan to unlock scan comparison.','');
+    return;
+  }
+
+  // Default: pre-select all scans (up to 5) on first open
+  if (!compareSelected.length && allScans.length >= 2) {
+    const start = Math.max(0, allScans.length - 5);
+    compareSelected = allScans.slice(start).map((_, i) => start + i);
+  }
+
+  const chips = allScans.map((s, i) => {
+    const sel = compareSelected.includes(i);
+    const maxed = !sel && compareSelected.length >= 5;
+    return `<div onclick="${maxed ? '' : 'toggleCompareScan('+i+')'}"
+      class="cmp-chip${sel?' sel':''}${maxed?' disabled':''}">
+      <div>Scan ${s.scan_number || i+1}</div>
+      <div style="font-size:10px;font-weight:400;opacity:0.8;">${fmtDate(s.date)}</div>
+    </div>`;
+  }).join('');
+
+  const sorted = compareSelected.slice().sort((a,b)=>a-b).map(i => allScans[i]);
+
+  // Metric groups for comparison table
+  const groups = [
+    { title: 'Body Composition', rows: [
+      { key:'fat_pct',    label:'Body Fat',    fmt: v=>v+'%',                          dir:'lower' },
+      { key:'fat_g',      label:'Fat Mass',    fmt: v=>(v/1000).toFixed(1)+' kg',     dir:'lower' },
+      { key:'lean_g',     label:'Lean Mass',   fmt: v=>(v/1000).toFixed(1)+' kg',     dir:'higher' },
+      { key:'total_g',    label:'Body Weight', fmt: v=>(v/1000).toFixed(1)+' kg',     dir:'neutral' },
+      { key:'ffmi',       label:'FFMI',        fmt: v=>v,                              dir:'higher' },
+      { key:'fmi',        label:'FMI',         fmt: v=>v,                              dir:'lower' },
+      { key:'almi',       label:'ALMI',        fmt: v=>v,                              dir:'higher' },
+    ]},
+    { title: 'Visceral Fat', rows: [
+      { key:'vat_area_cm2', label:'VAT Area',   fmt: v=>v+' cm²', dir:'lower' },
+      { key:'android_fat_pct', label:'Android Fat %', fmt: v=>v+'%', dir:'lower' },
+      { key:'android_fat_g',   label:'Android Fat Mass', fmt: v=>(v/1000).toFixed(2)+' kg', dir:'lower' },
+      { key:'gynoid_fat_pct',  label:'Gynoid Fat %',  fmt: v=>v+'%', dir:'neutral' },
+      { key:'ag_ratio',  label:'A:G Ratio',    fmt: v=>v,          dir:'lower' },
+    ]},
+    { title: 'Regional Fat %', rows: [
+      { key:'trunk_fat_pct',      label:'Trunk',     fmt: v=>v+'%', dir:'lower' },
+      { key:'left_arm_fat_pct',   label:'Left Arm',  fmt: v=>v+'%', dir:'lower' },
+      { key:'right_arm_fat_pct',  label:'Right Arm', fmt: v=>v+'%', dir:'lower' },
+      { key:'left_leg_fat_pct',   label:'Left Leg',  fmt: v=>v+'%', dir:'lower' },
+      { key:'right_leg_fat_pct',  label:'Right Leg', fmt: v=>v+'%', dir:'lower' },
+    ]},
+    { title: 'Lean Mass by Region', rows: [
+      { key:'trunk_lean_g',     label:'Trunk Lean',    fmt: v=>(v/1000).toFixed(2)+' kg', dir:'higher' },
+      { key:'left_arm_lean_g',  label:'Left Arm Lean', fmt: v=>(v/1000).toFixed(2)+' kg', dir:'higher' },
+      { key:'right_arm_lean_g', label:'Right Arm Lean',fmt: v=>(v/1000).toFixed(2)+' kg', dir:'higher' },
+      { key:'left_leg_lean_g',  label:'Left Leg Lean', fmt: v=>(v/1000).toFixed(2)+' kg', dir:'higher' },
+      { key:'right_leg_lean_g', label:'Right Leg Lean',fmt: v=>(v/1000).toFixed(2)+' kg', dir:'higher' },
+    ]},
+    { title: 'Bone Density', rows: [
+      { key:'bmd',           label:'Total BMD',        fmt: v=>v+' g/cm²', dir:'higher' },
+      { key:'spine_bmd',     label:'Spine BMD',        fmt: v=>v+' g/cm²', dir:'higher' },
+      { key:'femur_neck_bmd',label:'Femur Neck BMD',   fmt: v=>v+' g/cm²', dir:'higher' },
+      { key:'t_score',       label:'T-Score',          fmt: v=>(v>=0?'+':'')+v, dir:'higher' },
+      { key:'z_score',       label:'Z-Score',          fmt: v=>(v>=0?'+':'')+v, dir:'higher' },
+    ]},
+  ];
+
+  let tableHTML = '';
+  if (sorted.length >= 2) {
+    const thCols = sorted.map(s =>
+      `<th style="text-align:center;min-width:90px;">Scan ${s.scan_number||'?'}<br><span style="font-size:10px;font-weight:400;color:var(--muted2);">${fmtDate(s.date)}</span></th>`
+    ).join('');
+
+    const bodyRows = groups.map(g => {
+      const dataRows = g.rows.map(m => {
+        const vals = sorted.map(s => s[m.key]);
+        if (vals.every(v => v == null)) return '';
+        const cells = vals.map((v, ci) => {
+          if (v == null) return `<td style="color:var(--muted);font-weight:400;">—</td>`;
+          let delta = '';
+          const prev = ci > 0 ? vals[ci-1] : null;
+          if (prev != null && v !== prev) {
+            const diff = v - prev;
+            const pct = prev !== 0 ? ((diff/Math.abs(prev))*100).toFixed(1) : null;
+            const improved = m.dir === 'lower' ? diff < 0 : m.dir === 'higher' ? diff > 0 : false;
+            const cls = m.dir === 'neutral' ? 'cmp-neut' : improved ? 'cmp-up' : 'cmp-down';
+            const arrow = diff > 0 ? '↑' : '↓';
+            const diffStr = Math.abs(diff) >= 10 ? Math.round(Math.abs(diff)) :
+                            Math.abs(diff) >= 1 ? Math.abs(diff).toFixed(1) :
+                            Math.abs(diff).toFixed(2);
+            delta = `<div class="${cls}" style="font-size:10px;font-weight:700;margin-top:2px;">${arrow} ${diffStr}</div>`;
+          }
+          return `<td>${m.fmt(v)}${delta}</td>`;
+        }).join('');
+        return `<tr><td class="cmp-label">${m.label}</td>${cells}</tr>`;
+      }).filter(Boolean).join('');
+
+      if (!dataRows) return '';
+      return `<tr class="cmp-section-hd"><td colspan="${sorted.length+1}">${g.title}</td></tr>${dataRows}`;
+    }).filter(Boolean).join('');
+
+    tableHTML = `
+    <div class="cmp-table-wrap">
+      <table class="cmp-table">
+        <thead><tr>
+          <th class="cmp-label" style="font-size:10px;color:var(--muted2);">Metric</th>
+          ${thCols}
+        </tr></thead>
+        <tbody>${bodyRows}</tbody>
+      </table>
+    </div>
+    <div style="margin-top:10px;font-size:11px;color:var(--muted2);">
+      ↑ ↓ shows change from the previous selected scan · <span class="cmp-up">green</span> = improvement · <span class="cmp-down">red</span> = change to watch
+    </div>`;
+  }
+
+  el.innerHTML = `
+    <div style="margin-bottom:20px;">
+      <div style="font-size:12px;color:var(--muted2);margin-bottom:10px;">
+        ${compareSelected.length} of ${allScans.length} scans selected${compareSelected.length < 2 ? ' — pick at least 2' : compareSelected.length >= 5 ? ' (maximum)' : ''}
+      </div>
+      <div style="display:flex;flex-wrap:wrap;gap:8px;">${chips}</div>
+    </div>
+    ${sorted.length < 2
+      ? `<div style="color:var(--muted2);font-size:13px;padding:24px 0;text-align:center;">Select at least 2 scans above to see your comparison.</div>`
+      : tableHTML}`;
+}
+
+function toggleCompareScan(i) {
+  const idx = compareSelected.indexOf(i);
+  if (idx >= 0) {
+    compareSelected.splice(idx, 1);
+  } else {
+    if (compareSelected.length >= 5) return;
+    compareSelected.push(i);
+  }
+  renderCompare();
+}
+
+/* ══════════════════════════
    BLOOD PANEL
 ══════════════════════════ */
 function renderBlood() {
@@ -2409,7 +2575,7 @@ window.init = async function() {
     document.getElementById('loading').style.display='none';
     document.getElementById('app').style.display='flex';
   }
-  renderDashboard(); renderScore(); renderBodyComp(); renderBone(); renderBeforeAfter(); renderBlood(); renderHormones(); renderRMR(); renderSpin();
+  renderDashboard(); renderScore(); renderBodyComp(); renderBone(); renderBeforeAfter(); renderCompare(); renderBlood(); renderHormones(); renderRMR(); renderSpin();
   loadCheckins();
 }
 
@@ -2749,14 +2915,14 @@ function initBodyMap() {
   <!-- RIGHT FOOT -->
   <rect x="102" y="474" width="36" height="14" rx="6" fill="${col('rLeg')}" data-region="rLeg" ${p}/>
 
-  <!-- FAT % LABELS -->
-  ${lbl('torso') ? `<text x="100" y="134" text-anchor="middle" font-size="10" class="bm-lbl" fill="${tc('torso')}">${lbl('torso')}</text>` : ''}
-  ${lbl('belly') ? `<text x="100" y="207" text-anchor="middle" font-size="9"  class="bm-lbl" fill="${tc('belly')}">${lbl('belly')}</text>` : ''}
-  ${lbl('hips')  ? `<text x="100" y="261" text-anchor="middle" font-size="9"  class="bm-lbl" fill="${tc('hips')}">${lbl('hips')}</text>` : ''}
-  ${lbl('lArm')  ? `<text x="55"  y="168" text-anchor="middle" font-size="8"  class="bm-lbl" fill="${tc('lArm')}">${lbl('lArm')}</text>` : ''}
-  ${lbl('rArm')  ? `<text x="145" y="168" text-anchor="middle" font-size="8"  class="bm-lbl" fill="${tc('rArm')}">${lbl('rArm')}</text>` : ''}
-  ${lbl('lLeg')  ? `<text x="83"  y="340" text-anchor="middle" font-size="8"  class="bm-lbl" fill="${tc('lLeg')}">${lbl('lLeg')}</text>` : ''}
-  ${lbl('rLeg')  ? `<text x="117" y="340" text-anchor="middle" font-size="8"  class="bm-lbl" fill="${tc('rLeg')}">${lbl('rLeg')}</text>` : ''}
+  <!-- FAT % LABELS — larger, always visible -->
+  ${lbl('torso') ? `<text x="100" y="128" text-anchor="middle" font-size="11" class="bm-lbl" fill="${tc('torso')}">${lbl('torso')}</text><text x="100" y="141" text-anchor="middle" font-size="8" class="bm-lbl" fill="${tc('torso')}" opacity="0.75">fat</text>` : `<text x="100" y="134" text-anchor="middle" font-size="8" class="bm-lbl" fill="#3a4558">—</text>`}
+  ${lbl('belly') ? `<text x="100" y="203" text-anchor="middle" font-size="10" class="bm-lbl" fill="${tc('belly')}">${lbl('belly')}</text><text x="100" y="214" text-anchor="middle" font-size="8" class="bm-lbl" fill="${tc('belly')}" opacity="0.75">android</text>` : `<text x="100" y="207" text-anchor="middle" font-size="8" class="bm-lbl" fill="#3a4558">—</text>`}
+  ${lbl('hips')  ? `<text x="100" y="257" text-anchor="middle" font-size="10" class="bm-lbl" fill="${tc('hips')}">${lbl('hips')}</text><text x="100" y="268" text-anchor="middle" font-size="8" class="bm-lbl" fill="${tc('hips')}" opacity="0.75">gynoid</text>` : `<text x="100" y="261" text-anchor="middle" font-size="8" class="bm-lbl" fill="#3a4558">—</text>`}
+  ${lbl('lArm')  ? `<text x="55" y="163" text-anchor="middle" font-size="9"  class="bm-lbl" fill="${tc('lArm')}">${lbl('lArm')}</text>` : `<text x="55" y="163" text-anchor="middle" font-size="8" class="bm-lbl" fill="#3a4558">—</text>`}
+  ${lbl('rArm')  ? `<text x="145" y="163" text-anchor="middle" font-size="9" class="bm-lbl" fill="${tc('rArm')}">${lbl('rArm')}</text>` : `<text x="145" y="163" text-anchor="middle" font-size="8" class="bm-lbl" fill="#3a4558">—</text>`}
+  ${lbl('lLeg')  ? `<text x="83"  y="336" text-anchor="middle" font-size="9"  class="bm-lbl" fill="${tc('lLeg')}">${lbl('lLeg')}</text>` : `<text x="83" y="336" text-anchor="middle" font-size="8" class="bm-lbl" fill="#3a4558">—</text>`}
+  ${lbl('rLeg')  ? `<text x="117" y="336" text-anchor="middle" font-size="9"  class="bm-lbl" fill="${tc('rLeg')}">${lbl('rLeg')}</text>` : `<text x="117" y="336" text-anchor="middle" font-size="8" class="bm-lbl" fill="#3a4558">—</text>`}
 </svg>`;
 
   // Click handler
@@ -2780,10 +2946,10 @@ function initBodyMap() {
 function showBMRegion(rKey) {
   const isFemale = (scan2?.sex || profile?.sex || '').toLowerCase() === 'female';
   const regionDefs = {
-    torso: { fat_pct: scan2?.trunk_fat_pct,     lean_g: null, fat_g: null, label: 'Trunk' },
-    belly: { fat_pct: scan2?.android_fat_pct,   lean_g: null, fat_g: null, label: 'Belly (Android)',
+    torso: { fat_pct: scan2?.trunk_fat_pct,   lean_g: scan2?.trunk_lean_g,   fat_g: scan2?.trunk_fat_g,   label: 'Trunk (Chest & Back)' },
+    belly: { fat_pct: scan2?.android_fat_pct, lean_g: scan2?.android_lean_g, fat_g: scan2?.android_fat_g, label: 'Android (Belly)',
              extra: scan2?.vat_area_cm2 != null ? `VAT: ${scan2.vat_area_cm2} cm² (${scan2.vat_area_cm2 < 100 ? 'Normal' : scan2.vat_area_cm2 < 160 ? 'Borderline' : 'High Risk'})` : null },
-    hips:  { fat_pct: scan2?.gynoid_fat_pct,    lean_g: null, fat_g: null, label: 'Hips (Gynoid)' },
+    hips:  { fat_pct: scan2?.gynoid_fat_pct,  lean_g: scan2?.gynoid_lean_g,  fat_g: scan2?.gynoid_fat_g,  label: 'Gynoid (Hips)' },
     lArm:  { fat_pct: scan2?.left_arm_fat_pct,  lean_g: scan2?.left_arm_lean_g,  fat_g: scan2?.left_arm_fat_g,  label: 'Left Arm' },
     rArm:  { fat_pct: scan2?.right_arm_fat_pct, lean_g: scan2?.right_arm_lean_g, fat_g: scan2?.right_arm_fat_g, label: 'Right Arm' },
     lLeg:  { fat_pct: scan2?.left_leg_fat_pct,  lean_g: scan2?.left_leg_lean_g,  fat_g: scan2?.left_leg_fat_g,  label: 'Left Leg' },

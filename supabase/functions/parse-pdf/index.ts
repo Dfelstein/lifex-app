@@ -240,13 +240,24 @@ First, identify the scan type: DEXA, BLOOD, HORMONES, or RMR.
 Then extract all relevant data and return ONLY a valid JSON object with this structure:
 
 For DEXA:
-{"type":"DEXA","scan_date":"YYYY-MM-DD","scan_number":1,"patient_name":"","dob":"YYYY-MM-DD","patient_age":0,"sex":"male","height_cm":0.0,"weight_kg":0.0,"fat_pct":0.0,"fat_g":0,"lean_g":0,"total_g":0,"bmd":0.0,"t_score":0.0,"z_score":0.0,"pr_pct":0.0,"vat_g":0,"vat_area_cm2":0.0,"android_fat_pct":0.0,"gynoid_fat_pct":0.0,"ag_ratio":0.0,"trunk_fat_pct":0.0,"ffmi":0.0,"almi":0.0,"fmi":0.0,"left_arm_fat_pct":0.0,"right_arm_fat_pct":0.0,"left_leg_fat_pct":0.0,"right_leg_fat_pct":0.0,"left_arm_lean_g":0,"right_arm_lean_g":0,"left_leg_lean_g":0,"right_leg_lean_g":0,"left_arm_fat_g":0,"right_arm_fat_g":0,"left_leg_fat_g":0,"right_leg_fat_g":0}
+{"type":"DEXA","scan_date":"YYYY-MM-DD","scan_number":1,"patient_name":"","dob":"YYYY-MM-DD","patient_age":0,"sex":"male","height_cm":0.0,"weight_kg":0.0,"fat_pct":0.0,"fat_g":0,"lean_g":0,"total_g":0,"bmd":0.0,"t_score":0.0,"z_score":0.0,"pr_pct":0.0,"vat_g":0,"vat_area_cm2":0.0,"android_fat_pct":0.0,"android_fat_g":0,"android_lean_g":0,"gynoid_fat_pct":0.0,"gynoid_fat_g":0,"gynoid_lean_g":0,"ag_ratio":0.0,"trunk_fat_pct":0.0,"trunk_fat_g":0,"trunk_lean_g":0,"ffmi":0.0,"almi":0.0,"fmi":0.0,"spine_bmd":0.0,"femur_neck_bmd":0.0,"left_arm_fat_pct":0.0,"right_arm_fat_pct":0.0,"left_leg_fat_pct":0.0,"right_leg_fat_pct":0.0,"left_arm_lean_g":0,"right_arm_lean_g":0,"left_leg_lean_g":0,"right_leg_lean_g":0,"left_arm_fat_g":0,"right_arm_fat_g":0,"left_leg_fat_g":0,"right_leg_fat_g":0}
 
 Extract from the patient info header: patient_name (full name as written on the scan), patient_age (integer years), sex ("male" or "female"), height_cm (numeric), weight_kg (numeric), dob (date of birth as YYYY-MM-DD).
 Extract from Adipose Indices: fmi = "Fat Mass/Height²", vat_area_cm2 = "Est. VAT Area (cm²)".
 Extract from Lean Indices: ffmi = "Lean/Height²", almi = "Appen. Lean/Height²".
-Extract trunk_fat_pct from the Trunk row % Fat in the Body Composition Results table.
-Extract segmental data from the Body Composition Results table: for the "L Arm" row extract % Fat → left_arm_fat_pct, Lean (g) → left_arm_lean_g, Fat (g) → left_arm_fat_g; for "R Arm" → right_arm_fat_pct, right_arm_lean_g, right_arm_fat_g; for "L Leg" → left_leg_fat_pct, left_leg_lean_g, left_leg_fat_g; for "R Leg" → right_leg_fat_pct, right_leg_lean_g, right_leg_fat_g.
+Extract from Body Composition Results table — for each row extract % Fat, Lean (g), Fat (g):
+  - "L Arm" row → left_arm_fat_pct, left_arm_lean_g, left_arm_fat_g
+  - "R Arm" row → right_arm_fat_pct, right_arm_lean_g, right_arm_fat_g
+  - "Trunk" row → trunk_fat_pct, trunk_lean_g, trunk_fat_g
+  - "L Leg" row → left_leg_fat_pct, left_leg_lean_g, left_leg_fat_g
+  - "R Leg" row → right_leg_fat_pct, right_leg_lean_g, right_leg_fat_g
+Extract from the Android/Gynoid region table:
+  - Android row → android_fat_pct (% Fat), android_fat_g (Fat g), android_lean_g (Lean g)
+  - Gynoid row → gynoid_fat_pct (% Fat), gynoid_fat_g (Fat g), gynoid_lean_g (Lean g)
+Extract bone mineral density values:
+  - spine_bmd: Lumbar Spine or L1-L4 BMD (g/cm²) — look for "Spine" or "L1-L4" row
+  - femur_neck_bmd: Femur Neck or Left Femur Neck BMD (g/cm²)
+  - bmd: Total Body BMD from the total body DXA results
 
 For RMR:
 {"type":"RMR","test_date":"YYYY-MM-DD","kcal":0,"kj":0,"fat_pct":0.0,"glucose_pct":0.0,"feo2":0.0,"pop_min":0,"pop_max":0}
@@ -326,10 +337,18 @@ Return ONLY the JSON, no other text.`,
         pr_pct: parsed.pr_pct,
         vat_g: toInt(parsed.vat_g),
         vat_area_cm2: toNum(parsed.vat_area_cm2),
-        android_fat_pct: parsed.android_fat_pct,
-        gynoid_fat_pct: parsed.gynoid_fat_pct,
-        ag_ratio: parsed.ag_ratio,
         trunk_fat_pct: toNum(parsed.trunk_fat_pct),
+        trunk_lean_g: toInt(parsed.trunk_lean_g),
+        trunk_fat_g: toInt(parsed.trunk_fat_g),
+        android_fat_pct: toNum(parsed.android_fat_pct),
+        android_fat_g: toInt(parsed.android_fat_g),
+        android_lean_g: toInt(parsed.android_lean_g),
+        gynoid_fat_pct: toNum(parsed.gynoid_fat_pct),
+        gynoid_fat_g: toInt(parsed.gynoid_fat_g),
+        gynoid_lean_g: toInt(parsed.gynoid_lean_g),
+        ag_ratio: parsed.ag_ratio,
+        spine_bmd: toNum(parsed.spine_bmd),
+        femur_neck_bmd: toNum(parsed.femur_neck_bmd),
         ffmi: toNum(parsed.ffmi),
         almi: toNum(parsed.almi),
         fmi: toNum(parsed.fmi),
