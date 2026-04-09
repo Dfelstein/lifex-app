@@ -247,6 +247,26 @@ body { background: var(--bg); color: var(--text); font-family: 'Outfit', sans-se
 .info-modal-box p { font-size:13px;color:var(--muted2);line-height:1.7;margin-bottom:10px; }
 .info-modal-box ul { font-size:13px;color:var(--muted2);line-height:2;padding-left:18px;margin-bottom:14px; }
 .info-modal-close { width:100%;padding:10px;background:var(--surface2);border:1px solid var(--border2);border-radius:8px;color:var(--text);font-family:'Outfit',sans-serif;font-size:13px;cursor:pointer; }
+/* GP BLOOD ENTRY MODAL */
+.gp-overlay { display:none;position:fixed;inset:0;background:rgba(0,0,0,0.7);z-index:500;backdrop-filter:blur(4px); }
+.gp-overlay.open { display:block; }
+.gp-modal { position:fixed;bottom:0;left:0;right:0;z-index:501;background:var(--surface);border-radius:20px 20px 0 0;border-top:1px solid var(--border2);max-height:92vh;overflow-y:auto;transform:translateY(100%);transition:transform 0.32s cubic-bezier(0.32,0.72,0,1);padding-bottom:env(safe-area-inset-bottom,24px); }
+.gp-modal.open { transform:translateY(0); }
+.gp-modal-header { position:sticky;top:0;background:var(--surface);z-index:2;padding:14px 20px 12px;border-bottom:1px solid var(--border);display:flex;align-items:center;justify-content:space-between; }
+.gp-modal-title { font-family:'Bebas Neue',sans-serif;font-size:22px;letter-spacing:1px; }
+.gp-modal-close { width:32px;height:32px;border-radius:50%;background:var(--surface2);border:1px solid var(--border2);display:flex;align-items:center;justify-content:center;cursor:pointer;font-size:16px;color:var(--muted2);flex-shrink:0; }
+.gp-modal-close:hover { color:var(--text); }
+.gp-body { padding:16px 20px 24px; }
+.gp-section-hd { font-size:10px;font-weight:700;letter-spacing:1px;text-transform:uppercase;color:var(--gold);margin:20px 0 10px; }
+.gp-row { display:flex;align-items:center;justify-content:space-between;gap:12px;padding:9px 0;border-bottom:1px solid var(--border); }
+.gp-row:last-child { border-bottom:none; }
+.gp-row-info { flex:1; }
+.gp-row-name { font-size:13px;font-weight:500;color:var(--text); }
+.gp-row-ref  { font-size:10px;color:var(--muted2);margin-top:2px; }
+.gp-input-wrap { display:flex;align-items:center;gap:6px;flex-shrink:0; }
+.gp-input { width:72px;background:var(--surface2);border:1px solid var(--border2);border-radius:8px;padding:7px 10px;font-size:13px;font-family:'Outfit',sans-serif;color:var(--text);text-align:right; }
+.gp-input:focus { outline:none;border-color:var(--gold); }
+.gp-unit { font-size:11px;color:var(--muted2);white-space:nowrap;min-width:44px; }
 .info-modal-close:hover { border-color:var(--gold); }
 /* Member level tooltip */
 .level-info-btn { background:none;border:none;color:var(--muted);cursor:pointer;font-size:11px;padding:0 0 0 3px;line-height:1;vertical-align:middle; }
@@ -1682,7 +1702,11 @@ function closeScanDetail() {
 function renderBlood() {
   const el = document.getElementById('blood-panel-content');
   document.getElementById('blood-subtitle').textContent = bloodPanelDate ? fmtDate(bloodPanelDate) : '';
-  if (!blood.length) { el.innerHTML = noData('🩸','No Blood Panel','Blood panel results will appear here once uploaded by the Life X team.',`<a href="https://lifexclinic.square.site" target="_blank" class="btn btn-gold" style="margin-top:8px;">📅 Book a Blood Panel</a>`); return; }
+  const gpBtn = `<button onclick="showGPBloodModal()" class="btn btn-outline" style="width:100%;margin-bottom:16px;justify-content:center;">🩸 Log GP Blood Results</button>`;
+  if (!blood.length) {
+    el.innerHTML = gpBtn + noData('🩸','No Blood Panel','Upload a PDF via your staff team, or log results from your GP below.',`<a href="https://lifexclinic.square.site" target="_blank" class="btn btn-gold" style="margin-top:8px;">📅 Book a Full Blood Panel</a>`);
+    return;
+  }
   const cats = [...new Set(blood.map(m => m.category))];
   el.innerHTML = cats.map(cat => `
     <div class="card mb16">
@@ -1690,7 +1714,172 @@ function renderBlood() {
       <div style="display:flex;flex-direction:column;gap:18px;">
         ${blood.filter(m => m.category === cat).map(m => markerBar(m)).join('')}
       </div>
-    </div>`).join('');
+    </div>`).join('') + `<div style="margin-top:4px;">${gpBtn}</div>`;
+}
+
+/* ══════════════════════════
+   GP BLOOD ENTRY
+══════════════════════════ */
+const GP_MARKERS = [
+  // Lipids
+  { cat:'Lipids', name:'Total Cholesterol', unit:'mmol/L', dMin:2,   dMax:9,   rMin:0,    rMax:5.5,  optMax:4.5,  dir:'lower' },
+  { cat:'Lipids', name:'LDL Cholesterol',   unit:'mmol/L', dMin:0,   dMax:7,   rMin:0,    rMax:3.4,  optMax:2.5,  dir:'lower' },
+  { cat:'Lipids', name:'HDL Cholesterol',   unit:'mmol/L', dMin:0,   dMax:3,   rMin:1.0,  rMax:3.0,  optMin:1.5,  dir:'higher' },
+  { cat:'Lipids', name:'Triglycerides',     unit:'mmol/L', dMin:0,   dMax:5,   rMin:0,    rMax:1.7,  optMax:1.0,  dir:'lower' },
+  // Glucose
+  { cat:'Glucose & Metabolic', name:'Fasting Glucose', unit:'mmol/L', dMin:2,  dMax:12,  rMin:3.9, rMax:5.6, optMax:5.0, dir:'lower' },
+  { cat:'Glucose & Metabolic', name:'HbA1c',           unit:'%',      dMin:4,  dMax:12,  rMin:4.0, rMax:5.9, optMax:5.5, dir:'lower' },
+  // Liver
+  { cat:'Liver',   name:'ALT',   unit:'U/L', dMin:0, dMax:150, rMin:7,  rMax:55,  optMax:35,  dir:'lower' },
+  { cat:'Liver',   name:'GGT',   unit:'U/L', dMin:0, dMax:150, rMin:5,  rMax:65,  optMax:30,  dir:'lower' },
+  { cat:'Liver',   name:'ALP',   unit:'U/L', dMin:0, dMax:200, rMin:35, rMax:135, optMax:100, dir:'lower' },
+  // Kidney
+  { cat:'Kidney',  name:'Creatinine', unit:'μmol/L', dMin:40, dMax:200, rMin:60, rMax:110, optMax:90,  dir:'lower' },
+  { cat:'Kidney',  name:'eGFR',       unit:'mL/min', dMin:0,  dMax:120, rMin:60, rMax:999, optMin:90,  dir:'higher' },
+  { cat:'Kidney',  name:'Uric Acid',  unit:'μmol/L', dMin:100,dMax:600, rMin:150,rMax:420, optMax:360, dir:'lower' },
+  // Thyroid
+  { cat:'Thyroid', name:'TSH', unit:'mU/L', dMin:0, dMax:10, rMin:0.4, rMax:4.0, optMin:0.5, optMax:2.5, dir:'range' },
+  // Vitamins & Minerals
+  { cat:'Vitamins & Minerals', name:'Vitamin D',  unit:'nmol/L', dMin:0,  dMax:200, rMin:50,  rMax:250, optMin:75,  dir:'higher' },
+  { cat:'Vitamins & Minerals', name:'Vitamin B12',unit:'pmol/L', dMin:0,  dMax:800, rMin:145, rMax:650, optMin:220, dir:'higher' },
+  { cat:'Vitamins & Minerals', name:'Ferritin',   unit:'μg/L',   dMin:0,  dMax:500, rMin:15,  rMax:300, optMin:50,  dir:'higher' },
+  { cat:'Vitamins & Minerals', name:'Iron',       unit:'μmol/L', dMin:0,  dMax:40,  rMin:9,   rMax:30,  optMin:15,  dir:'higher' },
+  // Haematology
+  { cat:'Haematology', name:'Haemoglobin',      unit:'g/L',     dMin:80, dMax:200, rMin:130, rMax:175, optMin:140, dir:'higher' },
+  { cat:'Haematology', name:'White Blood Cells',unit:'×10⁹/L',  dMin:0,  dMax:15,  rMin:4.0, rMax:11.0,optMin:5.0, optMax:9.0, dir:'range' },
+  { cat:'Haematology', name:'Platelets',        unit:'×10⁹/L',  dMin:50, dMax:500, rMin:150, rMax:400, optMin:200, optMax:350, dir:'range' },
+  // Inflammation
+  { cat:'Inflammation', name:'CRP (hs)', unit:'mg/L', dMin:0, dMax:20, rMin:0, rMax:3.0, optMax:1.0, dir:'lower' },
+];
+
+function gpMarkerStatus(m, v) {
+  if (m.dir === 'lower') {
+    if (v < m.rMin) return 'low';
+    if (m.optMax != null && v <= m.optMax) return 'optimal';
+    if (v <= m.rMax) return 'normal';
+    return 'high';
+  }
+  if (m.dir === 'higher') {
+    if (v < m.rMin) return 'low';
+    if (m.optMin != null && v >= m.optMin) return 'optimal';
+    return 'normal';
+  }
+  // range
+  if (v < m.rMin) return 'low';
+  if (v > m.rMax) return 'high';
+  if (m.optMin != null && m.optMax != null && v >= m.optMin && v <= m.optMax) return 'optimal';
+  return 'normal';
+}
+
+function showGPBloodModal() {
+  const today = new Date();
+  const todayStr = `${today.getFullYear()}-${String(today.getMonth()+1).padStart(2,'0')}-${String(today.getDate()).padStart(2,'0')}`;
+  const cats = [...new Set(GP_MARKERS.map(m => m.cat))];
+
+  document.getElementById('gpBloodBody').innerHTML = `
+    <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px;margin-bottom:4px;">
+      <div>
+        <label style="font-size:11px;color:var(--muted2);display:block;margin-bottom:5px;text-transform:uppercase;letter-spacing:0.6px;">Test Date</label>
+        <input type="date" id="gp-date" value="${todayStr}"
+          style="width:100%;background:var(--surface2);border:1px solid var(--border2);border-radius:8px;padding:9px 12px;font-size:13px;font-family:'Outfit',sans-serif;color:var(--text);">
+      </div>
+      <div>
+        <label style="font-size:11px;color:var(--muted2);display:block;margin-bottom:5px;text-transform:uppercase;letter-spacing:0.6px;">Lab / Doctor <span style="opacity:0.5;">(optional)</span></label>
+        <input type="text" id="gp-lab" placeholder="e.g. Laverty Pathology"
+          style="width:100%;background:var(--surface2);border:1px solid var(--border2);border-radius:8px;padding:9px 12px;font-size:13px;font-family:'Outfit',sans-serif;color:var(--text);">
+      </div>
+    </div>
+    <div style="font-size:11px;color:var(--muted2);margin-bottom:4px;">Enter only the results you have — leave the rest blank.</div>
+
+    ${cats.map(cat => `
+      <div class="gp-section-hd">${cat}</div>
+      ${GP_MARKERS.filter(m => m.cat === cat).map((m, _) => {
+        const idx = GP_MARKERS.indexOf(m);
+        const refHint = m.dir === 'higher'
+          ? `ref ≥${m.rMin} ${m.unit}${m.optMin ? ' · optimal ≥'+m.optMin : ''}`
+          : m.dir === 'range'
+          ? `ref ${m.rMin}–${m.rMax} ${m.unit}${m.optMin != null ? ' · optimal '+m.optMin+'–'+m.optMax : ''}`
+          : `ref ≤${m.rMax} ${m.unit}${m.optMax ? ' · optimal ≤'+m.optMax : ''}`;
+        return `
+        <div class="gp-row">
+          <div class="gp-row-info">
+            <div class="gp-row-name">${m.name}</div>
+            <div class="gp-row-ref">${refHint}</div>
+          </div>
+          <div class="gp-input-wrap">
+            <input type="number" id="gp-marker-${idx}" step="any" placeholder="—"
+              class="gp-input" inputmode="decimal">
+            <span class="gp-unit">${m.unit}</span>
+          </div>
+        </div>`;
+      }).join('')}
+    `).join('')}
+
+    <div style="margin-top:24px;">
+      <button id="gp-save-btn" onclick="saveGPBlood()"
+        class="btn btn-gold" style="width:100%;justify-content:center;padding:14px;">
+        Save Results
+      </button>
+    </div>`;
+
+  document.getElementById('gpBloodOverlay').classList.add('open');
+  document.getElementById('gpBloodModal').classList.add('open');
+}
+
+function closeGPBloodModal() {
+  document.getElementById('gpBloodOverlay').classList.remove('open');
+  document.getElementById('gpBloodModal').classList.remove('open');
+}
+
+async function saveGPBlood() {
+  const dateVal = document.getElementById('gp-date')?.value;
+  const labVal  = document.getElementById('gp-lab')?.value.trim();
+  if (!dateVal) { alert('Please select a test date.'); return; }
+
+  const filled = [];
+  GP_MARKERS.forEach((m, idx) => {
+    const raw = document.getElementById(`gp-marker-${idx}`)?.value.trim();
+    if (!raw) return;
+    const v = parseFloat(raw);
+    if (isNaN(v)) return;
+    filled.push({
+      category: m.cat, name: m.name, value: v, unit: m.unit,
+      display_min: m.dMin, display_max: m.dMax,
+      ref_min: m.rMin, ref_max: Math.min(m.rMax, 9999),
+      status: gpMarkerStatus(m, v),
+    });
+  });
+
+  if (!filled.length) { alert('Please enter at least one result.'); return; }
+
+  const btn = document.getElementById('gp-save-btn');
+  btn.disabled = true; btn.textContent = 'Saving…';
+
+  const { data: panel, error: panelErr } = await sb
+    .from('blood_panels')
+    .insert({ client_id: profile.id, panel_date: dateVal, lab_name: labVal || null })
+    .select().single();
+
+  if (panelErr) {
+    btn.disabled = false; btn.textContent = 'Save Results';
+    alert('Error: ' + panelErr.message); return;
+  }
+
+  const { error: markerErr } = await sb
+    .from('blood_markers')
+    .insert(filled.map(m => ({ ...m, panel_id: panel.id })));
+
+  if (markerErr) {
+    btn.disabled = false; btn.textContent = 'Save Results';
+    alert('Error saving markers: ' + markerErr.message); return;
+  }
+
+  // Update global state & re-render without full page reload
+  bloodPanelDate = dateVal;
+  blood = filled.map(m => ({ ...m, min: m.display_min, max: m.display_max }));
+  renderBlood();
+  closeGPBloodModal();
+  logActivity('blood_self_reported');
 }
 
 /* ══════════════════════════
@@ -2635,5 +2824,18 @@ init();
 </script>
 
 <!-- SCAN DETAIL FULL SCREEN (injected into main content area) -->
+
+<!-- GP BLOOD ENTRY MODAL -->
+<div class="gp-overlay" id="gpBloodOverlay" onclick="closeGPBloodModal()"></div>
+<div class="gp-modal" id="gpBloodModal">
+  <div class="gp-modal-header">
+    <div>
+      <div class="gp-modal-title">Log GP Blood Results</div>
+      <div style="font-size:11px;color:var(--muted2);margin-top:2px;">Self-reported · not a clinical blood panel</div>
+    </div>
+    <div class="gp-modal-close" onclick="closeGPBloodModal()">✕</div>
+  </div>
+  <div class="gp-body" id="gpBloodBody"></div>
+</div>
 </body>
 </html>
