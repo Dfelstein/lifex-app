@@ -1731,12 +1731,6 @@ function renderCompare() {
     return;
   }
 
-  // Default: pre-select all scans (up to 5) on first open
-  if (!compareSelected.length && allScans.length >= 2) {
-    const start = Math.max(0, allScans.length - 5);
-    compareSelected = allScans.slice(start).map((_, i) => start + i);
-  }
-
   const chips = allScans.map((s, i) => {
     const sel = compareSelected.includes(i);
     const maxed = !sel && compareSelected.length >= 5;
