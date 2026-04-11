@@ -46,10 +46,77 @@ Deno.serve(async (req) => {
       if (fetchErr || !user?.email) return cors(JSON.stringify({ error: 'User not found' }), 404);
 
       const { data: profile } = await sb.from('profiles').select('full_name,initials').eq('id', clientId).single();
-      const { error: inviteErr } = await sb.auth.admin.inviteUserByEmail(user.email, {
-        data: { full_name: profile?.full_name, initials: profile?.initials }
+      const firstName = profile?.full_name?.split(' ')[0] || '';
+
+      // Generate invite link (does not send Supabase default email)
+      const { data: linkData, error: linkErr } = await sb.auth.admin.generateLink({
+        type: 'invite',
+        email: user.email,
+        options: {
+          data: { full_name: profile?.full_name, initials: profile?.initials },
+          redirectTo: 'https://lifex.xgym.com.au/index.html'
+        }
       });
-      if (inviteErr) return cors(JSON.stringify({ error: inviteErr.message }), 500);
+      if (linkErr) return cors(JSON.stringify({ error: linkErr.message }), 500);
+
+      const inviteLink = linkData?.properties?.action_link;
+      if (!inviteLink) return cors(JSON.stringify({ error: 'Could not generate invite link' }), 500);
+
+      // Send branded invite email via Resend
+      if (!RESEND_API_KEY) return cors(JSON.stringify({ error: 'Email not configured' }), 500);
+
+      const html = `<!DOCTYPE html>
+<html><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"></head>
+<body style="margin:0;padding:0;background:#f0f0f0;font-family:Arial,Helvetica,sans-serif">
+  <table width="100%" cellpadding="0" cellspacing="0" style="background:#f0f0f0">
+    <tr><td align="center" style="padding:40px 16px">
+      <table cellpadding="0" cellspacing="0" style="max-width:520px;width:100%;background:#08090b;border-radius:16px;overflow:hidden">
+        <tr><td style="padding:36px 40px 28px;text-align:center;border-bottom:1px solid rgba(255,255,255,0.07)">
+          <div style="display:inline-block;width:56px;height:56px;background:#f5c842;border-radius:14px;line-height:56px;font-family:Georgia,serif;font-size:26px;font-weight:900;color:#000;letter-spacing:-1px;text-align:center">LX</div>
+          <div style="margin-top:12px;font-size:22px;font-weight:700;letter-spacing:4px;color:#ffffff;text-transform:uppercase">Life X</div>
+          <div style="font-size:11px;color:#5a6272;letter-spacing:2px;text-transform:uppercase;margin-top:3px">Body Intelligence</div>
+        </td></tr>
+        <tr><td style="padding:36px 40px 28px">
+          ${firstName ? `<p style="margin:0 0 18px;font-size:16px;color:#eef0f3;line-height:1.6">Hi ${firstName},</p>` : ''}
+          <p style="margin:0 0 18px;font-size:15px;color:#c0c8d4;line-height:1.7">Your <strong style="color:#f5c842">Life X</strong> results portal is ready. Click below to set your password and access your DEXA scan results, body composition data, and Life X Score.</p>
+          <p style="margin:0 0 32px;font-size:15px;color:#c0c8d4;line-height:1.7">This takes less than a minute.</p>
+          <table cellpadding="0" cellspacing="0" width="100%">
+            <tr><td align="center">
+              <a href="${inviteLink}" style="display:inline-block;padding:16px 40px;background:#f5c842;color:#000000;font-size:16px;font-weight:700;text-decoration:none;border-radius:8px;letter-spacing:1px;text-transform:uppercase">
+                Set My Password &rarr;
+              </a>
+            </td></tr>
+          </table>
+          <p style="margin:28px 0 0;font-size:12px;color:#5a6272;line-height:1.6;text-align:center">
+            Button not working? Copy and paste this link into your browser:<br>
+            <a href="${inviteLink}" style="color:#f5c842;word-break:break-all">${inviteLink}</a>
+          </p>
+          <p style="margin:16px 0 0;font-size:12px;color:#5a6272;text-align:center">
+            This link expires in <strong style="color:#8a94a6">24 hours</strong>. If it expires, contact us and we'll send a new one.
+          </p>
+        </td></tr>
+        <tr><td style="padding:20px 40px 28px;border-top:1px solid rgba(255,255,255,0.07)">
+          <p style="margin:0 0 3px;font-size:13px;color:#5a6272;font-weight:600">The Life X Team</p>
+          <p style="margin:0 0 3px;font-size:13px;color:#5a6272">XGYM Castle Hill</p>
+          <p style="margin:0;font-size:13px;color:#5a6272">0424 023 601</p>
+        </td></tr>
+      </table>
+    </td></tr>
+  </table>
+</body></html>`;
+
+      const emailRes = await fetch('https://api.resend.com/emails', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${RESEND_API_KEY}` },
+        body: JSON.stringify({
+          from: 'Life X by XGYM <dexa@xgym.com.au>',
+          to: [user.email],
+          reply_to: 'dexa@xgym.com.au',
+          subject: 'Your Life X account is ready — set your password',
+          html,
+        }),
+      });
+      if (!emailRes.ok) return cors(JSON.stringify({ error: 'Failed to send email' }), 500);
       return cors(JSON.stringify({ success: true }));
     }
 

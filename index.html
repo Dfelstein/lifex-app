@@ -95,9 +95,21 @@ html, body {
   </div>
   <div class="card" id="reset-card">
     <div class="card-title" id="reset-title">Set New Password</div>
+    <div id="account-email-box" style="display:none;margin-bottom:20px;padding:12px 14px;background:rgba(245,200,66,0.07);border:1px solid rgba(245,200,66,0.2);border-radius:8px;">
+      <div style="font-size:10px;font-weight:600;text-transform:uppercase;letter-spacing:1px;color:#8a94a6;margin-bottom:4px;">Activating account for</div>
+      <div id="account-email-display" style="font-size:14px;color:#f5c842;font-weight:600;word-break:break-all;"></div>
+      <div style="font-size:11px;color:#5a6272;margin-top:4px;">You'll use this email to sign in every time.</div>
+    </div>
     <div class="field">
-      <label>New Password</label>
-      <input type="password" id="new-password" placeholder="••••••••">
+      <label id="pw-label">New Password</label>
+      <input type="password" id="new-password" placeholder="At least 8 characters" autocomplete="new-password" oninput="checkPwStrength()">
+      <div id="pw-strength" style="margin-top:6px;height:3px;border-radius:2px;background:rgba(255,255,255,0.08);overflow:hidden;display:none">
+        <div id="pw-strength-bar" style="height:100%;width:0%;transition:width 0.2s,background 0.2s;border-radius:2px"></div>
+      </div>
+    </div>
+    <div class="field" id="confirm-pw-field">
+      <label>Confirm Password</label>
+      <input type="password" id="confirm-password" placeholder="Re-enter your password" autocomplete="new-password">
     </div>
     <button class="btn" id="reset-btn" onclick="setNewPassword()">Update Password</button>
     <div class="error" id="reset-error"></div>
@@ -139,29 +151,65 @@ const SUPABASE_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZ
 const sb = window.supabase.createClient(SUPABASE_URL, SUPABASE_KEY);
 
 // Check for password recovery or invite link immediately (before any redirect)
-const isRecovery = window.location.hash.includes('type=recovery');
-const isInvite   = window.location.hash.includes('type=invite');
-if (isRecovery || isInvite) {
+const hashStr = window.location.hash;
+const isRecovery = hashStr.includes('type=recovery');
+const isInvite   = hashStr.includes('type=invite');
+
+function showSetPasswordScreen(mode) {
   document.getElementById('login-card').style.display = 'none';
   document.getElementById('reset-card').style.display = 'block';
-  if (isInvite) {
+  if (mode === 'invite') {
     document.getElementById('reset-title').textContent = 'Welcome — Create Your Password';
-    document.getElementById('reset-btn').textContent   = 'Create Password';
-    document.getElementById('reset-success').textContent = '';
+    document.getElementById('reset-btn').textContent   = 'Create My Password';
+    document.getElementById('pw-label').textContent    = 'Choose a Password';
+    document.getElementById('confirm-pw-field').style.display = 'block';
+  } else {
+    document.getElementById('reset-title').textContent = 'Set New Password';
+    document.getElementById('reset-btn').textContent   = 'Update Password';
+    document.getElementById('confirm-pw-field').style.display = 'none';
   }
+}
+
+if (isRecovery || isInvite) {
+  showSetPasswordScreen(isInvite ? 'invite' : 'recovery');
 }
 
 sb.auth.onAuthStateChange((event, session) => {
   if (event === 'PASSWORD_RECOVERY') {
-    document.getElementById('login-card').style.display = 'none';
-    document.getElementById('reset-card').style.display = 'block';
+    showSetPasswordScreen('recovery');
   }
   // Supabase fires SIGNED_IN when it processes an invite token
-  if (event === 'SIGNED_IN' && isInvite) {
-    document.getElementById('login-card').style.display = 'none';
-    document.getElementById('reset-card').style.display = 'block';
+  if (event === 'SIGNED_IN' && (isInvite || hashStr.includes('type=invite'))) {
+    showSetPasswordScreen('invite');
+    // Show the email they're activating
+    if (session?.user?.email) {
+      document.getElementById('account-email-display').textContent = session.user.email;
+      document.getElementById('account-email-box').style.display = 'block';
+    }
+  }
+  // If SIGNED_IN but not invite/recovery flow, redirect normally
+  if (event === 'SIGNED_IN' && !isInvite && !isRecovery && !hashStr.includes('type=')) {
+    redirect(session.user.id);
   }
 });
+
+function checkPwStrength() {
+  const pw = document.getElementById('new-password').value;
+  const bar = document.getElementById('pw-strength-bar');
+  const wrap = document.getElementById('pw-strength');
+  if (!pw) { wrap.style.display = 'none'; return; }
+  wrap.style.display = 'block';
+  let score = 0;
+  if (pw.length >= 8) score++;
+  if (pw.length >= 12) score++;
+  if (/[A-Z]/.test(pw)) score++;
+  if (/[0-9]/.test(pw)) score++;
+  if (/[^A-Za-z0-9]/.test(pw)) score++;
+  const pct = Math.max(20, score * 20);
+  const colors = ['#ff5555','#ff5555','#e8a020','#f5c842','#50c878'];
+  bar.style.width = pct + '%';
+  bar.style.background = colors[Math.min(score-1, 4)] || '#ff5555';
+}
 
 (async () => {
   if (isRecovery || isInvite) return; // skip auto-redirect for first-time setup
@@ -197,30 +245,39 @@ async function signIn() {
 
 async function setNewPassword() {
   const password = document.getElementById('new-password').value;
+  const confirmEl = document.getElementById('confirm-password');
+  const confirm   = confirmEl ? confirmEl.value : password;
   const errEl = document.getElementById('reset-error');
   const sucEl = document.getElementById('reset-success');
   const btn   = document.getElementById('reset-btn');
   errEl.style.display = 'none';
   sucEl.style.display = 'none';
 
-  if (password.length < 6) {
-    errEl.textContent = 'Password must be at least 6 characters.';
+  if (password.length < 8) {
+    errEl.textContent = 'Password must be at least 8 characters.';
+    errEl.style.display = 'block';
+    return;
+  }
+
+  const confirmVisible = document.getElementById('confirm-pw-field')?.style.display !== 'none';
+  if (confirmVisible && password !== confirm) {
+    errEl.textContent = 'Passwords don\'t match — please re-enter them.';
     errEl.style.display = 'block';
     return;
   }
 
   btn.disabled = true;
-  btn.textContent = 'Updating…';
+  btn.textContent = 'Setting up…';
 
   // Ensure session is established before updating
   const { data: { session } } = await sb.auth.getSession();
   if (!session) {
     errEl.textContent = isInvite
-      ? 'Invite link expired (valid for 24 hours) — contact Life X to resend.'
+      ? 'Your invite link has expired (links are valid for 24 hours). Contact Life X and we\'ll send you a new one.'
       : 'Reset link expired (valid for 24 hours) — please request a new one.';
     errEl.style.display = 'block';
     btn.disabled = false;
-    btn.textContent = 'Update Password';
+    btn.textContent = btn.dataset.origText || 'Update Password';
     return;
   }
 
@@ -229,15 +286,17 @@ async function setNewPassword() {
     errEl.textContent = error.message;
     errEl.style.display = 'block';
     btn.disabled = false;
-    btn.textContent = 'Update Password';
+    btn.textContent = btn.dataset.origText || 'Update Password';
   } else {
-    sucEl.textContent = 'Password set! Taking you to your results…';
+    sucEl.textContent = isInvite
+      ? 'Password created! Taking you to your results…'
+      : 'Password updated! Signing you in…';
     sucEl.style.display = 'block';
     document.getElementById('save-banner').style.display = 'block';
     setTimeout(async () => {
       const { data: { session } } = await sb.auth.getSession();
       if (session) await redirect(session.user.id);
-    }, 3500);
+    }, 2500);
   }
 }
 
