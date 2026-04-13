@@ -1964,14 +1964,16 @@ async function viewClientProfile(clientId, firstName, lastName) {
                   const isLatest = ri === 0;
                   const fatDelta = prev&&s.fat_pct!=null&&prev.fat_pct!=null ? (s.fat_pct-prev.fat_pct).toFixed(1) : null;
                   const scanNum = s.scan_number || dexaScans.length-ri;
-                  return `<tr class="scan-hist-row${isLatest?' latest':''}" style="border-bottom:1px solid var(--border);" onclick='showStaffScanDetail(${JSON.stringify(s)},${scanNum})' title="Click to view full scan detail">
-                    <td style="padding:10px 0;font-family:'Bebas Neue',sans-serif;font-size:16px;color:${isLatest?'var(--gold)':'var(--muted2)'};">${scanNum}</td>
-                    <td style="padding:10px 8px;color:var(--text);font-weight:${isLatest?'600':'400'};">${fmtD(s.scan_date)}${isLatest?' <span style="font-size:9px;background:rgba(245,200,66,0.15);color:var(--gold);border-radius:8px;padding:1px 6px;font-weight:700;">LATEST</span>':''}</td>
-                    <td style="padding:10px 8px;text-align:right;font-weight:600;">${s.fat_pct!=null?s.fat_pct+'%':'—'}</td>
-                    <td style="padding:10px 8px;text-align:right;color:var(--muted2);">${s.lean_g!=null?(s.lean_g/1000).toFixed(1)+' kg':'—'}</td>
-                    <td style="padding:10px 8px;text-align:right;color:${s.vat_area_cm2==null?'var(--muted2)':s.vat_area_cm2<100?'var(--green)':s.vat_area_cm2<160?'var(--gold)':'var(--red)'};">${s.vat_area_cm2!=null?s.vat_area_cm2+' cm²':'—'}</td>
-                    <td style="padding:10px 0;text-align:right;color:${fatDelta===null?'var(--muted2)':parseFloat(fatDelta)<0?'var(--green)':'var(--red)'};">${fatDelta!==null?(parseFloat(fatDelta)>0?'+':'')+fatDelta+'%':'—'}</td>
-                    <td style="padding:10px 0;text-align:right;color:var(--muted2);font-size:16px;">›</td>
+                  return `<tr class="scan-hist-row${isLatest?' latest':''}" style="border-bottom:1px solid var(--border);">
+                    <td style="padding:10px 0;font-family:'Bebas Neue',sans-serif;font-size:16px;color:${isLatest?'var(--gold)':'var(--muted2)'};" onclick='showStaffScanDetail(${JSON.stringify(s)},${scanNum})'>${scanNum}</td>
+                    <td style="padding:10px 8px;color:var(--text);font-weight:${isLatest?'600':'400'};" onclick='showStaffScanDetail(${JSON.stringify(s)},${scanNum})'>${fmtD(s.scan_date)}${isLatest?' <span style="font-size:9px;background:rgba(245,200,66,0.15);color:var(--gold);border-radius:8px;padding:1px 6px;font-weight:700;">LATEST</span>':''}</td>
+                    <td style="padding:10px 8px;text-align:right;font-weight:600;" onclick='showStaffScanDetail(${JSON.stringify(s)},${scanNum})'>${s.fat_pct!=null?s.fat_pct+'%':'—'}</td>
+                    <td style="padding:10px 8px;text-align:right;color:var(--muted2);" onclick='showStaffScanDetail(${JSON.stringify(s)},${scanNum})'>${s.lean_g!=null?(s.lean_g/1000).toFixed(1)+' kg':'—'}</td>
+                    <td style="padding:10px 8px;text-align:right;color:${s.vat_area_cm2==null?'var(--muted2)':s.vat_area_cm2<100?'var(--green)':s.vat_area_cm2<160?'var(--gold)':'var(--red)'};" onclick='showStaffScanDetail(${JSON.stringify(s)},${scanNum})'>${s.vat_area_cm2!=null?s.vat_area_cm2+' cm²':'—'}</td>
+                    <td style="padding:10px 0;text-align:right;color:${fatDelta===null?'var(--muted2)':parseFloat(fatDelta)<0?'var(--green)':'var(--red)'};" onclick='showStaffScanDetail(${JSON.stringify(s)},${scanNum})'>${fatDelta!==null?(parseFloat(fatDelta)>0?'+':'')+fatDelta+'%':'—'}</td>
+                    <td style="padding:10px 0;text-align:right;">
+                      <button onclick="event.stopPropagation();confirmDeleteScan('${s.id}',${scanNum},'${fmtD(s.scan_date)}')" title="Delete this scan" style="background:none;border:none;cursor:pointer;color:var(--muted);font-size:14px;padding:4px 6px;border-radius:4px;transition:color 0.15s;" onmouseover="this.style.color='var(--red)'" onmouseout="this.style.color='var(--muted)'">🗑</button>
+                    </td>
                   </tr>`;
                 }).join('')}
               </tbody>
@@ -4606,6 +4608,45 @@ function anColumnChart(entries, color, maxVal) {
       </div>`;
     }).join('')}
   </div></div>`;
+}
+
+/* ══════════════════════════
+   DELETE SCAN
+══════════════════════════ */
+function confirmDeleteScan(scanId, scanNum, scanDate) {
+  const overlay = document.createElement('div');
+  overlay.id = 'delete-scan-overlay';
+  overlay.style.cssText = 'position:fixed;inset:0;background:rgba(0,0,0,0.75);z-index:600;display:flex;align-items:center;justify-content:center;padding:20px;';
+  overlay.innerHTML = `
+    <div style="background:var(--surface);border:1px solid var(--border);border-radius:16px;padding:28px;max-width:380px;width:100%;">
+      <div style="font-size:22px;margin-bottom:8px;">🗑 Delete Scan?</div>
+      <div style="font-size:15px;color:var(--text);margin-bottom:6px;font-weight:600;">Scan #${scanNum} — ${scanDate}</div>
+      <div style="font-size:13px;color:var(--muted2);margin-bottom:24px;line-height:1.6;">This will permanently remove the scan and all its data. This cannot be undone.</div>
+      <div style="display:flex;gap:10px;">
+        <button onclick="document.getElementById('delete-scan-overlay').remove()" style="flex:1;padding:12px;background:var(--surface2);border:1px solid var(--border);border-radius:8px;color:var(--text);font-size:14px;font-weight:600;cursor:pointer;">Cancel</button>
+        <button onclick="deleteScan('${scanId}')" style="flex:1;padding:12px;background:rgba(255,85,85,0.15);border:1px solid rgba(255,85,85,0.4);border-radius:8px;color:var(--red);font-size:14px;font-weight:700;cursor:pointer;">Delete</button>
+      </div>
+    </div>`;
+  document.body.appendChild(overlay);
+}
+
+async function deleteScan(scanId) {
+  const overlay = document.getElementById('delete-scan-overlay');
+  if (overlay) overlay.remove();
+
+  const { error } = await sb.from('dexa_scans').delete().eq('id', scanId);
+  if (error) {
+    toast('Failed to delete scan: ' + error.message, 'error');
+    return;
+  }
+  toast('Scan deleted', 'success');
+
+  // Refresh the client profile
+  const nameEl = document.getElementById('cp-name');
+  const name = nameEl?.textContent?.trim().split(' ') || [];
+  const first = name[0] || '';
+  const last = name.slice(1).join(' ') || '';
+  if (_profileClientId) viewClientProfile(_profileClientId, first, last);
 }
 
 /* ══════════════════════════
