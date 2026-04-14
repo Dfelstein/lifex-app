@@ -823,6 +823,8 @@ async function init() {
 
   const { data: profile } = await sb.from('profiles').select('*').eq('id', currentUserId).single();
 
+  if (!profile?.is_staff) { window.location.href = 'dashboard.html'; return; }
+
   document.getElementById('staff-name').textContent = profile?.full_name || 'Staff';
   if (profile?.is_marketing) document.getElementById('nav-marketing').style.display = 'flex';
   await Promise.all([loadClients(), loadTodayAppointments()]);
