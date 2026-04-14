@@ -138,39 +138,59 @@ async function sendResultsEmail(sb: any, clientId: string, scanType: string, par
   const html = `<!DOCTYPE html>
 <html>
 <head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"></head>
-<body style="margin:0;padding:0;background:#f4f4f4;font-family:Arial,Helvetica,sans-serif">
-  <table width="100%" cellpadding="0" cellspacing="0" style="background:#f4f4f4">
-    <tr><td align="center" style="padding:32px 16px">
-      <table cellpadding="0" cellspacing="0" style="max-width:560px;width:100%;background:#ffffff;border-radius:4px;border:1px solid #e0e0e0">
-        <tr>
-          <td style="padding:28px 32px 0">
-            <p style="margin:0 0 20px;font-size:15px;color:#222;line-height:1.7">Hi ${firstName},</p>
-            <p style="margin:0 0 16px;font-size:15px;color:#222;line-height:1.7">${introLine}</p>
-            <p style="margin:0 0 12px;font-size:15px;color:#222;line-height:1.7">Here's a quick look at your key numbers:</p>
-            <div style="background:#f9f9f9;border-left:3px solid #C9A84C;padding:14px 18px;margin-bottom:20px;border-radius:0 4px 4px 0">
-              ${resultsList}
-            </div>
-            <p style="margin:0 0 16px;font-size:15px;color:#222;line-height:1.7">
-              You can view your full results — including bone density, regional breakdown, and comparisons with previous scans — in the Life X app:<br>
-              <a href="https://lifex.xgym.com.au/dashboard.html" style="color:#b8860b;font-weight:600">lifex.xgym.com.au</a>
-            </p>
-            <p style="margin:0 0 16px;font-size:15px;color:#222;line-height:1.7">
-              If you were happy with your appointment today, feel free to leave a Google review — it only takes a minute:<br>
-              <a href="https://g.page/r/CaGLAWIoh-6oEBM/review" style="color:#b8860b">https://g.page/r/CaGLAWIoh-6oEBM/review</a>
-            </p>
-            <p style="margin:0 0 28px;font-size:15px;color:#222;line-height:1.7">If you have any questions, just reply to this email.</p>
-            <p style="margin:0 0 4px;font-size:15px;color:#222">Thanks!</p>
-          </td>
-        </tr>
-        <tr>
-          <td style="padding:20px 32px 28px;border-top:1px solid #ebebeb;margin-top:16px">
-            <p style="margin:0 0 2px;font-size:13px;color:#555;font-weight:600">The Life X Team</p>
-            <p style="margin:0 0 2px;font-size:13px;color:#555">DEXA Scan Technician — XGYM Castle Hill</p>
-            <p style="margin:0 0 2px;font-size:13px;color:#555">website <a href="https://xgym.com.au/dexa-scan" style="color:#b8860b;text-decoration:none">xgym.com.au/dexa-scan</a></p>
-            <p style="margin:0 0 2px;font-size:13px;color:#555">phone: 0424 023 601</p>
-            <p style="margin:0;font-size:13px;color:#555">location: 5/9 Salisbury Rd, Castle Hill NSW 2154</p>
-          </td>
-        </tr>
+<body style="margin:0;padding:0;background:#f0f0f0;font-family:Arial,Helvetica,sans-serif">
+  <table width="100%" cellpadding="0" cellspacing="0" style="background:#f0f0f0">
+    <tr><td align="center" style="padding:40px 16px">
+      <table cellpadding="0" cellspacing="0" style="max-width:520px;width:100%;background:#08090b;border-radius:16px;overflow:hidden">
+
+        <!-- Header -->
+        <tr><td style="padding:32px 40px 24px;text-align:center;border-bottom:1px solid rgba(255,255,255,0.07)">
+          <div style="display:inline-block;width:52px;height:52px;background:#f5c842;border-radius:12px;line-height:52px;font-family:Georgia,serif;font-size:24px;font-weight:900;color:#000;text-align:center">LX</div>
+          <div style="margin-top:10px;font-size:20px;font-weight:700;letter-spacing:4px;color:#ffffff;text-transform:uppercase">Life X</div>
+          <div style="font-size:11px;color:#5a6272;letter-spacing:2px;text-transform:uppercase;margin-top:2px">Body Intelligence</div>
+        </td></tr>
+
+        <!-- Body -->
+        <tr><td style="padding:32px 40px 24px">
+          <p style="margin:0 0 16px;font-size:16px;color:#eef0f3;line-height:1.6">Hi ${firstName},</p>
+          <p style="margin:0 0 20px;font-size:15px;color:#c0c8d4;line-height:1.7">${introLine}</p>
+          <p style="margin:0 0 14px;font-size:13px;font-weight:600;text-transform:uppercase;letter-spacing:1px;color:#5a6272">Your Key Numbers</p>
+          <div style="background:#0f1114;border-left:3px solid #f5c842;padding:14px 18px;margin-bottom:28px;border-radius:0 8px 8px 0">
+            ${bodyLines.map(l => `<p style="margin:5px 0;font-size:14px;color:#c0c8d4;line-height:1.6">${l}</p>`).join('\n')}
+          </div>
+          <p style="margin:0 0 24px;font-size:15px;color:#c0c8d4;line-height:1.7">View your full results — bone density, regional breakdown, and comparisons with previous scans — in the Life X app.</p>
+
+          <!-- CTA Button -->
+          <table cellpadding="0" cellspacing="0" width="100%" style="margin-bottom:28px">
+            <tr><td align="center">
+              <a href="https://lifex.xgym.com.au/dashboard.html" style="display:inline-block;padding:15px 36px;background:#f5c842;color:#000000;font-size:15px;font-weight:700;text-decoration:none;border-radius:8px;letter-spacing:1px;text-transform:uppercase">
+                View My Results &rarr;
+              </a>
+            </td></tr>
+          </table>
+
+          <p style="margin:0 0 16px;font-size:14px;color:#8a94a6;line-height:1.7">Happy with your appointment? A quick Google review goes a long way — it only takes a minute.</p>
+
+          <!-- Google Review Button -->
+          <table cellpadding="0" cellspacing="0" width="100%" style="margin-bottom:28px">
+            <tr><td align="center">
+              <a href="https://g.page/r/CaGLAWIoh-6oEBM/review" style="display:inline-block;padding:12px 28px;background:transparent;border:1px solid rgba(245,200,66,0.35);color:#f5c842;font-size:13px;font-weight:600;text-decoration:none;border-radius:8px;letter-spacing:0.5px;">
+                Leave a Google Review ★
+              </a>
+            </td></tr>
+          </table>
+
+          <p style="margin:0;font-size:14px;color:#5a6272;line-height:1.7">Any questions? Just reply to this email.</p>
+        </td></tr>
+
+        <!-- Footer -->
+        <tr><td style="padding:20px 40px 28px;border-top:1px solid rgba(255,255,255,0.07)">
+          <p style="margin:0 0 3px;font-size:13px;color:#5a6272;font-weight:600">The Life X Team</p>
+          <p style="margin:0 0 3px;font-size:13px;color:#5a6272">DEXA Scan Technician — XGYM Castle Hill</p>
+          <p style="margin:0 0 3px;font-size:13px;color:#5a6272">0424 023 601 · 5/9 Salisbury Rd, Castle Hill NSW 2154</p>
+          <p style="margin:0;font-size:13px;color:#5a6272"><a href="https://xgym.com.au/dexa-scan" style="color:#5a6272;text-decoration:none">xgym.com.au/dexa-scan</a></p>
+        </td></tr>
+
       </table>
     </td></tr>
   </table>
