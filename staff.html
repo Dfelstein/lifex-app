@@ -2230,13 +2230,18 @@ let clientFilter = 'all';
 const CLIENT_PAGE_SIZE = 21;
 
 async function loadClients() {
-  const [profilesRes, dexaRes, rmrRes, bloodRes, hormoneRes] = await Promise.all([
-    sb.from('profiles').select('*').or('is_staff.is.null,is_staff.eq.false').order('created_at', { ascending: false }).limit(2000),
-    sb.from('dexa_scans').select('client_id,scan_date,fat_pct,weight_kg,lean_g').order('scan_date', { ascending: false }).limit(10000),
-    sb.from('rmr_tests').select('client_id,test_date').order('test_date', { ascending: false }),
-    sb.from('blood_panels').select('client_id,panel_date').order('panel_date', { ascending: false }),
-    sb.from('hormone_panels').select('client_id,panel_date').order('panel_date', { ascending: false }),
+  const [profilesList, dexaList, rmrList, bloodList, hormoneList] = await Promise.all([
+    fetchAllRows('profiles', '*', 'created_at', false),
+    fetchAllRows('dexa_scans', 'client_id,scan_date,fat_pct,weight_kg,lean_g', 'scan_date', false),
+    fetchAllRows('rmr_tests', 'client_id,test_date', 'test_date', false),
+    fetchAllRows('blood_panels', 'client_id,panel_date', 'panel_date', false),
+    fetchAllRows('hormone_panels', 'client_id,panel_date', 'panel_date', false),
   ]);
+  const profilesRes = { data: profilesList.filter(p => !p.is_staff) };
+  const dexaRes = { data: dexaList };
+  const rmrRes = { data: rmrList };
+  const bloodRes = { data: bloodList };
+  const hormoneRes = { data: hormoneList };
 
   const latestMap = {};
   const scanCount  = {}; // {clientId: {dexa,rmr,blood,hormone}}
@@ -3364,19 +3369,34 @@ async function confirmMerge() {
 let allScansData = [];   // raw from DB: dexa_scans joined with profile info
 let allScansProfiles = {}; // profileId → {full_name, email}
 
+async function fetchAllRows(table, selectCols, orderCol, ascending = false) {
+  const PAGE = 1000;
+  let from = 0, rows = [];
+  while (true) {
+    const { data, error } = await sb.from(table).select(selectCols)
+      .order(orderCol, { ascending })
+      .range(from, from + PAGE - 1);
+    if (error || !data?.length) break;
+    rows = rows.concat(data);
+    if (data.length < PAGE) break;
+    from += PAGE;
+  }
+  return rows;
+}
+
 async function loadAllScans() {
   document.getElementById('all-scans-list').innerHTML = '<div style="color:var(--muted2);font-size:13px;padding:20px 0;">Loading…</div>';
   document.getElementById('all-scans-stats').innerHTML = '';
 
-  // Fetch all dexa scans + all profiles in parallel
-  const [scansRes, profRes] = await Promise.all([
-    sb.from('dexa_scans').select('*').order('scan_date', { ascending: false }).limit(5000),
-    sb.from('profiles').select('id,full_name').limit(2000),
+  // Fetch all pages of scans + profiles in parallel
+  const [scans, profiles] = await Promise.all([
+    fetchAllRows('dexa_scans', '*', 'scan_date', false),
+    fetchAllRows('profiles', 'id,full_name', 'created_at', false),
   ]);
 
   allScansProfiles = {};
-  (profRes.data || []).forEach(p => { allScansProfiles[p.id] = p; });
-  allScansData = (scansRes.data || []);
+  profiles.forEach(p => { allScansProfiles[p.id] = p; });
+  allScansData = scans;
 
   filterAllScans();
 }
@@ -3982,11 +4002,12 @@ async function loadAnalytics() {
   if (Date.now() - analyticsLoadedAt < ANALYTICS_TTL) return;
   analyticsLoadedAt = Date.now();
 
-  // Fetch profiles (non-staff) and dexa scans in parallel
-  const [{ data: profilesRaw }, { data: dexaRaw }] = await Promise.all([
-    sb.from('profiles').select('*').or('is_staff.is.null,is_staff.eq.false').limit(2000),
-    sb.from('dexa_scans').select('client_id,scan_date,fat_pct,sex,patient_age').order('scan_date').limit(5000),
+  // Fetch profiles (non-staff) and dexa scans — paginated to get all rows
+  const [allProfiles, dexaRaw] = await Promise.all([
+    fetchAllRows('profiles', '*', 'created_at', false),
+    fetchAllRows('dexa_scans', 'client_id,scan_date,fat_pct,sex,patient_age', 'scan_date', true),
   ]);
+  const profilesRaw = allProfiles.filter(p => !p.is_staff);
 
   // Infer sex from first name for profiles missing it (all batches in parallel)
   const profiles = profilesRaw || [];
