@@ -142,15 +142,31 @@ html, body {
 <script>
 const SUPABASE_URL = 'https://shvpwgrjqskccsdzajkj.supabase.co';
 const SUPABASE_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InNodnB3Z3JqcXNrY2NzZHphamtqIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzM5MDUzNTIsImV4cCI6MjA4OTQ4MTM1Mn0.2dL3J9XbzU8q8ogPPqhwR4w7_vSB0FxVKMzsAOxCgk4';
+
+// !! Read URL BEFORE createClient — Supabase SDK may clear ?code= from the URL during init
+const _initHash   = window.location.hash;
+const _initSearch = window.location.search;
+const _hasCode    = new URLSearchParams(_initSearch).has('code');
+const _hasInviteHash = _initHash.includes('type=invite');
+const _hasRecoveryHash = _initHash.includes('type=recovery');
+
+// Persist setup signal in sessionStorage so it survives the SDK clearing the URL
+if (_hasCode || _hasInviteHash) {
+  sessionStorage.setItem('lx_pending_setup', '1');
+}
+if (_hasRecoveryHash) {
+  sessionStorage.setItem('lx_pending_reset', '1');
+}
+
 const sb = window.supabase.createClient(SUPABASE_URL, SUPABASE_KEY);
 
-// Detect invite/recovery from both hash (implicit flow) and search params (PKCE flow)
-const hashStr   = window.location.hash;
-const searchStr = window.location.search;
-const isRecovery = hashStr.includes('type=recovery') || searchStr.includes('type=recovery');
-const isInvite   = hashStr.includes('type=invite')   || searchStr.includes('type=invite');
-// PKCE flow: Supabase redirects back with ?code= — user came from an invite or reset link
-const hasPkceCode = new URLSearchParams(searchStr).has('code');
+// Now derive the detection flags (URL may already be cleaned by SDK)
+const hashStr    = _initHash;
+const searchStr  = _initSearch;
+const isRecovery = _hasRecoveryHash || searchStr.includes('type=recovery')
+                   || !!sessionStorage.getItem('lx_pending_reset');
+const isInvite   = _hasInviteHash   || searchStr.includes('type=invite');
+const hasPkceCode = _hasCode || !!sessionStorage.getItem('lx_pending_setup');
 
 function showSetPasswordScreen(mode, email) {
   document.getElementById('login-card').style.display = 'none';
@@ -295,6 +311,9 @@ async function setNewPassword() {
     btn.disabled = false;
     btn.textContent = btn.dataset.origText || 'Update Password';
   } else {
+    // Clear setup flags — password has been set successfully
+    sessionStorage.removeItem('lx_pending_setup');
+    sessionStorage.removeItem('lx_pending_reset');
     sucEl.textContent = isInvite
       ? 'Password created! Taking you to your results…'
       : 'Password updated! Signing you in…';
