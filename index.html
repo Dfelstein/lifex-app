@@ -137,12 +137,6 @@ html, body {
     <div class="sb-body">Tap <strong>Share → Add to Home Screen</strong> (iPhone) or <strong>Menu → Add to Home Screen</strong> (Android) so you can open your results anytime without hunting for the link.</div>
     <div class="sb-url">lifex.xgym.com.au</div>
   </div>
-  <div style="text-align:center;margin-top:20px;">
-    <div style="font-size:11px;color:var(--muted);margin-bottom:10px;letter-spacing:0.5px;">Don't have an account yet?</div>
-    <a href="guest.html" style="display:inline-block;width:100%;padding:13px;background:transparent;border:1px solid var(--border2);border-radius:8px;color:var(--muted2);font-family:'Outfit',sans-serif;font-size:14px;font-weight:600;text-decoration:none;transition:all 0.15s;" onmouseover="this.style.borderColor='var(--gold)';this.style.color='var(--text)'" onmouseout="this.style.borderColor='var(--border2)';this.style.color='var(--muted2)'">
-      Try Free Estimate &rarr;
-    </a>
-  </div>
 </div>
 
 <script>
@@ -150,12 +144,15 @@ const SUPABASE_URL = 'https://shvpwgrjqskccsdzajkj.supabase.co';
 const SUPABASE_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InNodnB3Z3JqcXNrY2NzZHphamtqIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzM5MDUzNTIsImV4cCI6MjA4OTQ4MTM1Mn0.2dL3J9XbzU8q8ogPPqhwR4w7_vSB0FxVKMzsAOxCgk4';
 const sb = window.supabase.createClient(SUPABASE_URL, SUPABASE_KEY);
 
-// Check for password recovery or invite link immediately (before any redirect)
-const hashStr = window.location.hash;
-const isRecovery = hashStr.includes('type=recovery');
-const isInvite   = hashStr.includes('type=invite');
+// Detect invite/recovery from both hash (implicit flow) and search params (PKCE flow)
+const hashStr   = window.location.hash;
+const searchStr = window.location.search;
+const isRecovery = hashStr.includes('type=recovery') || searchStr.includes('type=recovery');
+const isInvite   = hashStr.includes('type=invite')   || searchStr.includes('type=invite');
+// PKCE flow: Supabase redirects back with ?code= — user came from an invite or reset link
+const hasPkceCode = new URLSearchParams(searchStr).has('code');
 
-function showSetPasswordScreen(mode) {
+function showSetPasswordScreen(mode, email) {
   document.getElementById('login-card').style.display = 'none';
   document.getElementById('reset-card').style.display = 'block';
   if (mode === 'invite') {
@@ -168,27 +165,37 @@ function showSetPasswordScreen(mode) {
     document.getElementById('reset-btn').textContent   = 'Update Password';
     document.getElementById('confirm-pw-field').style.display = 'none';
   }
+  if (email) {
+    document.getElementById('account-email-display').textContent = email;
+    document.getElementById('account-email-box').style.display = 'block';
+  }
 }
 
 if (isRecovery || isInvite) {
   showSetPasswordScreen(isInvite ? 'invite' : 'recovery');
 }
 
+let _passwordScreenShown = isRecovery || isInvite;
 sb.auth.onAuthStateChange((event, session) => {
   if (event === 'PASSWORD_RECOVERY') {
-    showSetPasswordScreen('recovery');
+    showSetPasswordScreen('recovery', session?.user?.email);
+    _passwordScreenShown = true;
+    return;
   }
-  // Supabase fires SIGNED_IN when it processes an invite token
+  // Invite via implicit flow (hash contains type=invite)
   if (event === 'SIGNED_IN' && (isInvite || hashStr.includes('type=invite'))) {
-    showSetPasswordScreen('invite');
-    // Show the email they're activating
-    if (session?.user?.email) {
-      document.getElementById('account-email-display').textContent = session.user.email;
-      document.getElementById('account-email-box').style.display = 'block';
-    }
+    showSetPasswordScreen('invite', session?.user?.email);
+    _passwordScreenShown = true;
+    return;
   }
-  // If SIGNED_IN but not invite/recovery flow, redirect normally
-  if (event === 'SIGNED_IN' && !isInvite && !isRecovery && !hashStr.includes('type=')) {
+  // Invite or reset via PKCE flow (?code= in URL) — intercept before redirect
+  if (event === 'SIGNED_IN' && hasPkceCode && !_passwordScreenShown) {
+    showSetPasswordScreen('invite', session?.user?.email);
+    _passwordScreenShown = true;
+    return;
+  }
+  // Normal returning sign-in — redirect straight to app
+  if (event === 'SIGNED_IN' && !hasPkceCode && !isInvite && !isRecovery) {
     redirect(session.user.id);
   }
 });
@@ -212,7 +219,7 @@ function checkPwStrength() {
 }
 
 (async () => {
-  if (isRecovery || isInvite) return; // skip auto-redirect for first-time setup
+  if (isRecovery || isInvite || hasPkceCode) return; // skip auto-redirect for first-time setup // skip auto-redirect for first-time setup
   const { data: { session } } = await sb.auth.getSession();
   if (session) await redirect(session.user.id);
 })();
