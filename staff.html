@@ -374,6 +374,13 @@ html, body { height: 100%; background: var(--bg); color: var(--text); font-famil
   <!-- ── PREVIOUS APPOINTMENTS ── -->
   <div id="panel-previous" class="panel">
     <div class="page-title">All Appointments</div>
+    <div style="position:relative;margin-bottom:16px;">
+      <input type="text" id="appt-client-search" placeholder="Search client by name…" oninput="searchApptClients(this.value)"
+        style="width:100%;background:var(--surface2);border:1px solid var(--border2);border-radius:8px;padding:10px 14px 10px 36px;color:var(--text);font-family:'Outfit',sans-serif;font-size:13px;outline:none;"
+        onfocus="this.style.borderColor='var(--gold)'" onblur="this.style.borderColor='var(--border2)'">
+      <span style="position:absolute;left:12px;top:50%;transform:translateY(-50%);color:var(--muted2);font-size:14px;pointer-events:none;">🔍</span>
+      <div id="appt-search-results" style="display:none;position:absolute;top:calc(100% + 4px);left:0;right:0;background:var(--surface);border:1px solid var(--border2);border-radius:10px;z-index:100;max-height:280px;overflow-y:auto;box-shadow:0 8px 24px rgba(0,0,0,0.4);"></div>
+    </div>
     <div class="page-subtitle" id="prev-subtitle" style="margin-bottom:16px;">Select a day to view appointments</div>
     <div class="view-toggle">
       <button class="view-toggle-btn active" id="btn-week-view" onclick="setPrevView('week')">Week</button>
@@ -1019,13 +1026,13 @@ function renderApptCard(a) {
   })();
   return `
   <div class="appt-card ${hasClient ? 'has-client' : 'no-client'}">
-    <div class="appt-header">
+    <div class="appt-header" style="cursor:pointer;" onclick="${hasClient ? `event.target.closest('.card-toggle-btn')||viewClientProfile('${a.clientId}','${esc(a.firstName)}','${esc(a.lastName)}')` : `toggleCardCollapse('${a.id}','','${esc(a.firstName)}')`}">
       <div class="appt-avatar" style="background:linear-gradient(135deg,var(--blue),var(--teal));color:#000;">${initials}</div>
       <div style="flex:1">
-        <div class="appt-name ${hasClient ? 'clickable' : ''}" ${hasClient ? `onclick="viewClientProfile('${a.clientId}','${esc(a.firstName)}','${esc(a.lastName)}')"` : ''}>${a.firstName} ${a.lastName}</div>
-        <div class="appt-meta" style="display:flex;align-items:center;gap:6px;">${svcBadge2}${!hasClient ? '<span style="color:var(--red);font-size:11px;">No account</span>' : ''}</div>
+        <div class="appt-name clickable">${a.firstName} ${a.lastName}</div>
+        <div class="appt-meta" style="display:flex;align-items:center;gap:6px;">${svcBadge2}<span style="font-size:11px;color:var(--muted2);">${hasClient ? 'tap to view profile →' : 'tap to create account →'}</span></div>
       </div>
-      <button class="card-toggle-btn" id="toggle-${a.id}" onclick="toggleCardCollapse('${a.id}','${a.clientId||''}','${esc(a.firstName)}')">▼</button>
+      <button class="card-toggle-btn" id="toggle-${a.id}" onclick="event.stopPropagation();toggleCardCollapse('${a.id}','${a.clientId||''}','${esc(a.firstName)}')">▼</button>
     </div>
     <div class="appt-body">
       ${hasClient ? `
@@ -1243,6 +1250,42 @@ let monthYear = new Date().getFullYear();
 let monthMonth = new Date().getMonth();
 const MONTH_NAMES_FULL = ['January','February','March','April','May','June','July','August','September','October','November','December'];
 
+function searchApptClients(q) {
+  const box = document.getElementById('appt-search-results');
+  if (!q.trim()) { box.style.display = 'none'; return; }
+  const lower = q.toLowerCase();
+  const matches = clients.filter(c => c.full_name?.toLowerCase().includes(lower)).slice(0, 8);
+  if (!matches.length) {
+    box.style.display = 'block';
+    box.innerHTML = `<div style="padding:14px 16px;font-size:13px;color:var(--muted2);">No clients found for "${q}"</div>`;
+    return;
+  }
+  box.style.display = 'block';
+  box.innerHTML = matches.map(c => {
+    const fn = (c.full_name||'').split(' ')[0] || '';
+    const ln = (c.full_name||'').split(' ').slice(1).join(' ') || '';
+    const scanBadge = c.latestScan ? `<span style="font-size:10px;color:var(--green);margin-left:6px;">${c.latestScan.fat_pct != null ? c.latestScan.fat_pct+'% fat' : 'Has scan'}</span>` : '';
+    return `<div onclick="viewClientProfile('${c.id}','${fn.replace(/'/g,"\\'")}','${ln.replace(/'/g,"\\'")}');document.getElementById('appt-search-results').style.display='none';document.getElementById('appt-client-search').value='';"
+      style="padding:12px 16px;cursor:pointer;display:flex;align-items:center;gap:12px;border-bottom:1px solid var(--border);"
+      onmouseover="this.style.background='var(--surface2)'" onmouseout="this.style.background=''">
+      <div style="width:34px;height:34px;border-radius:50%;background:linear-gradient(135deg,var(--blue),var(--teal));display:flex;align-items:center;justify-content:center;font-size:13px;font-weight:700;color:#000;flex-shrink:0;">${(c.initials||c.full_name?.slice(0,2)||'?').toUpperCase()}</div>
+      <div style="flex:1;min-width:0;">
+        <div style="font-size:13px;font-weight:600;color:var(--text);">${c.full_name||'—'}${scanBadge}</div>
+        <div style="font-size:11px;color:var(--muted2);">${c.member_level||'Standard'} Member</div>
+      </div>
+      <span style="font-size:12px;color:var(--muted2);">→</span>
+    </div>`;
+  }).join('');
+}
+
+// Close search dropdown when clicking outside
+document.addEventListener('click', e => {
+  if (!e.target.closest('#appt-client-search') && !e.target.closest('#appt-search-results')) {
+    const box = document.getElementById('appt-search-results');
+    if (box) box.style.display = 'none';
+  }
+});
+
 function setPrevView(view) {
   document.getElementById('prev-week-view').style.display = view === 'week' ? '' : 'none';
   document.getElementById('prev-month-view').style.display = view === 'month' ? '' : 'none';
@@ -1304,7 +1347,7 @@ async function loadWeekView() {
         else { chipClass = 'confirmed-scans'; tooltip = 'Account active — scans uploaded'; }
       }
       return `<div class="week-appt-chip ${chipClass}" title="${tooltip}"
-        onclick="${a.clientId ? `viewClientProfile('${a.clientId}','${esc(a.firstName)}','${esc(a.lastName)}')` : `toast('No Life X account yet — use Today\\'s Appointments to create one','error')`}">
+        onclick="${a.clientId ? `viewClientProfile('${a.clientId}','${esc(a.firstName)}','${esc(a.lastName)}')` : `selectWeekDay('${dateToStr(new Date(a.datetime))}')`}">
         <div class="week-chip-time">${time}</div>
         <div class="week-chip-name">${name}</div>
       </div>`;
