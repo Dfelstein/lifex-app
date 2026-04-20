@@ -1026,13 +1026,13 @@ function renderApptCard(a) {
   })();
   return `
   <div class="appt-card ${hasClient ? 'has-client' : 'no-client'}">
-    <div class="appt-header" style="cursor:pointer;" onclick="${hasClient ? `event.target.closest('.card-toggle-btn')||viewClientProfile('${a.clientId}','${esc(a.firstName)}','${esc(a.lastName)}')` : `toggleCardCollapse('${a.id}','','${esc(a.firstName)}')`}">
+    <div class="appt-header" style="cursor:pointer;" onclick="${hasClient ? `event.target.closest('.card-toggle-btn')||viewClientProfile('${a.clientId}','${esc(a.firstName)}','${esc(a.lastName)}')` : `event.target.closest('.card-toggle-btn')||toggleNoAccountCard('${a.id}')`}">
       <div class="appt-avatar" style="background:linear-gradient(135deg,var(--blue),var(--teal));color:#000;">${initials}</div>
       <div style="flex:1">
         <div class="appt-name clickable">${a.firstName} ${a.lastName}</div>
         <div class="appt-meta" style="display:flex;align-items:center;gap:6px;">${svcBadge2}<span style="font-size:11px;color:var(--muted2);">${hasClient ? 'tap to view profile →' : 'tap to create account →'}</span></div>
       </div>
-      <button class="card-toggle-btn" id="toggle-${a.id}" onclick="event.stopPropagation();toggleCardCollapse('${a.id}','${a.clientId||''}','${esc(a.firstName)}')">▼</button>
+      <button class="card-toggle-btn" id="toggle-${a.id}" onclick="event.stopPropagation();${hasClient ? `toggleCardCollapse('${a.id}','${a.clientId}','${esc(a.firstName)}')` : `toggleNoAccountCard('${a.id}')`}">▼</button>
     </div>
     <div class="appt-body">
       ${hasClient ? `
@@ -1109,6 +1109,17 @@ async function handleDrop(e, appt) {
     setTimeout(() => { zone.innerHTML = `<div class="drop-icon">📄</div><div>Drop PDF here or click to browse</div>`; }, 3000);
     toast('Upload failed: ' + friendlyError(err.message), 'error');
   }
+}
+
+function toggleNoAccountCard(apptId) {
+  const btn = document.getElementById(`toggle-${apptId}`);
+  const card = btn?.closest('.appt-card');
+  if (!card) return;
+  const body = card.querySelector('.appt-body');
+  if (!body) return;
+  const isCollapsed = body.style.display === 'none';
+  body.style.display = isCollapsed ? '' : 'none';
+  btn.textContent = isCollapsed ? '▼' : '▶';
 }
 
 function toggleCardCollapse(apptId, clientId, firstName) {
