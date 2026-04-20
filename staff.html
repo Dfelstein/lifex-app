@@ -1358,7 +1358,7 @@ async function loadWeekView() {
         else { chipClass = 'confirmed-scans'; tooltip = 'Account active — scans uploaded'; }
       }
       return `<div class="week-appt-chip ${chipClass}" title="${tooltip}"
-        onclick="${a.clientId ? `viewClientProfile('${a.clientId}','${esc(a.firstName)}','${esc(a.lastName)}')` : `selectWeekDay('${dateToStr(new Date(a.datetime))}')`}">
+        onclick="${a.clientId ? `viewClientProfile('${a.clientId}','${esc(a.firstName)}','${esc(a.lastName)}')` : `showNoAccountModal('${esc(a.email)}','${esc(a.firstName)}','${esc(a.lastName)}')`}">
         <div class="week-chip-time">${time}</div>
         <div class="week-chip-name">${name}</div>
       </div>`;
@@ -4690,6 +4690,58 @@ function anColumnChart(entries, color, maxVal) {
 /* ══════════════════════════
    DELETE SCAN
 ══════════════════════════ */
+function showNoAccountModal(email, firstName, lastName) {
+  const existing = document.getElementById('no-account-overlay');
+  if (existing) existing.remove();
+  const overlay = document.createElement('div');
+  overlay.id = 'no-account-overlay';
+  overlay.style.cssText = 'position:fixed;inset:0;background:rgba(0,0,0,0.75);z-index:600;display:flex;align-items:center;justify-content:center;padding:20px;';
+  overlay.innerHTML = `
+    <div style="background:var(--surface);border:1px solid var(--border2);border-radius:16px;padding:28px;max-width:380px;width:100%;">
+      <div style="font-size:18px;font-weight:700;margin-bottom:6px;">${firstName} ${lastName}</div>
+      <div style="font-size:13px;color:var(--muted2);margin-bottom:20px;">${email || 'No email on file'}</div>
+      <div style="font-size:13px;color:var(--muted2);margin-bottom:20px;">No Life X account yet. Create one to send an invite and enable result uploads.</div>
+      <div id="no-account-status" style="font-size:13px;margin-bottom:12px;min-height:18px;"></div>
+      <div style="display:flex;gap:10px;">
+        <button onclick="document.getElementById('no-account-overlay').remove()" style="flex:1;padding:12px;background:var(--surface2);border:1px solid var(--border);border-radius:8px;color:var(--text);font-size:14px;font-weight:600;cursor:pointer;">Cancel</button>
+        <button id="no-account-create-btn" onclick="createAccountFromModal('${(email||'').replace(/'/g,"\\'")}','${(firstName||'').replace(/'/g,"\\'")}','${(lastName||'').replace(/'/g,"\\'")}',this)" style="flex:1;padding:12px;background:rgba(99,179,237,0.15);border:1px solid rgba(99,179,237,0.4);border-radius:8px;color:var(--blue);font-size:14px;font-weight:700;cursor:pointer;">➕ Create Account</button>
+      </div>
+    </div>`;
+  document.body.appendChild(overlay);
+  overlay.addEventListener('click', e => { if (e.target === overlay) overlay.remove(); });
+}
+
+async function createAccountFromModal(email, firstName, lastName, btn) {
+  const statusEl = document.getElementById('no-account-status');
+  btn.disabled = true;
+  btn.textContent = 'Creating…';
+  statusEl.style.color = 'var(--muted2)';
+  statusEl.textContent = 'Setting up account…';
+  try {
+    const res = await fetch(`${SUPABASE_URL}/functions/v1/create-client`, {
+      method: 'POST',
+      headers: { 'Authorization': `Bearer ${SUPABASE_KEY}`, 'Content-Type': 'application/json' },
+      body: JSON.stringify({ email, firstName, lastName })
+    });
+    const result = await res.json();
+    if (result.error) throw new Error(result.error);
+    if (result.alreadyExists) {
+      statusEl.style.color = 'var(--gold)';
+      statusEl.textContent = '⚠️ Account already exists — invite resent.';
+    } else {
+      statusEl.style.color = 'var(--green)';
+      statusEl.textContent = '✅ Account created! Invite sent.';
+    }
+    btn.textContent = 'Done';
+    setTimeout(() => { document.getElementById('no-account-overlay')?.remove(); }, 2000);
+  } catch (e) {
+    statusEl.style.color = 'var(--red)';
+    statusEl.textContent = '❌ ' + e.message;
+    btn.disabled = false;
+    btn.textContent = '➕ Create Account';
+  }
+}
+
 function confirmDeleteScan(scanId, scanNum, scanDate) {
   const overlay = document.createElement('div');
   overlay.id = 'delete-scan-overlay';
