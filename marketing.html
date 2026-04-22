@@ -300,7 +300,7 @@ html, body { height: 100%; background: var(--bg); color: var(--text); font-famil
         <div class="int-badge connected"><div class="int-dot"></div> Meta Pixel Active</div>
         <div class="int-badge connected"><div class="int-dot"></div> Google Ads Connected</div>
         <div class="int-badge connected"><div class="int-dot"></div> Acuity Webhook Active</div>
-        <div class="int-badge disconnected"><div class="int-dot"></div> Meta Ads — Setup needed</div>
+        <div class="int-badge connected"><div class="int-dot"></div> Meta Ads Active</div>
       </div>
 
       <!-- KPI grid -->
@@ -586,53 +586,54 @@ html, body { height: 100%; background: var(--bg); color: var(--text); font-famil
             <li class="done-step">Pixel ID: 1529714340852241</li>
             <li class="done-step">Installed via WPCode on xgym.com.au</li>
             <li class="done-step">Purchase event fires on Acuity booking confirmation</li>
-            <li>Set up Meta Ads retargeting campaign (next step)</li>
+            <li class="done-step">Meta Ads retargeting campaign live — 4,400 visitor audience</li>
           </ul>
-          <div style="font-size:12px;color:var(--muted2);">Meta is now building an audience of xgym.com.au visitors. Ready to run retargeting ads.</div>
+          <div style="font-size:12px;color:var(--muted2);">Pixel active. Retargeting campaign running. Purchase conversions tracking.</div>
         </div>
 
         <!-- Google Ads -->
-        <div class="setup-card">
+        <div class="setup-card done">
           <div class="setup-header">
-            <div class="setup-icon" style="background:rgba(245,200,66,0.08);">🎯</div>
+            <div class="setup-icon" style="background:rgba(57,224,122,0.1);">🎯</div>
             <div>
               <div class="setup-name">Google Ads</div>
-              <div class="setup-status-text todo">Not connected</div>
+              <div class="setup-status-text done">✓ Connected</div>
             </div>
           </div>
           <ul class="setup-steps">
-            <li>Create or sign into Google Ads account (ads.google.com)</li>
-            <li>In GA4 → Admin → Google Ads Links → Link your account</li>
-            <li>Import GA4 conversion events into Google Ads</li>
-            <li>Set DEXA booking as a primary conversion</li>
+            <li class="done-step">Account: 788-877-6786 (XGYM)</li>
+            <li class="done-step">Linked to GA4 property 315516030 (xgym.com.au)</li>
+            <li class="done-step">Purchase conversion imported from GA4 — primary conversion</li>
+            <li class="done-step">8 active campaigns running</li>
           </ul>
           <div class="field" style="margin-top:12px;">
-            <label>Google Ads Customer ID (when ready)</label>
-            <input type="text" id="google-ads-id" placeholder="e.g. 123-456-7890" oninput="saveIntegrationSetting('google_ads_id', this.value)">
+            <label>Google Ads Customer ID</label>
+            <input type="text" id="google-ads-id" value="788-877-6786" oninput="saveIntegrationSetting('google_ads_id', this.value)">
           </div>
-          <div style="font-size:12px;color:var(--muted2);">Linking Google Ads to GA4 lets you see cost-per-booking directly in your reports.</div>
+          <div style="font-size:12px;color:var(--muted2);">Purchase conversion active. Google Ads optimising toward bookings.</div>
         </div>
 
         <!-- Meta Ads -->
-        <div class="setup-card">
+        <div class="setup-card done">
           <div class="setup-header">
-            <div class="setup-icon" style="background:rgba(167,139,250,0.08);">📣</div>
+            <div class="setup-icon" style="background:rgba(57,224,122,0.1);">📣</div>
             <div>
               <div class="setup-name">Meta Ads (Facebook/Instagram)</div>
-              <div class="setup-status-text todo">Not connected</div>
+              <div class="setup-status-text done">✓ Campaign Live</div>
             </div>
           </div>
           <ul class="setup-steps">
-            <li>Set up Meta Pixel first (above)</li>
-            <li>In Meta Business Suite → Ads Manager → Create campaign</li>
-            <li>Use Conversion objective targeting DEXA booking page</li>
-            <li>Set up Custom Audiences from website visitors</li>
+            <li class="done-step">Ad Account ID: 65061558</li>
+            <li class="done-step">Campaign: XGYM DEXA Retargeting — $20/day</li>
+            <li class="done-step">Audience: Website Visitors 30 Days (4,400 people)</li>
+            <li class="done-step">Conversion event: Purchase (Meta Pixel)</li>
+            <li class="done-step">3 ad copy variants testing — video 18s</li>
           </ul>
           <div class="field" style="margin-top:12px;">
-            <label>Meta Ad Account ID (when ready)</label>
-            <input type="text" id="meta-ads-id" placeholder="e.g. act_1234567890" oninput="saveIntegrationSetting('meta_ads_id', this.value)">
+            <label>Meta Ad Account ID</label>
+            <input type="text" id="meta-ads-id" value="65061558" oninput="saveIntegrationSetting('meta_ads_id', this.value)">
           </div>
-          <div style="font-size:12px;color:var(--muted2);">Once Meta Pixel is firing, you can create retargeting ads for people who visited the DEXA page but didn't book.</div>
+          <div style="font-size:12px;color:var(--muted2);">Retargeting campaign running. Check Meta Ads Manager for live performance data.</div>
         </div>
 
         <!-- Acuity Conversion -->
