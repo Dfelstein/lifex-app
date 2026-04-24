@@ -13,6 +13,8 @@
 <link href="https://fonts.googleapis.com/css2?family=Bebas+Neue&family=Outfit:wght@300;400;500;600;700&display=swap" rel="stylesheet">
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
+<link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css"/>
+<script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
 <style>
 :root {
   --bg: #08090b; --surface: #0f1114; --surface2: #161a1f; --surface3: #1c2128;
@@ -243,6 +245,26 @@ html, body { height: 100%; background: var(--bg); color: var(--text); font-famil
 @media(max-width:900px) { .two-col { grid-template-columns:1fr; } }
 
 .divider { border:none;border-top:1px solid var(--border);margin:20px 0; }
+
+/* EXPANSION ANALYSIS */
+.exp-filter-row { display:flex;gap:16px;flex-wrap:wrap;align-items:flex-end;margin-bottom:0; }
+.exp-filter-group { display:flex;flex-direction:column;gap:6px; }
+.exp-filter-label { font-size:10px;font-weight:600;letter-spacing:1px;text-transform:uppercase;color:var(--muted2); }
+.exp-btn-group { display:flex;gap:6px; }
+.exp-btn { padding:6px 14px;border-radius:6px;border:1px solid var(--border2);background:transparent;color:var(--muted2);font-family:'Outfit',sans-serif;font-size:12px;font-weight:600;cursor:pointer;transition:all 0.15s; }
+.exp-btn.active { background:rgba(245,200,66,0.15);border-color:var(--gold);color:var(--gold); }
+.exp-btn:hover:not(.active) { background:var(--surface2);color:var(--text); }
+.exp-map-wrap { height:500px;border-radius:10px;overflow:hidden;background:var(--surface2); }
+.exp-table { width:100%;border-collapse:collapse;font-size:13px; }
+.exp-table th { font-size:10px;font-weight:600;letter-spacing:0.8px;text-transform:uppercase;color:var(--muted2);padding:8px 12px;text-align:left;border-bottom:1px solid var(--border); }
+.exp-table td { padding:10px 12px;border-bottom:1px solid rgba(255,255,255,0.03);vertical-align:middle; }
+.exp-table tr:hover td { background:var(--surface2); }
+.exp-score { display:inline-block;padding:3px 10px;border-radius:20px;font-size:11px;font-weight:700; }
+.exp-score.high { background:rgba(57,224,122,0.12);color:var(--green); }
+.exp-score.med { background:rgba(245,200,66,0.12);color:var(--gold); }
+.exp-score.low { background:rgba(255,255,255,0.06);color:var(--muted2); }
+.exp-age-row { display:flex;align-items:center;gap:8px; }
+.exp-age-row input[type=range] { width:90px;accent-color:var(--gold); }
 </style>
 </head>
 <body>
@@ -279,6 +301,7 @@ html, body { height: 100%; background: var(--bg); color: var(--text); font-famil
       <div class="nav-group-label">Data</div>
       <div class="nav-item" data-panel="tracker" onclick="showPanel('tracker')"><span class="nav-icon">📈</span> Weekly Tracker</div>
       <div class="nav-item" data-panel="setup" onclick="showPanel('setup')"><span class="nav-icon">⚙️</span> Integrations</div>
+      <div class="nav-item" data-panel="expansion" onclick="showPanel('expansion')"><span class="nav-icon">📍</span> Expansion Analysis</div>
     </div>
     <div class="sidebar-footer">
       <button class="back-btn" onclick="window.location.href='staff.html'">← Back to Staff Portal</button>
@@ -827,6 +850,69 @@ html, body { height: 100%; background: var(--bg); color: var(--text); font-famil
       </div>
     </div>
 
+    <!-- EXPANSION ANALYSIS PANEL -->
+    <div id="panel-expansion" class="panel">
+      <div class="page-title">EXPANSION ANALYSIS</div>
+      <div class="page-subtitle">Identify the best location for a second clinic — based on your client age demographics and ABS 2021 population data</div>
+
+      <!-- Filters -->
+      <div class="card" style="margin-bottom:20px;">
+        <div class="card-title">FILTERS</div>
+        <div class="exp-filter-row">
+          <div class="exp-filter-group">
+            <div class="exp-filter-label">Scan Type</div>
+            <div class="exp-btn-group">
+              <button class="exp-btn active" id="exp-scan-all" onclick="setExpFilter('scan','all')">All Leads</button>
+              <button class="exp-btn" id="exp-scan-dexa" onclick="setExpFilter('scan','dexa')">DEXA Clients</button>
+              <button class="exp-btn" id="exp-scan-rmr" onclick="setExpFilter('scan','rmr')">RMR Clients</button>
+            </div>
+          </div>
+          <div class="exp-filter-group">
+            <div class="exp-filter-label">Drive Time Radius (current catchment)</div>
+            <div class="exp-btn-group">
+              <button class="exp-btn" id="exp-radius-20" onclick="setExpFilter('radius',20)">20 min (~20km)</button>
+              <button class="exp-btn active" id="exp-radius-35" onclick="setExpFilter('radius',35)">35 min (~40km)</button>
+              <button class="exp-btn" id="exp-radius-50" onclick="setExpFilter('radius',50)">50 min (~55km)</button>
+            </div>
+          </div>
+          <div class="exp-filter-group">
+            <div class="exp-filter-label">Age Bracket</div>
+            <div class="exp-age-row">
+              <span style="font-size:12px;color:var(--muted2);min-width:22px;" id="exp-age-min-label">30</span>
+              <input type="range" id="exp-age-min" min="18" max="80" value="30" oninput="updateExpAge()">
+              <span style="font-size:12px;color:var(--muted2);">–</span>
+              <input type="range" id="exp-age-max" min="18" max="80" value="65" oninput="updateExpAge()">
+              <span style="font-size:12px;color:var(--muted2);min-width:22px;" id="exp-age-max-label">65</span>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- KPIs -->
+      <div id="exp-kpis" style="display:grid;grid-template-columns:repeat(4,1fr);gap:14px;margin-bottom:20px;"></div>
+
+      <!-- Map -->
+      <div class="card" style="margin-bottom:20px;">
+        <div class="card-title">CLIENT ORIGIN + UNTAPPED ZONES</div>
+        <div style="font-size:12px;color:var(--muted2);margin-bottom:12px;display:flex;gap:20px;flex-wrap:wrap;">
+          <span style="display:inline-flex;align-items:center;gap:6px;"><span style="width:12px;height:12px;border-radius:3px;background:#f5c842;display:inline-block;opacity:0.8;"></span>Current clients (your catchment)</span>
+          <span style="display:inline-flex;align-items:center;gap:6px;"><span style="width:12px;height:12px;border-radius:50%;background:#4da6ff;display:inline-block;opacity:0.7;"></span>Untapped zones — ABS pop match (circle size = population)</span>
+          <span style="display:inline-flex;align-items:center;gap:6px;"><span style="width:16px;height:0;border-top:2px dashed rgba(255,255,255,0.4);display:inline-block;"></span>Catchment radius</span>
+          <span style="display:inline-flex;align-items:center;gap:6px;"><span style="width:10px;height:10px;border-radius:50%;background:#f5c842;display:inline-block;"></span>Castle Hill (current clinic)</span>
+        </div>
+        <div id="exp-map" class="exp-map-wrap"></div>
+      </div>
+
+      <!-- Ranked table -->
+      <div class="card">
+        <div class="card-title">TOP EXPANSION TARGETS</div>
+        <div style="font-size:12px;color:var(--muted2);margin-bottom:16px;">Ranked by opportunity score — ABS age-matched population ÷ current client presence. Higher score = more untapped potential beyond your current reach.</div>
+        <div id="exp-table-wrap">
+          <div class="loading-insights"><div class="spinner"></div>Loading analysis…</div>
+        </div>
+      </div>
+    </div>
+
   </div><!-- /main -->
 </div><!-- /app -->
 
@@ -884,6 +970,7 @@ function showPanel(id) {
   document.querySelectorAll('.nav-item').forEach(n => n.classList.remove('active'));
   document.getElementById(`panel-${id}`).classList.add('active');
   document.querySelector(`[data-panel="${id}"]`).classList.add('active');
+  if (id === 'expansion') { loadExpansion(); setTimeout(() => _expLeafletMap?.invalidateSize(), 150); }
 }
 
 // ─── KPIs ──────────────────────────────────────────────────────────────────
@@ -1771,6 +1858,376 @@ async function addOutcomeNote(id) {
   if (error) { toast('Error saving note', 'error'); return; }
   toast('Note saved', 'success');
   loadSEOChanges();
+}
+
+// ─── EXPANSION ANALYSIS ────────────────────────────────────────────────────
+
+const CASTLE_HILL_COORDS = { lat: -33.7322, lng: 151.0043 };
+const EXP_RADIUS_KM = { 20: 20, 35: 40, 50: 55 };
+
+let _expFilters = { scan: 'all', radius: 35, ageMin: 30, ageMax: 65 };
+let _expLeafletMap = null;
+let _expPolyLayer  = null;
+let _expAbsLayer   = null;
+let _expRadiusCircle = null;
+let _expData = null;
+
+// ABS 2021 Census — estimated population aged 30–64 by suburb
+// Suburbs within ~20–80km of Castle Hill (outside typical 35-min catchment)
+const ABS_EXPANSION_DATA = [
+  // Hawkesbury / NW corridor
+  { suburb:'Windsor',        state:'NSW', lat:-33.6134, lng:150.8126, pop3064:4800  },
+  { suburb:'Richmond',       state:'NSW', lat:-33.5998, lng:150.7529, pop3064:6200  },
+  { suburb:'Bligh Park',     state:'NSW', lat:-33.6307, lng:150.8050, pop3064:2800  },
+  { suburb:'McGraths Hill',  state:'NSW', lat:-33.6128, lng:150.8400, pop3064:2400  },
+  { suburb:'South Windsor',  state:'NSW', lat:-33.6437, lng:150.8117, pop3064:1800  },
+  { suburb:'Wilberforce',    state:'NSW', lat:-33.5641, lng:150.8785, pop3064:900   },
+  { suburb:'Kurrajong',      state:'NSW', lat:-33.5465, lng:150.7948, pop3064:1200  },
+  { suburb:'Glossodia',      state:'NSW', lat:-33.5686, lng:150.8024, pop3064:1800  },
+  // Western growth corridor
+  { suburb:'Marsden Park',   state:'NSW', lat:-33.6957, lng:150.8466, pop3064:5500  },
+  { suburb:'Schofields',     state:'NSW', lat:-33.6924, lng:150.8804, pop3064:6200  },
+  { suburb:'Riverstone',     state:'NSW', lat:-33.6786, lng:150.8594, pop3064:4100  },
+  { suburb:'Vineyard',       state:'NSW', lat:-33.6440, lng:150.8735, pop3064:1500  },
+  // Penrith corridor
+  { suburb:'Penrith',        state:'NSW', lat:-33.7512, lng:150.6942, pop3064:18000 },
+  { suburb:'Glenmore Park',  state:'NSW', lat:-33.7833, lng:150.6596, pop3064:8500  },
+  { suburb:'Emu Plains',     state:'NSW', lat:-33.7467, lng:150.6736, pop3064:5200  },
+  { suburb:'Cranebrook',     state:'NSW', lat:-33.7183, lng:150.7022, pop3064:6800  },
+  { suburb:'St Marys',       state:'NSW', lat:-33.7718, lng:150.7756, pop3064:11000 },
+  { suburb:'Kingswood',      state:'NSW', lat:-33.7520, lng:150.7249, pop3064:5800  },
+  { suburb:'Werrington',     state:'NSW', lat:-33.7481, lng:150.7659, pop3064:4500  },
+  { suburb:'Cambridge Park', state:'NSW', lat:-33.7481, lng:150.7108, pop3064:6200  },
+  { suburb:'Jordan Springs', state:'NSW', lat:-33.7558, lng:150.7214, pop3064:4200  },
+  { suburb:'Regentville',    state:'NSW', lat:-33.7667, lng:150.6833, pop3064:3500  },
+  { suburb:'Colyton',        state:'NSW', lat:-33.7611, lng:150.7975, pop3064:4800  },
+  // Central Coast
+  { suburb:'Gosford',        state:'NSW', lat:-33.4280, lng:151.3411, pop3064:10500 },
+  { suburb:'Erina',          state:'NSW', lat:-33.4310, lng:151.3721, pop3064:5100  },
+  { suburb:'Kariong',        state:'NSW', lat:-33.4736, lng:151.2922, pop3064:4200  },
+  { suburb:'Woy Woy',        state:'NSW', lat:-33.4882, lng:151.3215, pop3064:7500  },
+  { suburb:'Umina Beach',    state:'NSW', lat:-33.5245, lng:151.3000, pop3064:6200  },
+  { suburb:'Terrigal',       state:'NSW', lat:-33.4449, lng:151.4448, pop3064:6500  },
+  { suburb:'Tuggerah',       state:'NSW', lat:-33.2994, lng:151.3847, pop3064:5800  },
+  { suburb:'Wyong',          state:'NSW', lat:-33.2833, lng:151.4167, pop3064:3800  },
+  { suburb:'Bateau Bay',     state:'NSW', lat:-33.3806, lng:151.4794, pop3064:4800  },
+  { suburb:'The Entrance',   state:'NSW', lat:-33.3444, lng:151.4965, pop3064:5200  },
+  { suburb:'Avoca Beach',    state:'NSW', lat:-33.4651, lng:151.4336, pop3064:3200  },
+  { suburb:'Killarney Vale', state:'NSW', lat:-33.3611, lng:151.4597, pop3064:4100  },
+  { suburb:'Point Clare',    state:'NSW', lat:-33.4524, lng:151.3350, pop3064:3800  },
+  // Blue Mountains
+  { suburb:'Springwood',     state:'NSW', lat:-33.7047, lng:150.5698, pop3064:5500  },
+  { suburb:'Blaxland',       state:'NSW', lat:-33.7396, lng:150.6159, pop3064:4200  },
+  { suburb:'Winmalee',       state:'NSW', lat:-33.6842, lng:150.5969, pop3064:3800  },
+  { suburb:'Faulconbridge',  state:'NSW', lat:-33.7136, lng:150.5474, pop3064:2800  },
+  { suburb:'Hazelbrook',     state:'NSW', lat:-33.7294, lng:150.4783, pop3064:2200  },
+  // Northern (beyond current Hills catchment)
+  { suburb:'Galston',        state:'NSW', lat:-33.6564, lng:151.0329, pop3064:2500  },
+  { suburb:'Glenorie',       state:'NSW', lat:-33.6026, lng:151.0198, pop3064:1800  },
+  // Southwest
+  { suburb:'Narellan',       state:'NSW', lat:-34.0443, lng:150.7378, pop3064:8500  },
+  { suburb:'Camden',         state:'NSW', lat:-34.0572, lng:150.6973, pop3064:10000 },
+  { suburb:'Oran Park',      state:'NSW', lat:-34.0183, lng:150.7419, pop3064:5500  },
+  { suburb:'Gregory Hills',  state:'NSW', lat:-34.0350, lng:150.7617, pop3064:4800  },
+  { suburb:'Campbelltown',   state:'NSW', lat:-34.0667, lng:150.8144, pop3064:18000 },
+];
+
+function haversineKm(lat1, lng1, lat2, lng2) {
+  const R = 6371, rad = x => x * Math.PI / 180;
+  const dLat = rad(lat2 - lat1), dLng = rad(lng2 - lng1);
+  const a = Math.sin(dLat/2)**2 + Math.cos(rad(lat1)) * Math.cos(rad(lat2)) * Math.sin(dLng/2)**2;
+  return R * 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1-a));
+}
+
+function setExpFilter(type, value) {
+  _expFilters[type] = value;
+  if (type === 'scan') {
+    ['all','dexa','rmr'].forEach(v => {
+      const el = document.getElementById(`exp-scan-${v}`);
+      if (el) el.classList.toggle('active', v === value);
+    });
+  } else if (type === 'radius') {
+    [20,35,50].forEach(v => {
+      const el = document.getElementById(`exp-radius-${v}`);
+      if (el) el.classList.toggle('active', v === value);
+    });
+  }
+  if (_expData) renderExpansion(_expData);
+}
+
+function updateExpAge() {
+  let min = +document.getElementById('exp-age-min').value;
+  let max = +document.getElementById('exp-age-max').value;
+  if (min > max) { const t = min; min = max; max = t; }
+  _expFilters.ageMin = min;
+  _expFilters.ageMax = max;
+  document.getElementById('exp-age-min-label').textContent = min;
+  document.getElementById('exp-age-max-label').textContent = max;
+  if (_expData) renderExpansion(_expData);
+}
+
+function parseExpSuburb(address) {
+  if (!address) return null;
+  const AU_STATES = new Set(['nsw','vic','qld','wa','sa','tas','act','nt','australia']);
+  const parts = address.split(',').map(s => s.trim());
+  const suburb = parts.length >= 2 ? parts[1] : parts[0];
+  if (!suburb || suburb.length < 2) return null;
+  const clean = suburb.replace(/\d/g,'').trim().toLowerCase();
+  if (AU_STATES.has(clean) || clean.length < 2) return null;
+  const state = parts.length >= 3 ? parts[2].replace(/\d/g,'').trim().toUpperCase() : 'NSW';
+  return { suburb, state };
+}
+
+function getAgeFromDob(dob) {
+  if (!dob) return null;
+  const birth = new Date(dob);
+  if (isNaN(birth)) return null;
+  const today = new Date();
+  let age = today.getFullYear() - birth.getFullYear();
+  if (today.getMonth() < birth.getMonth() || (today.getMonth() === birth.getMonth() && today.getDate() < birth.getDate())) age--;
+  return age;
+}
+
+async function loadExpansion() {
+  if (_expData) { renderExpansion(_expData); setTimeout(() => _expLeafletMap?.invalidateSize(), 100); return; }
+
+  document.getElementById('exp-table-wrap').innerHTML = '<div class="loading-insights"><div class="spinner"></div>Loading client data…</div>';
+
+  const [
+    { data: leads },
+    { data: profiles },
+    { data: dexaRows },
+    { data: rmrRows },
+  ] = await Promise.all([
+    sb.from('zoho_intake_pending').select('email,dob,address').limit(5000),
+    sb.from('profiles').select('id,email,address').not('address', 'is', null).limit(5000),
+    sb.from('dexa_scans').select('client_id').limit(5000),
+    sb.from('rmr_tests').select('client_id').limit(5000),
+  ]);
+
+  const dexaIds = new Set((dexaRows || []).map(r => r.client_id));
+  const rmrIds  = new Set((rmrRows  || []).map(r => r.client_id));
+
+  const emailScanType = {};
+  (profiles || []).forEach(p => {
+    if (!p.email) return;
+    emailScanType[p.email.toLowerCase()] = { dexa: dexaIds.has(p.id), rmr: rmrIds.has(p.id) };
+  });
+
+  _expData = { leads: leads || [], emailScanType };
+  renderExpansion(_expData);
+  setTimeout(() => _expLeafletMap?.invalidateSize(), 150);
+}
+
+function renderExpansion(data) {
+  const { leads, emailScanType } = data;
+  const { scan, radius, ageMin, ageMax } = _expFilters;
+  const radiusKm = EXP_RADIUS_KM[radius];
+
+  const filtered = leads.filter(l => {
+    const age = getAgeFromDob(l.dob);
+    if (age !== null && (age < ageMin || age > ageMax)) return false;
+    if (scan !== 'all' && l.email) {
+      const st = emailScanType[l.email.toLowerCase()];
+      if (st) {
+        if (scan === 'dexa' && !st.dexa) return false;
+        if (scan === 'rmr'  && !st.rmr)  return false;
+      }
+    }
+    return true;
+  });
+
+  const suburbCounts = {};
+  filtered.forEach(l => {
+    const p = parseExpSuburb(l.address);
+    if (!p) return;
+    const key = `${p.suburb.toLowerCase()}||${p.state.toLowerCase()}`;
+    if (!suburbCounts[key]) suburbCounts[key] = { suburb: p.suburb, state: p.state, count: 0, key };
+    suburbCounts[key].count++;
+  });
+  const currentSuburbs = Object.values(suburbCounts).sort((a,b) => b.count - a.count);
+
+  const absScored = ABS_EXPANSION_DATA.map(s => {
+    const dist = haversineKm(CASTLE_HILL_COORDS.lat, CASTLE_HILL_COORDS.lng, s.lat, s.lng);
+    const key = `${s.suburb.toLowerCase()}||${s.state.toLowerCase()}`;
+    const currentClients = suburbCounts[key]?.count || 0;
+    const score = Math.round(s.pop3064 / (currentClients + 1));
+    return { ...s, dist, currentClients, score };
+  }).filter(s => s.dist > radiusKm).sort((a,b) => b.score - a.score);
+
+  // KPIs
+  const topTarget = absScored[0];
+  const untappedPop = absScored.slice(0,10).reduce((s,x) => s + x.pop3064, 0);
+  document.getElementById('exp-kpis').innerHTML = [
+    { label:'Clients in Analysis',    value: filtered.length,              sub: `${scan==='all'?'All intake leads':scan.toUpperCase()+' clients'}, age ${ageMin}–${ageMax}`, color:'var(--gold)'  },
+    { label:'Active Catchment Suburbs', value: currentSuburbs.length,     sub: 'Suburbs with current clients',        color:'var(--teal)'  },
+    { label:'Top Expansion Target',   value: topTarget?.suburb || '—',     sub: topTarget ? `${Math.round(topTarget.dist)}km from Castle Hill` : '', color:'var(--green)' },
+    { label:'Untapped Pop (Top 10)',   value: untappedPop.toLocaleString(), sub: 'Age-matched pop, outside catchment', color:'var(--blue)'  },
+  ].map(k => `
+    <div class="kpi-card">
+      <div class="kpi-label">${k.label}</div>
+      <div class="kpi-value" style="color:${k.color};font-size:${typeof k.value==='string'&&k.value.length>6?'22px':'28px'};">${k.value}</div>
+      <div class="kpi-sub">${k.sub}</div>
+    </div>`).join('');
+
+  renderExpMap(currentSuburbs, absScored, radiusKm);
+  renderExpTable(absScored);
+}
+
+const EXP_POLY_CACHE_KEY = 'lifex_exp_poly_v1';
+let _expPolyCache = null;
+function loadExpPolyCache() {
+  if (_expPolyCache) return _expPolyCache;
+  try { _expPolyCache = JSON.parse(localStorage.getItem(EXP_POLY_CACHE_KEY) || '{}'); } catch { _expPolyCache = {}; }
+  return _expPolyCache;
+}
+function saveExpPolyCache(cache) {
+  _expPolyCache = cache;
+  try { localStorage.setItem(EXP_POLY_CACHE_KEY, JSON.stringify(cache)); } catch {}
+}
+
+function renderExpMap(currentSuburbs, absScored, radiusKm) {
+  const mapEl = document.getElementById('exp-map');
+  if (!mapEl) return;
+
+  if (!_expLeafletMap) {
+    _expLeafletMap = L.map(mapEl, { zoomControl: true, scrollWheelZoom: false });
+    L.tileLayer('https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png', {
+      attribution: '&copy; OpenStreetMap &copy; CARTO',
+      subdomains: 'abcd', maxZoom: 18
+    }).addTo(_expLeafletMap);
+    _expPolyLayer = L.layerGroup().addTo(_expLeafletMap);
+    _expAbsLayer  = L.layerGroup().addTo(_expLeafletMap);
+    _expLeafletMap.setView([CASTLE_HILL_COORDS.lat, CASTLE_HILL_COORDS.lng], 9);
+  } else {
+    _expPolyLayer.clearLayers();
+    _expAbsLayer.clearLayers();
+    if (_expRadiusCircle) { _expRadiusCircle.remove(); _expRadiusCircle = null; }
+  }
+
+  // Dashed radius ring
+  _expRadiusCircle = L.circle([CASTLE_HILL_COORDS.lat, CASTLE_HILL_COORDS.lng], {
+    radius: radiusKm * 1000,
+    color: 'rgba(255,255,255,0.35)',
+    weight: 2,
+    dashArray: '8 6',
+    fillOpacity: 0,
+  }).addTo(_expLeafletMap);
+
+  // Castle Hill marker
+  L.circleMarker([CASTLE_HILL_COORDS.lat, CASTLE_HILL_COORDS.lng], {
+    radius: 10, color: '#f5c842', fillColor: '#f5c842', fillOpacity: 1, weight: 2
+  }).bindTooltip('<strong>Castle Hill — Current Clinic</strong>', { permanent: false, opacity: 0.95 })
+    .addTo(_expPolyLayer);
+
+  // Current client suburb polygons (gold tones)
+  const polyCache = loadExpPolyCache();
+  const maxCount = Math.max(...currentSuburbs.map(s => s.count), 1);
+  const toFetch = [];
+
+  currentSuburbs.slice(0, 25).forEach(({ suburb, state, count }) => {
+    const key = `${suburb}||${state}`.toLowerCase();
+    if (polyCache[key]) {
+      addExpClientPoly(suburb, state, count, maxCount, polyCache[key]);
+    } else {
+      toFetch.push({ suburb, state, count, key });
+    }
+  });
+
+  if (toFetch.length) {
+    let i = 0;
+    const fetchNext = () => {
+      if (i >= toFetch.length) return;
+      const { suburb, state, count, key } = toFetch[i++];
+      const q = encodeURIComponent(`${suburb}, ${state}, Australia`);
+      fetch(`https://nominatim.openstreetmap.org/search?q=${q}&format=geojson&limit=3&polygon_geojson=1&featureType=settlement`)
+        .then(r => r.json()).then(data => {
+          const features = data.features || [];
+          const PLACE_TYPES = new Set(['suburb','neighbourhood','hamlet','village','quarter','city_district','residential']);
+          const isSuburb = f => {
+            const p = f.properties || {};
+            if ((p.category||p.class) === 'boundary') return false;
+            if ((p.category||p.class) === 'place' && !PLACE_TYPES.has(p.type)) return false;
+            const bb = f.bbox;
+            if (bb && ((bb[2]-bb[0]) > 0.2 || (bb[3]-bb[1]) > 0.2)) return false;
+            return true;
+          };
+          const best = features.filter(f => (f.geometry?.type === 'Polygon' || f.geometry?.type === 'MultiPolygon') && isSuburb(f))[0];
+          if (best?.geometry) {
+            polyCache[key] = best.geometry;
+            saveExpPolyCache(polyCache);
+            addExpClientPoly(suburb, state, count, maxCount, best.geometry);
+          }
+        }).catch(() => {}).finally(() => setTimeout(fetchNext, 1200));
+    };
+    setTimeout(fetchNext, 300);
+  }
+
+  // ABS circles (blue) for untapped suburbs outside the radius
+  const maxPop = Math.max(...absScored.map(s => s.pop3064), 1);
+  absScored.slice(0, 30).forEach(s => {
+    const t = s.pop3064 / maxPop;
+    const r = 8 + t * 22;
+    L.circleMarker([s.lat, s.lng], {
+      radius: r, color: '#4da6ff', fillColor: '#4da6ff',
+      fillOpacity: 0.35 + t * 0.45, weight: 1.5
+    }).bindTooltip(`
+      <strong>${s.suburb}, ${s.state}</strong><br>
+      Pop 30–64: <span style="color:#f5c842;font-weight:700;">${s.pop3064.toLocaleString()}</span><br>
+      Distance from Castle Hill: ${Math.round(s.dist)} km<br>
+      Current clients from here: ${s.currentClients || 'None yet'}<br>
+      Opportunity score: <span style="color:#39e07a;font-weight:700;">${s.score.toLocaleString()}</span>
+    `, { sticky: true, opacity: 0.97 }).addTo(_expAbsLayer);
+  });
+}
+
+function addExpClientPoly(suburb, state, count, maxCount, geojson) {
+  const t = maxCount > 1 ? count / maxCount : 1;
+  const fill = t < 0.33 ? '#f5c842' : t < 0.66 ? '#e8a020' : '#ff7043';
+  const opacity = 0.4 + t * 0.45;
+  L.geoJSON(geojson, { style: { color: fill, fillColor: fill, fillOpacity: opacity, weight: 1.5 } })
+   .bindTooltip(`<strong>${suburb}</strong> — <span style="color:#f5c842;font-weight:700;">${count} client${count!==1?'s':''}</span>`, { sticky: true })
+   .on('mouseover', function() { this.setStyle({ fillOpacity: Math.min(opacity+0.2,1) }); })
+   .on('mouseout',  function() { this.setStyle({ fillOpacity: opacity }); })
+   .addTo(_expPolyLayer);
+}
+
+function renderExpTable(absScored) {
+  const top = absScored.slice(0, 20);
+  if (!top.length) {
+    document.getElementById('exp-table-wrap').innerHTML = '<p style="color:var(--muted2);font-size:13px;padding:10px 0;">No suburbs found outside the selected radius. Try decreasing the drive time.</p>';
+    return;
+  }
+  document.getElementById('exp-table-wrap').innerHTML = `
+    <div style="overflow-x:auto;">
+    <table class="exp-table">
+      <thead>
+        <tr>
+          <th style="width:36px;">#</th>
+          <th>Suburb</th>
+          <th>Distance</th>
+          <th>ABS Pop 30–64</th>
+          <th>Current Clients</th>
+          <th>Opportunity</th>
+        </tr>
+      </thead>
+      <tbody>
+        ${top.map((s,i) => {
+          const tier = i < 3 ? 'high' : i < 8 ? 'med' : 'low';
+          const tierLabel = i < 3 ? 'HIGH' : i < 8 ? 'MED' : 'LOW';
+          return `<tr>
+            <td style="font-family:'Bebas Neue',sans-serif;font-size:20px;color:${i<3?'var(--gold)':'var(--muted2)'};">${i+1}</td>
+            <td><div style="font-weight:600;">${s.suburb}</div><div style="font-size:11px;color:var(--muted2);">${s.state}</div></td>
+            <td>${Math.round(s.dist)} km</td>
+            <td style="font-weight:600;">${s.pop3064.toLocaleString()}</td>
+            <td>${s.currentClients > 0 ? `<span style="color:var(--teal);font-weight:600;">${s.currentClients}</span>` : '<span style="color:var(--muted);">None yet</span>'}</td>
+            <td><span class="exp-score ${tier}">${tierLabel} — ${s.score.toLocaleString()}</span></td>
+          </tr>`;
+        }).join('')}
+      </tbody>
+    </table>
+    </div>
+    <div style="font-size:11px;color:var(--muted);margin-top:14px;">Population data: ABS Census 2021 (estimated). Distance = straight-line km from Castle Hill.</div>`;
 }
 
 // ─── START ─────────────────────────────────────────────────────────────────
