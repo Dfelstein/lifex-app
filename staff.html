@@ -1892,10 +1892,14 @@ async function viewClientProfile(clientId, firstName, lastName) {
       const vatStatus = vatVal != null ? (vatVal < 100 ? {c:'green',t:'Normal (<100 cm²)'} : vatVal < 160 ? {c:'gold',t:'Increased Risk'} : {c:'red',t:'High Risk'}) : null;
       const agStatus = dexa.ag_ratio != null ? (dexa.ag_ratio < 1 ? {c:'green',t:'Pear shape — lower CVD risk'} : {c:'red',t:'Apple shape — higher CVD risk'}) : null;
       const tStatus = dexa.t_score != null ? (dexa.t_score >= -1 ? {c:'green',t:'Normal'} : dexa.t_score >= -2.5 ? {c:'gold',t:'Osteopenia'} : {c:'red',t:'Osteoporosis'}) : null;
+      const dexaScanNum = dexa.scan_number || dexaScans.length;
       html += `<div class="card" style="margin-bottom:20px;">
-        <div class="card-title" style="display:flex;align-items:center;justify-content:space-between;">
+        <div class="card-title" style="display:flex;align-items:center;justify-content:space-between;cursor:pointer;" onclick='showStaffScanDetail(${JSON.stringify(dexa)},${dexaScanNum})'>
           <span>DEXA Scan — ${fmtDate(dexa.scan_date)}</span>
-          ${dexa.pdf_path ? `<button onclick="downloadScanPdf('${dexa.pdf_path}')" style="background:rgba(255,255,255,0.07);border:1px solid rgba(255,255,255,0.12);border-radius:6px;color:var(--muted2);font-size:11px;padding:4px 10px;cursor:pointer;">⬇ PDF</button>` : ''}
+          <div style="display:flex;gap:6px;align-items:center;">
+            ${dexa.pdf_path ? `<button onclick="event.stopPropagation();downloadScanPdf('${dexa.pdf_path}')" style="background:rgba(255,255,255,0.07);border:1px solid rgba(255,255,255,0.12);border-radius:6px;color:var(--muted2);font-size:11px;padding:4px 10px;cursor:pointer;">⬇ PDF</button>` : ''}
+            <span style="font-size:11px;color:var(--blue);font-weight:600;">Full Details →</span>
+          </div>
         </div>
         <div class="profile-stats">
           ${dexa.fat_pct != null ? `<div class="stat-chip orange"><div class="stat-chip-label">Body Fat</div><div class="stat-chip-value">${dexa.fat_pct}<span class="stat-chip-unit">%</span></div></div>` : ''}
