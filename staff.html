@@ -2946,9 +2946,15 @@ function signOut() {
 
 async function downloadScanPdf(path) {
   try {
-    const { data, error } = await sb.storage.from('scans').createSignedUrl(path, 3600);
-    if (error || !data?.signedUrl) { toast('Could not generate download link', 'error'); return; }
-    window.open(data.signedUrl, '_blank');
+    const { data: { session } } = await sb.auth.getSession();
+    const res = await fetch(`${SUPABASE_URL}/functions/v1/get-scan-url`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${session.access_token}` },
+      body: JSON.stringify({ path }),
+    });
+    const json = await res.json();
+    if (!json.signedUrl) { toast('Could not generate download link', 'error'); return; }
+    window.open(json.signedUrl, '_blank');
   } catch(e) { toast('Download failed: ' + e.message, 'error'); }
 }
 
