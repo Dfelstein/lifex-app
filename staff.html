@@ -1941,7 +1941,9 @@ async function viewClientProfile(clientId, firstName, lastName) {
         <div class="card-title" style="display:flex;align-items:center;justify-content:space-between;cursor:pointer;" onclick='showStaffScanDetail(${JSON.stringify(dexa)},${dexaScanNum})'>
           <span>DEXA Scan — ${fmtDate(dexa.scan_date)}</span>
           <div style="display:flex;gap:6px;align-items:center;">
-            ${dexa.pdf_path ? `<button onclick="event.stopPropagation();downloadScanPdf('${dexa.pdf_path}')" style="background:rgba(255,255,255,0.07);border:1px solid rgba(255,255,255,0.12);border-radius:6px;color:var(--muted2);font-size:11px;padding:4px 10px;cursor:pointer;">⬇ PDF</button>` : ''}
+            ${dexa.pdf_path
+              ? `<button onclick="event.stopPropagation();downloadScanPdf('${dexa.pdf_path}')" style="background:rgba(255,255,255,0.07);border:1px solid rgba(255,255,255,0.12);border-radius:6px;color:var(--muted2);font-size:11px;padding:4px 10px;cursor:pointer;">⬇ PDF</button>`
+              : `<span style="font-size:11px;color:var(--muted);font-style:italic;">no PDF on file</span>`}
             <span style="font-size:11px;color:var(--blue);font-weight:600;">Full Details →</span>
           </div>
         </div>
@@ -2125,7 +2127,7 @@ async function viewClientProfile(clientId, firstName, lastName) {
       html += `<div class="card" style="margin-bottom:20px;">
         <div class="card-title" style="display:flex;align-items:center;justify-content:space-between;">
           <span>RMR Test — ${fmtDate(rmr.test_date)}</span>
-          ${rmr.pdf_path ? `<button onclick="downloadScanPdf('${rmr.pdf_path}')" style="background:rgba(255,255,255,0.07);border:1px solid rgba(255,255,255,0.12);border-radius:6px;color:var(--muted2);font-size:11px;padding:4px 10px;cursor:pointer;">⬇ PDF</button>` : ''}
+          ${rmr.pdf_path ? `<button onclick="downloadScanPdf('${rmr.pdf_path}')" style="background:rgba(255,255,255,0.07);border:1px solid rgba(255,255,255,0.12);border-radius:6px;color:var(--muted2);font-size:11px;padding:4px 10px;cursor:pointer;">⬇ PDF</button>` : `<span style="font-size:11px;color:var(--muted);font-style:italic;">no PDF on file</span>`}
         </div>
         <div class="profile-stats">
           ${rmr.kcal != null ? `<div class="stat-chip orange"><div class="stat-chip-label">Resting Metabolism</div><div class="stat-chip-value">${fmt(rmr.kcal)}<span class="stat-chip-unit">kcal/day</span></div></div>` : ''}
@@ -2141,7 +2143,7 @@ async function viewClientProfile(clientId, firstName, lastName) {
       html += `<div class="card" style="margin-bottom:20px;">
         <div class="card-title" style="display:flex;align-items:center;justify-content:space-between;">
           <span>Blood Panel — ${fmtDate(bp.panel_date)}${bp.lab_name ? ' · ' + bp.lab_name : ''}</span>
-          ${bp.pdf_path ? `<button onclick="downloadScanPdf('${bp.pdf_path}')" style="background:rgba(255,255,255,0.07);border:1px solid rgba(255,255,255,0.12);border-radius:6px;color:var(--muted2);font-size:11px;padding:4px 10px;cursor:pointer;">⬇ PDF</button>` : ''}
+          ${bp.pdf_path ? `<button onclick="downloadScanPdf('${bp.pdf_path}')" style="background:rgba(255,255,255,0.07);border:1px solid rgba(255,255,255,0.12);border-radius:6px;color:var(--muted2);font-size:11px;padding:4px 10px;cursor:pointer;">⬇ PDF</button>` : `<span style="font-size:11px;color:var(--muted);font-style:italic;">no PDF on file</span>`}
         </div>
         <div style="overflow-x:auto;">
           <table class="markers-table">
@@ -2164,7 +2166,7 @@ async function viewClientProfile(clientId, firstName, lastName) {
       html += `<div class="card" style="margin-bottom:20px;">
         <div class="card-title" style="display:flex;align-items:center;justify-content:space-between;">
           <span>Hormone Panel — ${fmtDate(hp.panel_date)}</span>
-          ${hp.pdf_path ? `<button onclick="downloadScanPdf('${hp.pdf_path}')" style="background:rgba(255,255,255,0.07);border:1px solid rgba(255,255,255,0.12);border-radius:6px;color:var(--muted2);font-size:11px;padding:4px 10px;cursor:pointer;">⬇ PDF</button>` : ''}
+          ${hp.pdf_path ? `<button onclick="downloadScanPdf('${hp.pdf_path}')" style="background:rgba(255,255,255,0.07);border:1px solid rgba(255,255,255,0.12);border-radius:6px;color:var(--muted2);font-size:11px;padding:4px 10px;cursor:pointer;">⬇ PDF</button>` : `<span style="font-size:11px;color:var(--muted);font-style:italic;">no PDF on file</span>`}
         </div>
         <div style="overflow-x:auto;">
           <table class="markers-table">
