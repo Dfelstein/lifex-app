@@ -325,6 +325,15 @@ html, body { height: 100%; background: var(--bg); color: var(--text); font-famil
     <span class="staff-badge">🔑 STAFF ACCESS</span>
   </div>
 
+  <div style="padding:10px 12px;border-bottom:1px solid var(--border);position:relative;">
+    <input id="global-client-search" type="text" placeholder="🔍 Search clients…"
+      oninput="globalClientSearch(this.value)"
+      style="width:100%;box-sizing:border-box;background:var(--surface2);border:1px solid var(--border2);border-radius:8px;padding:8px 12px;font-family:'Outfit',sans-serif;font-size:13px;color:var(--text);outline:none;"
+      onfocus="if(this.value.trim())globalClientSearch(this.value)"
+    />
+    <div id="global-search-results" style="display:none;position:fixed;left:0;width:240px;background:var(--surface);border:1px solid var(--border2);border-radius:10px;box-shadow:0 8px 32px rgba(0,0,0,0.4);z-index:9999;overflow:hidden;max-height:360px;overflow-y:auto;"></div>
+  </div>
+
   <div class="sidebar-nav">
     <div class="nav-group-label">Today</div>
     <div class="nav-item active" data-panel="today" onclick="showPanel('today')"><span class="nav-icon">📅</span> Today's Appointments</div>
@@ -1289,10 +1298,45 @@ function searchApptClients(q) {
   }).join('');
 }
 
+function globalClientSearch(q) {
+  const box = document.getElementById('global-search-results');
+  const input = document.getElementById('global-client-search');
+  if (!q.trim()) { box.style.display = 'none'; return; }
+  const lower = q.toLowerCase();
+  const matches = clients.filter(c => c.full_name?.toLowerCase().includes(lower)).slice(0, 8);
+  // Position dropdown below the input
+  const rect = input.getBoundingClientRect();
+  box.style.top = (rect.bottom + 4) + 'px';
+  if (!matches.length) {
+    box.style.display = 'block';
+    box.innerHTML = `<div style="padding:14px 16px;font-size:13px;color:var(--muted2);">No clients found</div>`;
+    return;
+  }
+  box.style.display = 'block';
+  box.innerHTML = matches.map(c => {
+    const fn = (c.full_name||'').split(' ')[0] || '';
+    const ln = (c.full_name||'').split(' ').slice(1).join(' ') || '';
+    const scanBadge = c.latestScan ? `<span style="font-size:10px;color:var(--green);margin-left:6px;">${c.latestScan.fat_pct != null ? c.latestScan.fat_pct+'% fat' : 'Has scan'}</span>` : '';
+    return `<div onclick="viewClientProfile('${c.id}','${fn.replace(/'/g,"\\'")}','${ln.replace(/'/g,"\\'")}');document.getElementById('global-search-results').style.display='none';document.getElementById('global-client-search').value='';"
+      style="padding:11px 14px;cursor:pointer;display:flex;align-items:center;gap:10px;border-bottom:1px solid var(--border);"
+      onmouseover="this.style.background='var(--surface2)'" onmouseout="this.style.background=''">
+      <div style="width:32px;height:32px;border-radius:50%;background:linear-gradient(135deg,var(--blue),var(--teal));display:flex;align-items:center;justify-content:center;font-size:12px;font-weight:700;color:#000;flex-shrink:0;">${(c.initials||c.full_name?.slice(0,2)||'?').toUpperCase()}</div>
+      <div style="flex:1;min-width:0;">
+        <div style="font-size:13px;font-weight:600;color:var(--text);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;">${c.full_name||'—'}${scanBadge}</div>
+        <div style="font-size:11px;color:var(--muted2);">${c.member_level||'Standard'}</div>
+      </div>
+    </div>`;
+  }).join('');
+}
+
 // Close search dropdown when clicking outside
 document.addEventListener('click', e => {
   if (!e.target.closest('#appt-client-search') && !e.target.closest('#appt-search-results')) {
     const box = document.getElementById('appt-search-results');
+    if (box) box.style.display = 'none';
+  }
+  if (!e.target.closest('#global-client-search') && !e.target.closest('#global-search-results')) {
+    const box = document.getElementById('global-search-results');
     if (box) box.style.display = 'none';
   }
 });
