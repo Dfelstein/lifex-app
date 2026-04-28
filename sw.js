@@ -1,4 +1,4 @@
-const CACHE = 'lifex-v10';
+const CACHE = 'lifex-v11';
 const ASSETS = [
   '/lifex-app/',
   '/lifex-app/index.html',
@@ -7,8 +7,11 @@ const ASSETS = [
 ];
 
 self.addEventListener('install', e => {
-  e.waitUntil(caches.open(CACHE).then(c => c.addAll(ASSETS)));
-  self.skipWaiting();
+  e.waitUntil(
+    caches.open(CACHE)
+      .then(c => Promise.allSettled(ASSETS.map(a => c.add(a))))
+      .then(() => self.skipWaiting())
+  );
 });
 
 self.addEventListener('activate', e => {
