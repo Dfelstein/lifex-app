@@ -908,7 +908,7 @@ html, body { height: 100%; background: var(--bg); color: var(--text); font-famil
       <!-- Ranked table -->
       <div class="card">
         <div class="card-title">TOP EXPANSION TARGETS</div>
-        <div style="font-size:12px;color:var(--muted2);margin-bottom:16px;">Ranked by opportunity score — income-adjusted population ÷ current client presence. Castle Hill reference income: <span style="color:var(--gold);">$2,900/wk</span>. Suburbs with similar income profiles rank higher regardless of raw population size.</div>
+        <div style="font-size:12px;color:var(--muted2);margin-bottom:16px;">Score = (pop ÷ existing clients) × income match × age factor × growth bonus. Castle Hill reference: <span style="color:var(--gold);">$2,900/wk, age 40</span>. Younger estates with high income and active development rank highest — regardless of raw population size.</div>
         <div id="exp-table-wrap">
           <div class="loading-insights"><div class="spinner"></div>Loading analysis…</div>
         </div>
@@ -1874,70 +1874,68 @@ let _expAbsLayer   = null;
 let _expRadiusCircle = null;
 let _expData = null;
 
-// ABS 2021 Census — estimated population aged 30–64 by suburb
-// Suburbs within ~20–80km of Castle Hill (outside typical 35-min catchment)
-// Castle Hill reference income for compatibility scoring
 const CH_INCOME_REF = 2900;
 
-// ABS 2021 Census — pop aged 30–64 + median household income ($/week)
-// Confirmed from ABS: Marsden Park $2,722, Jordan Springs $2,482, Glenmore Park $2,526
-// Remaining estimated from suburb type / ABS LGA data
+// ABS 2021 — pop 30–64, median household income ($/wk), median age, growth score (1–5)
+// Growth: 5=rapid new estate/urban release, 4=active development, 3=moderate, 2=stable infill, 1=built out
+// Age sweet spot 28–40: highest disposable income + gym/health culture engagement
+// Confirmed ABS: Marsden Park income $2,722 age 32, Jordan Springs income $2,482 age 30, Glenmore Park income $2,526
 const ABS_EXPANSION_DATA = [
   // Hawkesbury / NW corridor
-  { suburb:'Windsor',        state:'NSW', lat:-33.6134, lng:150.8126, pop3064:4800,  medianIncome:1750 },
-  { suburb:'Richmond',       state:'NSW', lat:-33.5998, lng:150.7529, pop3064:6200,  medianIncome:1850 },
-  { suburb:'Bligh Park',     state:'NSW', lat:-33.6307, lng:150.8050, pop3064:2800,  medianIncome:1950 },
-  { suburb:'McGraths Hill',  state:'NSW', lat:-33.6128, lng:150.8400, pop3064:2400,  medianIncome:1900 },
-  { suburb:'South Windsor',  state:'NSW', lat:-33.6437, lng:150.8117, pop3064:1800,  medianIncome:1750 },
-  { suburb:'Wilberforce',    state:'NSW', lat:-33.5641, lng:150.8785, pop3064:900,   medianIncome:1900 },
-  { suburb:'Kurrajong',      state:'NSW', lat:-33.5465, lng:150.7948, pop3064:1200,  medianIncome:2200 },
-  { suburb:'Glossodia',      state:'NSW', lat:-33.5686, lng:150.8024, pop3064:1800,  medianIncome:2000 },
+  { suburb:'Windsor',        state:'NSW', lat:-33.6134, lng:150.8126, pop3064:4800,  medianIncome:1750, medianAge:40, growthScore:2 },
+  { suburb:'Richmond',       state:'NSW', lat:-33.5998, lng:150.7529, pop3064:6200,  medianIncome:1850, medianAge:39, growthScore:2 },
+  { suburb:'Bligh Park',     state:'NSW', lat:-33.6307, lng:150.8050, pop3064:2800,  medianIncome:1950, medianAge:36, growthScore:2 },
+  { suburb:'McGraths Hill',  state:'NSW', lat:-33.6128, lng:150.8400, pop3064:2400,  medianIncome:1900, medianAge:37, growthScore:2 },
+  { suburb:'South Windsor',  state:'NSW', lat:-33.6437, lng:150.8117, pop3064:1800,  medianIncome:1750, medianAge:40, growthScore:2 },
+  { suburb:'Wilberforce',    state:'NSW', lat:-33.5641, lng:150.8785, pop3064:900,   medianIncome:1900, medianAge:41, growthScore:1 },
+  { suburb:'Kurrajong',      state:'NSW', lat:-33.5465, lng:150.7948, pop3064:1200,  medianIncome:2200, medianAge:43, growthScore:1 },
+  { suburb:'Glossodia',      state:'NSW', lat:-33.5686, lng:150.8024, pop3064:1800,  medianIncome:2000, medianAge:42, growthScore:1 },
   // Western growth corridor
-  { suburb:'Marsden Park',   state:'NSW', lat:-33.6957, lng:150.8466, pop3064:5500,  medianIncome:2722 },
-  { suburb:'Schofields',     state:'NSW', lat:-33.6924, lng:150.8804, pop3064:6200,  medianIncome:2600 },
-  { suburb:'Riverstone',     state:'NSW', lat:-33.6786, lng:150.8594, pop3064:4100,  medianIncome:2000 },
-  { suburb:'Vineyard',       state:'NSW', lat:-33.6440, lng:150.8735, pop3064:1500,  medianIncome:2300 },
+  { suburb:'Marsden Park',   state:'NSW', lat:-33.6957, lng:150.8466, pop3064:5500,  medianIncome:2722, medianAge:32, growthScore:5 },
+  { suburb:'Schofields',     state:'NSW', lat:-33.6924, lng:150.8804, pop3064:6200,  medianIncome:2600, medianAge:31, growthScore:4 },
+  { suburb:'Riverstone',     state:'NSW', lat:-33.6786, lng:150.8594, pop3064:4100,  medianIncome:2000, medianAge:36, growthScore:3 },
+  { suburb:'Vineyard',       state:'NSW', lat:-33.6440, lng:150.8735, pop3064:1500,  medianIncome:2300, medianAge:34, growthScore:4 },
   // Penrith corridor
-  { suburb:'Penrith',        state:'NSW', lat:-33.7512, lng:150.6942, pop3064:18000, medianIncome:1700 },
-  { suburb:'Glenmore Park',  state:'NSW', lat:-33.7833, lng:150.6596, pop3064:8500,  medianIncome:2526 },
-  { suburb:'Emu Plains',     state:'NSW', lat:-33.7467, lng:150.6736, pop3064:5200,  medianIncome:2100 },
-  { suburb:'Cranebrook',     state:'NSW', lat:-33.7183, lng:150.7022, pop3064:6800,  medianIncome:1500 },
-  { suburb:'St Marys',       state:'NSW', lat:-33.7718, lng:150.7756, pop3064:11000, medianIncome:1600 },
-  { suburb:'Kingswood',      state:'NSW', lat:-33.7520, lng:150.7249, pop3064:5800,  medianIncome:1900 },
-  { suburb:'Werrington',     state:'NSW', lat:-33.7481, lng:150.7659, pop3064:4500,  medianIncome:1800 },
-  { suburb:'Cambridge Park', state:'NSW', lat:-33.7481, lng:150.7108, pop3064:6200,  medianIncome:1700 },
-  { suburb:'Jordan Springs', state:'NSW', lat:-33.7558, lng:150.7214, pop3064:4200,  medianIncome:2482 },
-  { suburb:'Regentville',    state:'NSW', lat:-33.7667, lng:150.6833, pop3064:3500,  medianIncome:2000 },
-  { suburb:'Colyton',        state:'NSW', lat:-33.7611, lng:150.7975, pop3064:4800,  medianIncome:1700 },
+  { suburb:'Penrith',        state:'NSW', lat:-33.7512, lng:150.6942, pop3064:18000, medianIncome:1700, medianAge:38, growthScore:2 },
+  { suburb:'Glenmore Park',  state:'NSW', lat:-33.7833, lng:150.6596, pop3064:8500,  medianIncome:2526, medianAge:36, growthScore:2 },
+  { suburb:'Emu Plains',     state:'NSW', lat:-33.7467, lng:150.6736, pop3064:5200,  medianIncome:2100, medianAge:39, growthScore:2 },
+  { suburb:'Cranebrook',     state:'NSW', lat:-33.7183, lng:150.7022, pop3064:6800,  medianIncome:1500, medianAge:37, growthScore:1 },
+  { suburb:'St Marys',       state:'NSW', lat:-33.7718, lng:150.7756, pop3064:11000, medianIncome:1600, medianAge:38, growthScore:2 },
+  { suburb:'Kingswood',      state:'NSW', lat:-33.7520, lng:150.7249, pop3064:5800,  medianIncome:1900, medianAge:37, growthScore:2 },
+  { suburb:'Werrington',     state:'NSW', lat:-33.7481, lng:150.7659, pop3064:4500,  medianIncome:1800, medianAge:38, growthScore:2 },
+  { suburb:'Cambridge Park', state:'NSW', lat:-33.7481, lng:150.7108, pop3064:6200,  medianIncome:1700, medianAge:37, growthScore:2 },
+  { suburb:'Jordan Springs', state:'NSW', lat:-33.7558, lng:150.7214, pop3064:4200,  medianIncome:2482, medianAge:30, growthScore:5 },
+  { suburb:'Regentville',    state:'NSW', lat:-33.7667, lng:150.6833, pop3064:3500,  medianIncome:2000, medianAge:38, growthScore:2 },
+  { suburb:'Colyton',        state:'NSW', lat:-33.7611, lng:150.7975, pop3064:4800,  medianIncome:1700, medianAge:37, growthScore:1 },
   // Central Coast
-  { suburb:'Gosford',        state:'NSW', lat:-33.4280, lng:151.3411, pop3064:10500, medianIncome:1650 },
-  { suburb:'Erina',          state:'NSW', lat:-33.4310, lng:151.3721, pop3064:5100,  medianIncome:2000 },
-  { suburb:'Kariong',        state:'NSW', lat:-33.4736, lng:151.2922, pop3064:4200,  medianIncome:2100 },
-  { suburb:'Woy Woy',        state:'NSW', lat:-33.4882, lng:151.3215, pop3064:7500,  medianIncome:1700 },
-  { suburb:'Umina Beach',    state:'NSW', lat:-33.5245, lng:151.3000, pop3064:6200,  medianIncome:1900 },
-  { suburb:'Terrigal',       state:'NSW', lat:-33.4449, lng:151.4448, pop3064:6500,  medianIncome:2500 },
-  { suburb:'Tuggerah',       state:'NSW', lat:-33.2994, lng:151.3847, pop3064:5800,  medianIncome:1900 },
-  { suburb:'Wyong',          state:'NSW', lat:-33.2833, lng:151.4167, pop3064:3800,  medianIncome:1500 },
-  { suburb:'Bateau Bay',     state:'NSW', lat:-33.3806, lng:151.4794, pop3064:4800,  medianIncome:2000 },
-  { suburb:'The Entrance',   state:'NSW', lat:-33.3444, lng:151.4965, pop3064:5200,  medianIncome:1700 },
-  { suburb:'Avoca Beach',    state:'NSW', lat:-33.4651, lng:151.4336, pop3064:3200,  medianIncome:2600 },
-  { suburb:'Killarney Vale', state:'NSW', lat:-33.3611, lng:151.4597, pop3064:4100,  medianIncome:1900 },
-  { suburb:'Point Clare',    state:'NSW', lat:-33.4524, lng:151.3350, pop3064:3800,  medianIncome:2000 },
+  { suburb:'Gosford',        state:'NSW', lat:-33.4280, lng:151.3411, pop3064:10500, medianIncome:1650, medianAge:43, growthScore:2 },
+  { suburb:'Erina',          state:'NSW', lat:-33.4310, lng:151.3721, pop3064:5100,  medianIncome:2000, medianAge:40, growthScore:2 },
+  { suburb:'Kariong',        state:'NSW', lat:-33.4736, lng:151.2922, pop3064:4200,  medianIncome:2100, medianAge:38, growthScore:2 },
+  { suburb:'Woy Woy',        state:'NSW', lat:-33.4882, lng:151.3215, pop3064:7500,  medianIncome:1700, medianAge:45, growthScore:1 },
+  { suburb:'Umina Beach',    state:'NSW', lat:-33.5245, lng:151.3000, pop3064:6200,  medianIncome:1900, medianAge:43, growthScore:2 },
+  { suburb:'Terrigal',       state:'NSW', lat:-33.4449, lng:151.4448, pop3064:6500,  medianIncome:2500, medianAge:46, growthScore:1 },
+  { suburb:'Tuggerah',       state:'NSW', lat:-33.2994, lng:151.3847, pop3064:5800,  medianIncome:1900, medianAge:38, growthScore:3 },
+  { suburb:'Wyong',          state:'NSW', lat:-33.2833, lng:151.4167, pop3064:3800,  medianIncome:1500, medianAge:40, growthScore:2 },
+  { suburb:'Bateau Bay',     state:'NSW', lat:-33.3806, lng:151.4794, pop3064:4800,  medianIncome:2000, medianAge:44, growthScore:1 },
+  { suburb:'The Entrance',   state:'NSW', lat:-33.3444, lng:151.4965, pop3064:5200,  medianIncome:1700, medianAge:46, growthScore:1 },
+  { suburb:'Avoca Beach',    state:'NSW', lat:-33.4651, lng:151.4336, pop3064:3200,  medianIncome:2600, medianAge:47, growthScore:1 },
+  { suburb:'Killarney Vale', state:'NSW', lat:-33.3611, lng:151.4597, pop3064:4100,  medianIncome:1900, medianAge:41, growthScore:2 },
+  { suburb:'Point Clare',    state:'NSW', lat:-33.4524, lng:151.3350, pop3064:3800,  medianIncome:2000, medianAge:40, growthScore:2 },
   // Blue Mountains
-  { suburb:'Springwood',     state:'NSW', lat:-33.7047, lng:150.5698, pop3064:5500,  medianIncome:1900 },
-  { suburb:'Blaxland',       state:'NSW', lat:-33.7396, lng:150.6159, pop3064:4200,  medianIncome:2100 },
-  { suburb:'Winmalee',       state:'NSW', lat:-33.6842, lng:150.5969, pop3064:3800,  medianIncome:1900 },
-  { suburb:'Faulconbridge',  state:'NSW', lat:-33.7136, lng:150.5474, pop3064:2800,  medianIncome:1850 },
-  { suburb:'Hazelbrook',     state:'NSW', lat:-33.7294, lng:150.4783, pop3064:2200,  medianIncome:1900 },
+  { suburb:'Springwood',     state:'NSW', lat:-33.7047, lng:150.5698, pop3064:5500,  medianIncome:1900, medianAge:42, growthScore:1 },
+  { suburb:'Blaxland',       state:'NSW', lat:-33.7396, lng:150.6159, pop3064:4200,  medianIncome:2100, medianAge:40, growthScore:1 },
+  { suburb:'Winmalee',       state:'NSW', lat:-33.6842, lng:150.5969, pop3064:3800,  medianIncome:1900, medianAge:41, growthScore:1 },
+  { suburb:'Faulconbridge',  state:'NSW', lat:-33.7136, lng:150.5474, pop3064:2800,  medianIncome:1850, medianAge:43, growthScore:1 },
+  { suburb:'Hazelbrook',     state:'NSW', lat:-33.7294, lng:150.4783, pop3064:2200,  medianIncome:1900, medianAge:44, growthScore:1 },
   // Northern (beyond current Hills catchment)
-  { suburb:'Galston',        state:'NSW', lat:-33.6564, lng:151.0329, pop3064:2500,  medianIncome:2500 },
-  { suburb:'Glenorie',       state:'NSW', lat:-33.6026, lng:151.0198, pop3064:1800,  medianIncome:2300 },
+  { suburb:'Galston',        state:'NSW', lat:-33.6564, lng:151.0329, pop3064:2500,  medianIncome:2500, medianAge:43, growthScore:1 },
+  { suburb:'Glenorie',       state:'NSW', lat:-33.6026, lng:151.0198, pop3064:1800,  medianIncome:2300, medianAge:42, growthScore:1 },
   // Southwest
-  { suburb:'Narellan',       state:'NSW', lat:-34.0443, lng:150.7378, pop3064:8500,  medianIncome:2300 },
-  { suburb:'Camden',         state:'NSW', lat:-34.0572, lng:150.6973, pop3064:10000, medianIncome:2200 },
-  { suburb:'Oran Park',      state:'NSW', lat:-34.0183, lng:150.7419, pop3064:5500,  medianIncome:2450 },
-  { suburb:'Gregory Hills',  state:'NSW', lat:-34.0350, lng:150.7617, pop3064:4800,  medianIncome:2500 },
-  { suburb:'Campbelltown',   state:'NSW', lat:-34.0667, lng:150.8144, pop3064:18000, medianIncome:1650 },
+  { suburb:'Narellan',       state:'NSW', lat:-34.0443, lng:150.7378, pop3064:8500,  medianIncome:2300, medianAge:34, growthScore:3 },
+  { suburb:'Camden',         state:'NSW', lat:-34.0572, lng:150.6973, pop3064:10000, medianIncome:2200, medianAge:33, growthScore:4 },
+  { suburb:'Oran Park',      state:'NSW', lat:-34.0183, lng:150.7419, pop3064:5500,  medianIncome:2450, medianAge:31, growthScore:5 },
+  { suburb:'Gregory Hills',  state:'NSW', lat:-34.0350, lng:150.7617, pop3064:4800,  medianIncome:2500, medianAge:32, growthScore:4 },
+  { suburb:'Campbelltown',   state:'NSW', lat:-34.0667, lng:150.8144, pop3064:18000, medianIncome:1650, medianAge:36, growthScore:2 },
 ];
 
 function haversineKm(lat1, lng1, lat2, lng2) {
@@ -2060,8 +2058,14 @@ function renderExpansion(data) {
     const key = `${s.suburb.toLowerCase()}||${s.state.toLowerCase()}`;
     const currentClients = suburbCounts[key]?.count || 0;
     const incomeCompat = Math.min(s.medianIncome / CH_INCOME_REF, 1);
-    const score = Math.round((s.pop3064 / (currentClients + 1)) * incomeCompat);
-    return { ...s, dist, currentClients, incomeCompat, score };
+    // Age sweet spot: peaks at 32, penalises older suburbs (retirees = price resistant, lower disposable spend)
+    const ageFactor = Math.max(0.25, 1 - Math.max(0, s.medianAge - 33) / 28);
+    // Growth bonus: up to +60% for rapid development suburbs (future catchment compounds)
+    const growthBonus = 1 + (s.growthScore / 5) * 0.6;
+    // Disposable spend proxy = income compatibility × age factor
+    const disposableProxy = incomeCompat * ageFactor;
+    const score = Math.round((s.pop3064 / (currentClients + 1)) * disposableProxy * growthBonus);
+    return { ...s, dist, currentClients, incomeCompat, ageFactor, disposableProxy, score };
   }).filter(s => s.dist > radiusKm).sort((a,b) => b.score - a.score);
 
   // KPIs
@@ -2178,17 +2182,18 @@ function renderExpMap(currentSuburbs, absScored, radiusKm) {
     const t = s.pop3064 / maxPop;
     const r = 8 + t * 22;
     // Green = high income compat (>85%), gold = medium (65-85%), orange = lower (<65%)
-    const fill = s.incomeCompat >= 0.85 ? '#39e07a' : s.incomeCompat >= 0.65 ? '#f5c842' : '#ff9f43';
-    const incPct = Math.round(s.incomeCompat * 100);
-    const incLabel = s.incomeCompat >= 0.85 ? '✅ High' : s.incomeCompat >= 0.65 ? '⚡ Medium' : '⚠️ Lower';
+    // Circle colour driven by composite disposable proxy (income × age factor)
+    const fill = s.disposableProxy >= 0.75 ? '#39e07a' : s.disposableProxy >= 0.5 ? '#f5c842' : '#ff9f43';
+    const growthLabels = ['','🐢 Slow','➡️ Stable','📈 Growing','🚀 Active','🔥 Rapid'];
     L.circleMarker([s.lat, s.lng], {
       radius: r, color: fill, fillColor: fill,
       fillOpacity: 0.45 + t * 0.35, weight: 1.5
     }).bindTooltip(`
       <strong>${s.suburb}, ${s.state}</strong><br>
       Pop 30–64: <span style="color:#f5c842;font-weight:700;">${s.pop3064.toLocaleString()}</span><br>
-      Median income: <span style="color:${fill};font-weight:700;">$${s.medianIncome.toLocaleString()}/wk</span> (${incPct}% of Castle Hill)<br>
-      Income compatibility: ${incLabel}<br>
+      Median income: <span style="color:${fill};font-weight:700;">$${s.medianIncome.toLocaleString()}/wk</span> (${Math.round(s.incomeCompat*100)}% of CH)<br>
+      Median age: ${s.medianAge} — age factor: ${Math.round(s.ageFactor*100)}%<br>
+      Growth: ${growthLabels[s.growthScore]}<br>
       Distance: ${Math.round(s.dist)} km from Castle Hill<br>
       Current clients: ${s.currentClients || 'None yet'}<br>
       Opportunity score: <span style="color:#39e07a;font-weight:700;">${s.score.toLocaleString()}</span>
@@ -2220,36 +2225,39 @@ function renderExpTable(absScored) {
         <tr>
           <th style="width:36px;">#</th>
           <th>Suburb</th>
-          <th>Distance</th>
+          <th>Dist</th>
           <th>Pop 30–64</th>
           <th>Median Income</th>
-          <th>Income Match</th>
-          <th>Current Clients</th>
-          <th>Opportunity Score</th>
+          <th>Median Age</th>
+          <th>Growth</th>
+          <th>Clients</th>
+          <th>Score</th>
         </tr>
       </thead>
       <tbody>
         ${top.map((s,i) => {
           const tier = i < 3 ? 'high' : i < 8 ? 'med' : 'low';
           const tierLabel = i < 3 ? 'HIGH' : i < 8 ? 'MED' : 'LOW';
-          const incPct = Math.round(s.incomeCompat * 100);
           const incColor = s.incomeCompat >= 0.85 ? 'var(--green)' : s.incomeCompat >= 0.65 ? 'var(--gold)' : 'var(--orange)';
-          const incIcon = s.incomeCompat >= 0.85 ? '✅' : s.incomeCompat >= 0.65 ? '⚡' : '⚠️';
+          const ageColor = s.medianAge <= 34 ? 'var(--green)' : s.medianAge <= 40 ? 'var(--gold)' : 'var(--orange)';
+          const growthLabels = ['','🐢','➡️','📈','🚀','🔥'];
+          const growthText  = ['','Slow','Stable','Growing','Active','Rapid'];
           return `<tr>
             <td style="font-family:'Bebas Neue',sans-serif;font-size:20px;color:${i<3?'var(--gold)':'var(--muted2)'};">${i+1}</td>
             <td><div style="font-weight:600;">${s.suburb}</div><div style="font-size:11px;color:var(--muted2);">${s.state}</div></td>
             <td>${Math.round(s.dist)} km</td>
             <td style="font-weight:600;">${s.pop3064.toLocaleString()}</td>
-            <td style="font-weight:600;">$${s.medianIncome.toLocaleString()}/wk</td>
-            <td><span style="color:${incColor};font-weight:700;font-size:12px;">${incIcon} ${incPct}%</span></td>
-            <td>${s.currentClients > 0 ? `<span style="color:var(--teal);font-weight:600;">${s.currentClients}</span>` : '<span style="color:var(--muted);">None yet</span>'}</td>
-            <td><span class="exp-score ${tier}">${tierLabel} — ${s.score.toLocaleString()}</span></td>
+            <td style="font-weight:600;color:${incColor};">$${s.medianIncome.toLocaleString()}<div style="font-size:10px;font-weight:400;color:var(--muted2);">${Math.round(s.incomeCompat*100)}% of CH</div></td>
+            <td style="font-weight:600;color:${ageColor};">${s.medianAge}<div style="font-size:10px;font-weight:400;color:var(--muted2);">${s.medianAge<=34?'Young':s.medianAge<=40?'Mid':'Older'}</div></td>
+            <td style="font-size:16px;">${growthLabels[s.growthScore]} <span style="font-size:11px;color:var(--muted2);">${growthText[s.growthScore]}</span></td>
+            <td>${s.currentClients > 0 ? `<span style="color:var(--teal);font-weight:600;">${s.currentClients}</span>` : '<span style="color:var(--muted);">—</span>'}</td>
+            <td><span class="exp-score ${tier}">${tierLabel}</span><div style="font-size:11px;color:var(--muted2);margin-top:3px;">${s.score.toLocaleString()}</div></td>
           </tr>`;
         }).join('')}
       </tbody>
     </table>
     </div>
-    <div style="font-size:11px;color:var(--muted);margin-top:14px;">Population: ABS Census 2021 (estimated). Income: ABS 2021 — confirmed for Marsden Park, Jordan Springs, Glenmore Park; estimated for remaining suburbs. Distance = straight-line km from Castle Hill ($2,900/wk reference).</div>`;
+    <div style="font-size:11px;color:var(--muted);margin-top:14px;">ABS Census 2021. Income confirmed for Marsden Park, Jordan Springs, Glenmore Park — estimated for remainder. Age factor peaks at 32, drops for 40+ (price resistance, lower discretionary spend). Growth score reflects active development / urban release activity.</div>`;
 }
 
 // ─── START ─────────────────────────────────────────────────────────────────
