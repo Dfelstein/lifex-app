@@ -18,25 +18,36 @@ function cors(body: string, status = 200) {
   });
 }
 
-async function verifyStaff(req: Request): Promise<boolean> {
+async function verifyStaffDebug(req: Request): Promise<{ ok: boolean; reason: string }> {
   const authHeader = req.headers.get('Authorization');
-  if (!authHeader?.startsWith('Bearer ')) return false;
+  if (!authHeader?.startsWith('Bearer ')) return { ok: false, reason: 'no_auth_header' };
+  const token = authHeader.slice(7);
+  const token = authHeader.slice(7);
   const userClient = createClient(SUPABASE_URL, SUPABASE_ANON_KEY, {
     auth: { autoRefreshToken: false, persistSession: false },
-    global: { headers: { Authorization: authHeader } },
   });
-  const { data: { user }, error } = await userClient.auth.getUser();
-  if (error || !user) return false;
+  const { data: { user }, error } = await userClient.auth.getUser(token);
+  if (error) return { ok: false, reason: 'getUser_error:' + error.message };
+  if (!user) return { ok: false, reason: 'no_user' };
   const adminClient = createClient(SUPABASE_URL, SUPABASE_SERVICE_KEY, { auth: { autoRefreshToken: false, persistSession: false } });
-  const { data: profile } = await adminClient.from('profiles').select('is_staff').eq('id', user.id).single();
-  return !!profile?.is_staff;
+  const { data: profile, error: pe } = await adminClient.from('profiles').select('is_staff').eq('id', user.id).single();
+  if (pe) return { ok: false, reason: 'profile_error:' + pe.message };
+  if (!profile) return { ok: false, reason: 'no_profile' };
+  if (!profile.is_staff) return { ok: false, reason: 'not_staff' };
+  return { ok: true, reason: 'ok' };
+}
+
+async function verifyStaff(req: Request): Promise<boolean> {
+  const result = await verifyStaffDebug(req);
+  return result.ok;
 }
 
 Deno.serve(async (req) => {
   if (req.method === 'OPTIONS') return new Response(null, { status: 204, headers: { 'Access-Control-Allow-Origin': 'https://lifex.xgym.com.au', 'Access-Control-Allow-Headers': 'authorization, content-type' } });
 
   try {
-    if (!(await verifyStaff(req))) return cors(JSON.stringify({ error: 'Unauthorized' }), 401);
+    const authResult = await verifyStaffDebug(req);
+    if (!authResult.ok) return cors(JSON.stringify({ error: 'Unauthorized', reason: authResult.reason }), 401);
 
     // Allow ?date=YYYY-MM-DD param, otherwise use today in Sydney time
     const urlParams = new URL(req.url).searchParams;

@@ -22,11 +22,11 @@ function cors(body: string, status = 200) {
 async function verifyStaff(req: Request, adminSb: any): Promise<boolean> {
   const authHeader = req.headers.get('Authorization');
   if (!authHeader?.startsWith('Bearer ')) return false;
+  const token = authHeader.slice(7);
   const userClient = createClient(SUPABASE_URL, SUPABASE_ANON_KEY, {
     auth: { autoRefreshToken: false, persistSession: false },
-    global: { headers: { Authorization: authHeader } },
   });
-  const { data: { user }, error } = await userClient.auth.getUser();
+  const { data: { user }, error } = await userClient.auth.getUser(token);
   if (error || !user) return false;
   const { data: profile } = await adminSb.from('profiles').select('is_staff').eq('id', user.id).single();
   return !!profile?.is_staff;
