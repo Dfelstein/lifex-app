@@ -25,7 +25,11 @@ async function verifyStaff(req: Request, adminSb: any): Promise<boolean> {
   });
   const { data: { user }, error } = await userClient.auth.getUser(token);
   if (error || !user) return false;
-  const { data: profile } = await adminSb.from('profiles').select('is_staff').eq('id', user.id).single();
+  const authedClient = createClient(SUPABASE_URL, SUPABASE_ANON_KEY, {
+    global: { headers: { Authorization: `Bearer ${token}` } },
+    auth: { autoRefreshToken: false, persistSession: false },
+  });
+  const { data: profile } = await authedClient.from('profiles').select('is_staff').eq('id', user.id).single();
   return !!profile?.is_staff;
 }
 

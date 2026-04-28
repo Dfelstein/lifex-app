@@ -28,11 +28,16 @@ Deno.serve(async (req) => {
     const { data: { user }, error: userErr } = await userClient.auth.getUser(token);
     if (userErr || !user) return cors(JSON.stringify({ error: 'Unauthorized' }), 401);
 
+    const authedClient = createClient(SUPABASE_URL, SUPABASE_ANON_KEY, {
+      global: { headers: { Authorization: `Bearer ${token}` } },
+      auth: { autoRefreshToken: false, persistSession: false },
+    });
+    const { data: profile } = await authedClient.from('profiles').select('is_staff').eq('id', user.id).single();
+    if (!profile?.is_staff) return cors(JSON.stringify({ error: 'Forbidden' }), 403);
+
     const adminClient = createClient(SUPABASE_URL, SUPABASE_SERVICE_KEY, {
       auth: { autoRefreshToken: false, persistSession: false },
     });
-    const { data: profile } = await adminClient.from('profiles').select('is_staff').eq('id', user.id).single();
-    if (!profile?.is_staff) return cors(JSON.stringify({ error: 'Forbidden' }), 403);
 
     const { path } = await req.json();
     if (!path) return cors(JSON.stringify({ error: 'path required' }), 400);

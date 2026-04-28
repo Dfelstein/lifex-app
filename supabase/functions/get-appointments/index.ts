@@ -27,8 +27,11 @@ async function verifyStaffDebug(req: Request): Promise<{ ok: boolean; reason: st
   const { data: { user }, error } = await userClient.auth.getUser(token);
   if (error) return { ok: false, reason: 'getUser_error:' + error.message };
   if (!user) return { ok: false, reason: 'no_user' };
-  const adminClient = createClient(SUPABASE_URL, SUPABASE_SERVICE_KEY, { auth: { autoRefreshToken: false, persistSession: false } });
-  const { data: profile, error: pe } = await adminClient.from('profiles').select('is_staff').eq('id', user.id).single();
+  const authedClient = createClient(SUPABASE_URL, SUPABASE_ANON_KEY, {
+    global: { headers: { Authorization: `Bearer ${token}` } },
+    auth: { autoRefreshToken: false, persistSession: false },
+  });
+  const { data: profile, error: pe } = await authedClient.from('profiles').select('is_staff').eq('id', user.id).single();
   if (pe) return { ok: false, reason: 'profile_error:' + pe.message };
   if (!profile) return { ok: false, reason: 'no_profile' };
   if (!profile.is_staff) return { ok: false, reason: 'not_staff' };
