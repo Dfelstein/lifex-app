@@ -32,7 +32,7 @@ function toInt(v: any): number | null {
   return n !== null ? Math.round(n) : null;
 }
 
-async function sendResultsEmail(sb: any, clientId: string, scanType: string, parsed: any, firstNameHint?: string) {
+async function sendResultsEmail(sb: any, clientId: string, scanType: string, parsed: any, firstNameHint?: string, pdfBase64?: string) {
   if (!RESEND_API_KEY) return;
 
   const { data: { user }, error: userErr } = await sb.auth.admin.getUserById(clientId);
@@ -212,6 +212,7 @@ async function sendResultsEmail(sb: any, clientId: string, scanType: string, par
         reply_to: 'dexa@xgym.com.au',
         subject,
         html,
+        ...(pdfBase64 ? { attachments: [{ filename: `${scanType}-scan-results.pdf`, content: pdfBase64 }] } : {}),
       }),
     });
   } catch {
@@ -409,7 +410,7 @@ Return ONLY the JSON, no other text.`,
         pdf_path: pdfPath,
       }, { onConflict: 'client_id,scan_date' });
       if (error) return cors(JSON.stringify({ error: error.message }), 500);
-      sendResultsEmail(sb, clientId, 'DEXA', parsed, firstNameHint);
+      sendResultsEmail(sb, clientId, 'DEXA', parsed, firstNameHint, pdfBase64);
 
     } else if (scanType === 'RMR') {
       const { error } = await sb.from('rmr_tests').insert({
@@ -425,7 +426,7 @@ Return ONLY the JSON, no other text.`,
         pdf_path: pdfPath,
       });
       if (error) return cors(JSON.stringify({ error: error.message }), 500);
-      sendResultsEmail(sb, clientId, 'RMR', parsed, firstNameHint);
+      sendResultsEmail(sb, clientId, 'RMR', parsed, firstNameHint, pdfBase64);
 
     } else if (scanType === 'BLOOD') {
       const { data: panel, error: panelErr } = await sb.from('blood_panels').insert({
@@ -450,7 +451,7 @@ Return ONLY the JSON, no other text.`,
       }));
       const { error: markersErr } = await sb.from('blood_markers').insert(markers);
       if (markersErr) return cors(JSON.stringify({ error: markersErr.message }), 500);
-      sendResultsEmail(sb, clientId, 'BLOOD', parsed, firstNameHint);
+      sendResultsEmail(sb, clientId, 'BLOOD', parsed, firstNameHint, pdfBase64);
 
     } else if (scanType === 'HORMONES') {
       const { data: panel, error: panelErr } = await sb.from('hormone_panels').insert({
@@ -474,7 +475,7 @@ Return ONLY the JSON, no other text.`,
       }));
       const { error: markersErr } = await sb.from('hormone_markers').insert(markers);
       if (markersErr) return cors(JSON.stringify({ error: markersErr.message }), 500);
-      sendResultsEmail(sb, clientId, 'HORMONES', parsed, firstNameHint);
+      sendResultsEmail(sb, clientId, 'HORMONES', parsed, firstNameHint, pdfBase64);
     }
 
     if (scanType === 'UNKNOWN') {
