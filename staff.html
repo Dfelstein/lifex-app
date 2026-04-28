@@ -1694,7 +1694,7 @@ async function viewClientProfile(clientId, firstName, lastName) {
         if (s.fat_pct != null) parts.push(`${s.fat_pct}% body fat`);
         if (s.lean_g != null) parts.push(`${(s.lean_g/1000).toFixed(1)} kg lean`);
         if (s.vat_area_cm2 != null) parts.push(`VAT ${s.vat_area_cm2} cm²`);
-        emailLog.push({ date: s.scan_date, icon: '🦴', type: 'DEXA', label: `DEXA Scan #${s.scan_number || '?'}`, detail: parts.join(' · ') });
+        emailLog.push({ id: s.id, scanNum: s.scan_number, date: s.scan_date, icon: '🦴', type: 'DEXA', label: `DEXA Scan #${s.scan_number || '?'}`, detail: parts.join(' · ') });
       });
       rmrAll.forEach(r => {
         if (!r.test_date) return;
@@ -1745,7 +1745,8 @@ async function viewClientProfile(clientId, firstName, lastName) {
               <div style="display:flex;align-items:center;gap:10px;">
                 <span style="font-size:15px;width:20px;text-align:center;">${e.icon}</span>
                 <span style="font-size:13px;font-weight:600;flex:1;">${e.label}</span>
-                <span style="font-size:11px;color:var(--muted2);white-space:nowrap;">${fmtDate(e.date)}</span>
+                <span style="font-size:11px;color:var(--muted2);white-space:nowrap;margin-right:4px;">${fmtDate(e.date)}</span>
+                ${e.id ? `<button onclick="confirmDeleteScan('${e.id}',${e.scanNum||'?'},'${fmtDate(e.date)}')" title="Delete scan" style="background:none;border:none;cursor:pointer;color:var(--muted);font-size:18px;padding:2px 6px;border-radius:4px;line-height:1;" onmouseover="this.style.color='var(--red)'" onmouseout="this.style.color='var(--muted)'">🗑</button>` : ''}
               </div>
               ${e.detail ? `<div style="font-size:12px;color:var(--muted2);margin-top:3px;padding-left:30px;">${e.detail}</div>` : ''}
             </div>`).join('')}
@@ -1959,7 +1960,7 @@ async function viewClientProfile(clientId, firstName, lastName) {
             ${dexa.pdf_path
               ? `<button onclick="event.stopPropagation();downloadScanPdf('${dexa.pdf_path}')" style="background:rgba(255,255,255,0.07);border:1px solid rgba(255,255,255,0.12);border-radius:6px;color:var(--muted2);font-size:11px;padding:4px 10px;cursor:pointer;">⬇ PDF</button>`
               : `<span style="font-size:11px;color:var(--muted);font-style:italic;">no PDF on file</span>`}
-            <button onclick="event.stopPropagation();confirmDeleteScan('${dexa.id}',${dexaScanNum},'${fmtDate(dexa.scan_date)}')" title="Delete scan" style="background:none;border:none;cursor:pointer;color:var(--muted);font-size:14px;padding:4px 6px;border-radius:4px;" onmouseover="this.style.color='var(--red)'" onmouseout="this.style.color='var(--muted)'">🗑</button>
+            <button onclick="event.stopPropagation();confirmDeleteScan('${dexa.id}',${dexaScanNum},'${fmtDate(dexa.scan_date)}')" title="Delete scan" style="background:none;border:none;cursor:pointer;color:var(--muted);font-size:18px;padding:6px 8px;border-radius:4px;" onmouseover="this.style.color='var(--red)'" onmouseout="this.style.color='var(--muted)'">🗑</button>
             <span style="font-size:11px;color:var(--blue);font-weight:600;">Full Details →</span>
           </div>
         </div>
@@ -2094,7 +2095,7 @@ async function viewClientProfile(clientId, firstName, lastName) {
                     <td style="padding:10px 8px;text-align:right;color:${s.vat_area_cm2==null?'var(--muted2)':s.vat_area_cm2<100?'var(--green)':s.vat_area_cm2<160?'var(--gold)':'var(--red)'};" onclick='showStaffScanDetail(${JSON.stringify(s)},${scanNum})'>${s.vat_area_cm2!=null?s.vat_area_cm2+' cm²':'—'}</td>
                     <td style="padding:10px 0;text-align:right;color:${fatDelta===null?'var(--muted2)':parseFloat(fatDelta)<0?'var(--green)':'var(--red)'};" onclick='showStaffScanDetail(${JSON.stringify(s)},${scanNum})'>${fatDelta!==null?(parseFloat(fatDelta)>0?'+':'')+fatDelta+'%':'—'}</td>
                     <td style="padding:10px 0;text-align:right;">
-                      <button onclick="event.stopPropagation();confirmDeleteScan('${s.id}',${scanNum},'${fmtD(s.scan_date)}')" title="Delete this scan" style="background:none;border:none;cursor:pointer;color:var(--muted);font-size:14px;padding:4px 6px;border-radius:4px;transition:color 0.15s;" onmouseover="this.style.color='var(--red)'" onmouseout="this.style.color='var(--muted)'">🗑</button>
+                      <button onclick="event.stopPropagation();confirmDeleteScan('${s.id}',${scanNum},'${fmtD(s.scan_date)}')" title="Delete this scan" style="background:none;border:none;cursor:pointer;color:var(--muted);font-size:18px;padding:6px 8px;border-radius:4px;transition:color 0.15s;" onmouseover="this.style.color='var(--red)'" onmouseout="this.style.color='var(--muted)'">🗑</button>
                     </td>
                   </tr>`;
                 }).join('')}
