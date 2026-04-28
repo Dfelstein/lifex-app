@@ -19,8 +19,8 @@ function cors(body: string, status = 200) {
 }
 
 async function verifyStaffDebug(req: Request): Promise<{ ok: boolean; reason: string }> {
-  const token = req.headers.get('x-user-jwt');
-  if (!token) return { ok: false, reason: 'no_x_user_jwt' };
+  const authHeader = req.headers.get('Authorization'); const token = authHeader?.startsWith('Bearer ') ? authHeader.slice(7) : null;
+  if (!token) return { ok: false, reason: 'no_auth_header' };
   const userClient = createClient(SUPABASE_URL, SUPABASE_ANON_KEY, {
     auth: { autoRefreshToken: false, persistSession: false },
   });

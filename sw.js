@@ -1,4 +1,4 @@
-const CACHE = 'lifex-v12';
+const CACHE = 'lifex-v13';
 const ASSETS = [
   '/lifex-app/',
   '/lifex-app/index.html',

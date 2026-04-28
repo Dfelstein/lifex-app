@@ -223,7 +223,7 @@ const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/
 const MAX_PDF_BYTES = 20 * 1024 * 1024; // 20 MB base64 limit
 
 async function verifyStaff(req: Request, adminSb: any): Promise<boolean> {
-  const token = req.headers.get('x-user-jwt');
+  const authHeader = req.headers.get('Authorization'); const token = authHeader?.startsWith('Bearer ') ? authHeader.slice(7) : null;
   if (!token) return false;
   const userClient = createClient(SUPABASE_URL, SUPABASE_ANON_KEY, {
     auth: { autoRefreshToken: false, persistSession: false },

@@ -19,7 +19,7 @@ Deno.serve(async (req) => {
   if (req.method === 'OPTIONS') return cors('', 204);
 
   try {
-    const token = req.headers.get('x-user-jwt');
+    const authHeader = req.headers.get('Authorization'); const token = authHeader?.startsWith('Bearer ') ? authHeader.slice(7) : null;
     if (!authHeader?.startsWith('Bearer ')) return cors(JSON.stringify({ error: 'Unauthorized' }), 401);
 
     const userClient = createClient(SUPABASE_URL, SUPABASE_ANON_KEY, {

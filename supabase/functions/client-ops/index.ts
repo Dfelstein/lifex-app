@@ -18,7 +18,7 @@ function cors(body: string, status = 200) {
 }
 
 async function verifyStaff(req: Request, adminSb: any): Promise<boolean> {
-  const token = req.headers.get('x-user-jwt');
+  const authHeader = req.headers.get('Authorization'); const token = authHeader?.startsWith('Bearer ') ? authHeader.slice(7) : null;
   if (!token) return false;
   const userClient = createClient(SUPABASE_URL, SUPABASE_ANON_KEY, {
     auth: { autoRefreshToken: false, persistSession: false },
