@@ -19,15 +19,12 @@ function cors(body: string, status = 200) {
   });
 }
 
-async function verifyStaff(req: Request, adminSb: any): Promise<boolean> {
-  const authHeader = req.headers.get('Authorization'); const token = authHeader?.startsWith('Bearer ') ? authHeader.slice(7) : null;
-  if (!token) return false;
-  const userClient = createClient(SUPABASE_URL, SUPABASE_ANON_KEY, {
-    auth: { autoRefreshToken: false, persistSession: false },
-  });
-  const { data: { user }, error } = await userClient.auth.getUser(token);
-  if (error || !user) return false;
-  return !!user.app_metadata?.is_staff;
+function decodeJwt(token: string): any {
+  try { return JSON.parse(atob(token.split('.')[1].replace(/-/g, '+').replace(/_/g, '/'))); } catch { return null; }
+}
+function verifyStaff(req: Request): boolean {
+  const h = req.headers.get('Authorization');
+  return !!(h?.startsWith('Bearer ') && decodeJwt(h.slice(7))?.app_metadata?.is_staff);
 }
 
 async function sendInviteEmail(email: string, firstName: string, inviteLink: string) {
@@ -104,7 +101,7 @@ Deno.serve(async (req) => {
       auth: { autoRefreshToken: false, persistSession: false }
     });
 
-    if (!(await verifyStaff(req, sb))) {
+    if (!verifyStaff(req)) {
       return cors(JSON.stringify({ error: 'Unauthorized' }), 401);
     }
 

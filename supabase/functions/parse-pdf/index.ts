@@ -222,22 +222,19 @@ async function sendResultsEmail(sb: any, clientId: string, scanType: string, par
 const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 const MAX_PDF_BYTES = 20 * 1024 * 1024; // 20 MB base64 limit
 
-async function verifyStaff(req: Request, adminSb: any): Promise<boolean> {
-  const authHeader = req.headers.get('Authorization'); const token = authHeader?.startsWith('Bearer ') ? authHeader.slice(7) : null;
-  if (!token) return false;
-  const userClient = createClient(SUPABASE_URL, SUPABASE_ANON_KEY, {
-    auth: { autoRefreshToken: false, persistSession: false },
-  });
-  const { data: { user }, error } = await userClient.auth.getUser(token);
-  if (error || !user) return false;
-  return !!user.app_metadata?.is_staff;
+function decodeJwt(token: string): any {
+  try { return JSON.parse(atob(token.split('.')[1].replace(/-/g, '+').replace(/_/g, '/'))); } catch { return null; }
+}
+function verifyStaff(req: Request): boolean {
+  const h = req.headers.get('Authorization');
+  return !!(h?.startsWith('Bearer ') && decodeJwt(h.slice(7))?.app_metadata?.is_staff);
 }
 
 Deno.serve(async (req) => {
   if (req.method === 'OPTIONS') return new Response(null, { status: 204, headers: { 'Access-Control-Allow-Origin': 'https://lifex.xgym.com.au', 'Access-Control-Allow-Headers': 'authorization, content-type, apikey, x-user-jwt' } });
 
   try {
-    if (!(await verifyStaff(req, createClient(SUPABASE_URL, SUPABASE_SERVICE_KEY, { auth: { autoRefreshToken: false, persistSession: false } })))) {
+    if (!verifyStaff(req)) {
       return cors(JSON.stringify({ error: 'Unauthorized' }), 401);
     }
 

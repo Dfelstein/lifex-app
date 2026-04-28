@@ -2,7 +2,6 @@ import { createClient } from 'https://esm.sh/@supabase/supabase-js@2';
 
 const SUPABASE_URL = Deno.env.get('SUPABASE_URL')!;
 const SUPABASE_SERVICE_KEY = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!;
-const SUPABASE_ANON_KEY = Deno.env.get('SUPABASE_ANON_KEY')!;
 
 function cors(body: string, status = 200) {
   return new Response(body, {
@@ -15,20 +14,18 @@ function cors(body: string, status = 200) {
   });
 }
 
+function decodeJwt(token: string): any {
+  try { return JSON.parse(atob(token.split('.')[1].replace(/-/g, '+').replace(/_/g, '/'))); } catch { return null; }
+}
+
 Deno.serve(async (req) => {
   if (req.method === 'OPTIONS') return cors('', 204);
 
   try {
-    const authHeader = req.headers.get('Authorization'); const token = authHeader?.startsWith('Bearer ') ? authHeader.slice(7) : null;
+    const authHeader = req.headers.get('Authorization');
     if (!authHeader?.startsWith('Bearer ')) return cors(JSON.stringify({ error: 'Unauthorized' }), 401);
-
-    const userClient = createClient(SUPABASE_URL, SUPABASE_ANON_KEY, {
-      auth: { autoRefreshToken: false, persistSession: false },
-    });
-    const { data: { user }, error: userErr } = await userClient.auth.getUser(token);
-    if (userErr || !user) return cors(JSON.stringify({ error: 'Unauthorized' }), 401);
-
-    if (!user.app_metadata?.is_staff) return cors(JSON.stringify({ error: 'Forbidden' }), 403);
+    const payload = decodeJwt(authHeader.slice(7));
+    if (!payload?.app_metadata?.is_staff) return cors(JSON.stringify({ error: 'Forbidden' }), 403);
 
     const adminClient = createClient(SUPABASE_URL, SUPABASE_SERVICE_KEY, {
       auth: { autoRefreshToken: false, persistSession: false },

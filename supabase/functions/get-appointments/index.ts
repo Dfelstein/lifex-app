@@ -18,30 +18,25 @@ function cors(body: string, status = 200) {
   });
 }
 
-async function verifyStaffDebug(req: Request): Promise<{ ok: boolean; reason: string }> {
-  const authHeader = req.headers.get('Authorization'); const token = authHeader?.startsWith('Bearer ') ? authHeader.slice(7) : null;
-  if (!token) return { ok: false, reason: 'no_auth_header' };
-  const userClient = createClient(SUPABASE_URL, SUPABASE_ANON_KEY, {
-    auth: { autoRefreshToken: false, persistSession: false },
-  });
-  const { data: { user }, error } = await userClient.auth.getUser(token);
-  if (error) return { ok: false, reason: 'getUser_error:' + error.message };
-  if (!user) return { ok: false, reason: 'no_user' };
-  if (!user.app_metadata?.is_staff) return { ok: false, reason: 'not_staff' };
-  return { ok: true, reason: 'ok' };
+function decodeJwt(token: string): any {
+  try {
+    const payload = token.split('.')[1];
+    return JSON.parse(atob(payload.replace(/-/g, '+').replace(/_/g, '/')));
+  } catch { return null; }
 }
 
-async function verifyStaff(req: Request): Promise<boolean> {
-  const result = await verifyStaffDebug(req);
-  return result.ok;
+function verifyStaff(req: Request): boolean {
+  const authHeader = req.headers.get('Authorization');
+  if (!authHeader?.startsWith('Bearer ')) return false;
+  const payload = decodeJwt(authHeader.slice(7));
+  return !!payload?.app_metadata?.is_staff;
 }
 
 Deno.serve(async (req) => {
   if (req.method === 'OPTIONS') return new Response(null, { status: 204, headers: { 'Access-Control-Allow-Origin': 'https://lifex.xgym.com.au', 'Access-Control-Allow-Headers': 'authorization, content-type, apikey, x-user-jwt' } });
 
   try {
-    const authResult = await verifyStaffDebug(req);
-    if (!authResult.ok) return cors(JSON.stringify({ error: 'Unauthorized', reason: authResult.reason }), 401);
+    if (!verifyStaff(req)) return cors(JSON.stringify({ error: 'Unauthorized' }), 401);
 
     // Allow ?date=YYYY-MM-DD param, otherwise use today in Sydney time
     const urlParams = new URL(req.url).searchParams;
