@@ -834,7 +834,7 @@ async function staffFetch(url, options = {}) {
   if (!session) { toast('Session expired — please refresh', 'error'); throw new Error('No session'); }
   return fetch(url, {
     ...options,
-    headers: { ...(options.headers || {}), 'apikey': SUPABASE_KEY, 'Authorization': `Bearer ${session.access_token}` },
+    headers: { ...(options.headers || {}), 'Authorization': `Bearer ${SUPABASE_KEY}`, 'x-user-jwt': session.access_token },
   });
 }
 

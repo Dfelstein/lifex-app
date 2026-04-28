@@ -10,7 +10,7 @@ function cors(body: string, status = 200) {
     headers: {
       'Content-Type': 'application/json',
       'Access-Control-Allow-Origin': 'https://lifex.xgym.com.au',
-      'Access-Control-Allow-Headers': 'authorization, content-type, apikey',
+      'Access-Control-Allow-Headers': 'authorization, content-type, apikey, x-user-jwt',
     },
   });
 }
@@ -19,10 +19,9 @@ Deno.serve(async (req) => {
   if (req.method === 'OPTIONS') return cors('', 204);
 
   try {
-    const authHeader = req.headers.get('Authorization');
+    const token = req.headers.get('x-user-jwt');
     if (!authHeader?.startsWith('Bearer ')) return cors(JSON.stringify({ error: 'Unauthorized' }), 401);
 
-    const token = authHeader.slice(7);
     const userClient = createClient(SUPABASE_URL, SUPABASE_ANON_KEY, {
       auth: { autoRefreshToken: false, persistSession: false },
     });

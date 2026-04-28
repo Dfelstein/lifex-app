@@ -9,7 +9,7 @@ function cors(body: string, status = 200) {
     headers: {
       'Content-Type': 'application/json',
       'Access-Control-Allow-Origin': '*',
-      'Access-Control-Allow-Headers': 'authorization, content-type, apikey',
+      'Access-Control-Allow-Headers': 'authorization, content-type, apikey, x-user-jwt',
     },
   });
 }
@@ -43,7 +43,7 @@ Deno.serve(async (req) => {
   if (req.method === 'OPTIONS') {
     return new Response(null, {
       status: 204,
-      headers: { 'Access-Control-Allow-Origin': '*', 'Access-Control-Allow-Headers': 'authorization, content-type, apikey' },
+      headers: { 'Access-Control-Allow-Origin': '*', 'Access-Control-Allow-Headers': 'authorization, content-type, apikey, x-user-jwt' },
     });
   }
 

@@ -13,15 +13,14 @@ function cors(body: string, status = 200) {
     headers: {
       'Content-Type': 'application/json',
       'Access-Control-Allow-Origin': 'https://lifex.xgym.com.au',
-      'Access-Control-Allow-Headers': 'authorization, content-type, apikey',
+      'Access-Control-Allow-Headers': 'authorization, content-type, apikey, x-user-jwt',
     },
   });
 }
 
 async function verifyStaffDebug(req: Request): Promise<{ ok: boolean; reason: string }> {
-  const authHeader = req.headers.get('Authorization');
-  if (!authHeader?.startsWith('Bearer ')) return { ok: false, reason: 'no_auth_header' };
-  const token = authHeader.slice(7);
+  const token = req.headers.get('x-user-jwt');
+  if (!token) return { ok: false, reason: 'no_x_user_jwt' };
   const userClient = createClient(SUPABASE_URL, SUPABASE_ANON_KEY, {
     auth: { autoRefreshToken: false, persistSession: false },
   });
@@ -42,7 +41,7 @@ async function verifyStaff(req: Request): Promise<boolean> {
 }
 
 Deno.serve(async (req) => {
-  if (req.method === 'OPTIONS') return new Response(null, { status: 204, headers: { 'Access-Control-Allow-Origin': 'https://lifex.xgym.com.au', 'Access-Control-Allow-Headers': 'authorization, content-type, apikey' } });
+  if (req.method === 'OPTIONS') return new Response(null, { status: 204, headers: { 'Access-Control-Allow-Origin': 'https://lifex.xgym.com.au', 'Access-Control-Allow-Headers': 'authorization, content-type, apikey, x-user-jwt' } });
 
   try {
     const authResult = await verifyStaffDebug(req);

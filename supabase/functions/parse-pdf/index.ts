@@ -13,7 +13,7 @@ function cors(body: string, status = 200) {
     headers: {
       'Content-Type': 'application/json',
       'Access-Control-Allow-Origin': 'https://lifex.xgym.com.au',
-      'Access-Control-Allow-Headers': 'authorization, content-type, apikey',
+      'Access-Control-Allow-Headers': 'authorization, content-type, apikey, x-user-jwt',
     },
   });
 }
@@ -223,9 +223,8 @@ const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/
 const MAX_PDF_BYTES = 20 * 1024 * 1024; // 20 MB base64 limit
 
 async function verifyStaff(req: Request, adminSb: any): Promise<boolean> {
-  const authHeader = req.headers.get('Authorization');
-  if (!authHeader?.startsWith('Bearer ')) return false;
-  const token = authHeader.slice(7);
+  const token = req.headers.get('x-user-jwt');
+  if (!token) return false;
   const userClient = createClient(SUPABASE_URL, SUPABASE_ANON_KEY, {
     auth: { autoRefreshToken: false, persistSession: false },
   });
@@ -236,7 +235,7 @@ async function verifyStaff(req: Request, adminSb: any): Promise<boolean> {
 }
 
 Deno.serve(async (req) => {
-  if (req.method === 'OPTIONS') return new Response(null, { status: 204, headers: { 'Access-Control-Allow-Origin': 'https://lifex.xgym.com.au', 'Access-Control-Allow-Headers': 'authorization, content-type, apikey' } });
+  if (req.method === 'OPTIONS') return new Response(null, { status: 204, headers: { 'Access-Control-Allow-Origin': 'https://lifex.xgym.com.au', 'Access-Control-Allow-Headers': 'authorization, content-type, apikey, x-user-jwt' } });
 
   try {
     if (!(await verifyStaff(req, createClient(SUPABASE_URL, SUPABASE_SERVICE_KEY, { auth: { autoRefreshToken: false, persistSession: false } })))) {

@@ -23,7 +23,7 @@ export function corsHeaders(origin = 'https://lifex.xgym.com.au') {
   return {
     'Content-Type': 'application/json',
     'Access-Control-Allow-Origin': origin,
-    'Access-Control-Allow-Headers': 'authorization, content-type, apikey',
+    'Access-Control-Allow-Headers': 'authorization, content-type, apikey, x-user-jwt',
   };
 }
 
