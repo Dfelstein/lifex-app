@@ -71,13 +71,11 @@ Deno.serve(async (req) => {
 
     const appointments = await res.json();
 
-    // Filter strictly to the target date in AEST
-    const filtered = appointments.filter((a: any) => {
-      if (!a.datetime) return false;
-      return dateFmt.format(new Date(a.datetime)) === targetDate;
-    });
+    if (!Array.isArray(appointments)) {
+      return cors(JSON.stringify({ error: 'Acuity error', raw: appointments }), 500);
+    }
 
-    filtered.sort((a: any, b: any) => new Date(a.datetime).getTime() - new Date(b.datetime).getTime());
+    appointments.sort((a: any, b: any) => new Date(a.datetime).getTime() - new Date(b.datetime).getTime());
 
     // Look up Supabase UUID for each client — fetch all users once
     const sb = createClient(SUPABASE_URL, SUPABASE_SERVICE_KEY, {
@@ -87,7 +85,7 @@ Deno.serve(async (req) => {
     const { data: usersData } = await sb.auth.admin.listUsers({ perPage: 1000 });
     const users = usersData?.users || [];
 
-    const mapped = filtered.map((a: any) => {
+    const mapped = appointments.map((a: any) => {
       let clientId = null;
       let emailConfirmed = false;
       if (a.email) {
