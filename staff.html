@@ -1944,6 +1944,7 @@ async function viewClientProfile(clientId, firstName, lastName) {
             ${dexa.pdf_path
               ? `<button onclick="event.stopPropagation();downloadScanPdf('${dexa.pdf_path}')" style="background:rgba(255,255,255,0.07);border:1px solid rgba(255,255,255,0.12);border-radius:6px;color:var(--muted2);font-size:11px;padding:4px 10px;cursor:pointer;">⬇ PDF</button>`
               : `<span style="font-size:11px;color:var(--muted);font-style:italic;">no PDF on file</span>`}
+            <button onclick="event.stopPropagation();confirmDeleteScan('${dexa.id}',${dexaScanNum},'${fmtDate(dexa.scan_date)}')" title="Delete scan" style="background:none;border:none;cursor:pointer;color:var(--muted);font-size:14px;padding:4px 6px;border-radius:4px;" onmouseover="this.style.color='var(--red)'" onmouseout="this.style.color='var(--muted)'">🗑</button>
             <span style="font-size:11px;color:var(--blue);font-weight:600;">Full Details →</span>
           </div>
         </div>
