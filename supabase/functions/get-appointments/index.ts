@@ -22,7 +22,6 @@ async function verifyStaffDebug(req: Request): Promise<{ ok: boolean; reason: st
   const authHeader = req.headers.get('Authorization');
   if (!authHeader?.startsWith('Bearer ')) return { ok: false, reason: 'no_auth_header' };
   const token = authHeader.slice(7);
-  const token = authHeader.slice(7);
   const userClient = createClient(SUPABASE_URL, SUPABASE_ANON_KEY, {
     auth: { autoRefreshToken: false, persistSession: false },
   });
