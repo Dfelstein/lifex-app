@@ -834,7 +834,7 @@ async function staffFetch(url, options = {}) {
   if (!session) { toast('Session expired — please refresh', 'error'); throw new Error('No session'); }
   return fetch(url, {
     ...options,
-    headers: { ...(options.headers || {}), 'Authorization': `Bearer ${session.access_token}` },
+    headers: { ...(options.headers || {}), 'apikey': SUPABASE_KEY, 'Authorization': `Bearer ${session.access_token}` },
   });
 }
 
@@ -1238,7 +1238,7 @@ async function fetchAppts(date) {
   const url = date === 'today'
     ? `${SUPABASE_URL}/functions/v1/get-appointments`
     : `${SUPABASE_URL}/functions/v1/get-appointments?date=${date}`;
-  const res = await staffFetch(url).then(r => r.json()).catch(() => ({ appointments: [] }));
+  const res = await staffFetch(url).then(async r => { const j = await r.json(); if (!r.ok) console.error('fetchAppts error', r.status, j); return j; }).catch(e => { console.error('fetchAppts catch', e); return { appointments: [] }; });
   apptCache.set(date, { data: res, ts: Date.now() });
   return res;
 }
