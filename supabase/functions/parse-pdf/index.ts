@@ -4,6 +4,7 @@ import { createClient } from 'https://esm.sh/@supabase/supabase-js@2';
 const ANTHROPIC_KEY = Deno.env.get('ANTHROPIC_KEY')!;
 const SUPABASE_URL = Deno.env.get('SUPABASE_URL')!;
 const SUPABASE_SERVICE_KEY = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!;
+const SUPABASE_ANON_KEY = Deno.env.get('SUPABASE_ANON_KEY')!;
 const RESEND_API_KEY = Deno.env.get('RESEND_API_KEY');
 
 function cors(body: string, status = 200) {
@@ -221,13 +222,16 @@ async function sendResultsEmail(sb: any, clientId: string, scanType: string, par
 const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 const MAX_PDF_BYTES = 20 * 1024 * 1024; // 20 MB base64 limit
 
-async function verifyStaff(req: Request, sb: any): Promise<boolean> {
+async function verifyStaff(req: Request, adminSb: any): Promise<boolean> {
   const authHeader = req.headers.get('Authorization');
   if (!authHeader?.startsWith('Bearer ')) return false;
-  const token = authHeader.slice(7);
-  const { data: { user }, error } = await sb.auth.getUser(token);
+  const userClient = createClient(SUPABASE_URL, SUPABASE_ANON_KEY, {
+    auth: { autoRefreshToken: false, persistSession: false },
+    global: { headers: { Authorization: authHeader } },
+  });
+  const { data: { user }, error } = await userClient.auth.getUser();
   if (error || !user) return false;
-  const { data: profile } = await sb.from('profiles').select('is_staff').eq('id', user.id).single();
+  const { data: profile } = await adminSb.from('profiles').select('is_staff').eq('id', user.id).single();
   return !!profile?.is_staff;
 }
 
