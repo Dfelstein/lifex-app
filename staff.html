@@ -2242,33 +2242,84 @@ async function handleProfileDrop(event, clientId) {
 
     zone.innerHTML = `<div class="drop-icon">🤖</div><div>Detecting scan type…</div>`;
 
-    const resp = await staffFetch(`${SUPABASE_URL}/functions/v1/parse-pdf`, {
+    // Phase 1: dry run — parse only, no save/email
+    const dryResp = await staffFetch(`${SUPABASE_URL}/functions/v1/parse-pdf`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ pdfBase64: base64, clientId })
+      body: JSON.stringify({ pdfBase64: base64, clientId, parseOnly: true })
     });
-    const result = await resp.json();
+    const dryResult = await dryResp.json();
+    if (dryResult.error) throw new Error(dryResult.error);
 
-    if (result.error) throw new Error(result.error);
-    if (result.skipped) {
+    // Check name match
+    const clientName = (document.getElementById('cp-name')?.textContent || '').trim().toLowerCase();
+    const pdfName = (dryResult.patient_name || '').trim().toLowerCase();
+    const nameMismatch = pdfName && clientName && !pdfName.includes(clientName.split(' ')[0]) && !clientName.includes(pdfName.split(' ')[0]);
+
+    if (nameMismatch) {
       zone.classList.remove('uploading');
-      zone.classList.add('done');
-      zone.innerHTML = `<div class="drop-icon">⊘</div><div style="font-size:13px;">Not a recognised scan type — skipped</div>`;
-    } else {
-      zone.classList.remove('uploading');
-      zone.classList.add('done');
-      zone.innerHTML = `<div class="drop-icon">✅</div><div style="font-size:13px;">${result.type} scan uploaded successfully!</div>`;
-      // Reload profile data after short delay
-      setTimeout(() => {
-        const name = document.getElementById('cp-name').textContent.split(' ');
-        viewClientProfile(clientId, name[0], name.slice(1).join(' '));
-      }, 1500);
+      zone.innerHTML = `
+        <div style="padding:12px;text-align:center">
+          <div style="font-size:22px;margin-bottom:8px">⚠️</div>
+          <div style="font-size:13px;color:var(--orange);font-weight:600;margin-bottom:4px">Name mismatch detected</div>
+          <div style="font-size:12px;color:var(--muted2);margin-bottom:12px">PDF says <strong style="color:var(--text)">${escHtml(dryResult.patient_name)}</strong> but client is <strong style="color:var(--text)">${escHtml(document.getElementById('cp-name')?.textContent)}</strong></div>
+          <div style="display:flex;gap:8px;justify-content:center">
+            <button onclick="confirmScanUpload('${clientId}','${encodeURIComponent(base64)}','${dryResult.type}')" style="padding:8px 16px;background:var(--orange);color:#000;border:none;border-radius:6px;font-weight:700;cursor:pointer;font-size:13px">Upload Anyway</button>
+            <button onclick="cancelScanUpload()" style="padding:8px 16px;background:var(--surface2);color:var(--text);border:none;border-radius:6px;cursor:pointer;font-size:13px">Cancel</button>
+          </div>
+        </div>`;
+      window._pendingScanBase64 = base64;
+      return;
     }
+
+    // Phase 2: no mismatch — proceed with full upload
+    await doScanUpload(base64, clientId, zone);
   } catch(e) {
     zone.classList.remove('uploading');
     zone.innerHTML = `<div class="drop-icon">❌</div><div style="font-size:12px;color:var(--red);">${e.message}</div>`;
     toast('Upload failed: ' + e.message, 'error');
   }
+}
+
+async function doScanUpload(base64, clientId, zone) {
+  zone.classList.add('uploading');
+  zone.innerHTML = `<div class="drop-icon">⏳</div><div>Saving scan…</div>`;
+  const resp = await staffFetch(`${SUPABASE_URL}/functions/v1/parse-pdf`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ pdfBase64: base64, clientId })
+  });
+  const result = await resp.json();
+  if (result.error) throw new Error(result.error);
+  zone.classList.remove('uploading');
+  if (result.skipped) {
+    zone.classList.add('done');
+    zone.innerHTML = `<div class="drop-icon">⊘</div><div style="font-size:13px;">Not a recognised scan type — skipped</div>`;
+  } else {
+    zone.classList.add('done');
+    zone.innerHTML = `<div class="drop-icon">✅</div><div style="font-size:13px;">${result.type} scan uploaded successfully!</div>`;
+    setTimeout(() => {
+      const name = document.getElementById('cp-name').textContent.split(' ');
+      viewClientProfile(clientId, name[0], name.slice(1).join(' '));
+    }, 1500);
+  }
+}
+
+async function confirmScanUpload(clientId, encodedBase64, type) {
+  const zone = document.getElementById('cp-upload-zone');
+  try {
+    await doScanUpload(decodeURIComponent(encodedBase64), clientId, zone);
+  } catch(e) {
+    zone.classList.remove('uploading');
+    zone.innerHTML = `<div class="drop-icon">❌</div><div style="font-size:12px;color:var(--red);">${e.message}</div>`;
+    toast('Upload failed: ' + e.message, 'error');
+  }
+}
+
+function cancelScanUpload() {
+  const zone = document.getElementById('cp-upload-zone');
+  zone.classList.remove('uploading');
+  zone.innerHTML = `<div class="drop-icon">📄</div><div>Drop PDF here to upload scan</div>`;
 }
 
 async function createAccountFromAppt(apptId, email, firstName, lastName) {

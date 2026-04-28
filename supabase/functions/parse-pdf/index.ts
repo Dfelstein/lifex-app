@@ -239,12 +239,15 @@ Deno.serve(async (req) => {
       return cors(JSON.stringify({ error: 'Unauthorized' }), 401);
     }
 
-    const { pdfBase64, clientId, firstName: firstNameHint } = await req.json();
+    const { pdfBase64, clientId, firstName: firstNameHint, parseOnly } = await req.json();
 
-    if (!pdfBase64 || !clientId) {
-      return cors(JSON.stringify({ error: 'Missing pdfBase64 or clientId' }), 400);
+    if (!pdfBase64) {
+      return cors(JSON.stringify({ error: 'Missing pdfBase64' }), 400);
     }
-    if (!UUID_RE.test(clientId)) {
+    if (!parseOnly && !clientId) {
+      return cors(JSON.stringify({ error: 'Missing clientId' }), 400);
+    }
+    if (clientId && !UUID_RE.test(clientId)) {
       return cors(JSON.stringify({ error: 'Invalid clientId' }), 400);
     }
     if (pdfBase64.length > MAX_PDF_BYTES) {
@@ -341,6 +344,11 @@ Return ONLY the JSON, no other text.`,
       } catch (e2) {
         return cors(JSON.stringify({ error: `JSON parse failed: ${String(e2)}`, raw: rawText.slice(0, 500) }), 500);
       }
+    }
+
+    // If dry run, return parsed data without saving or emailing
+    if (parseOnly) {
+      return cors(JSON.stringify({ parseOnly: true, type: parsed.type, patient_name: parsed.patient_name || null }));
     }
 
     // Save to Supabase using service role (bypasses RLS)
