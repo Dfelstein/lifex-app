@@ -11,7 +11,7 @@ function cors(body: string, status = 200) {
     status,
     headers: {
       'Content-Type': 'application/json',
-      'Access-Control-Allow-Origin': '*',
+      'Access-Control-Allow-Origin': 'https://lifex.xgym.com.au',
       'Access-Control-Allow-Headers': 'authorization, content-type',
     },
   });
@@ -218,14 +218,37 @@ async function sendResultsEmail(sb: any, clientId: string, scanType: string, par
   }
 }
 
+const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+const MAX_PDF_BYTES = 20 * 1024 * 1024; // 20 MB base64 limit
+
+async function verifyStaff(req: Request, sb: any): Promise<boolean> {
+  const authHeader = req.headers.get('Authorization');
+  if (!authHeader?.startsWith('Bearer ')) return false;
+  const token = authHeader.slice(7);
+  const { data: { user }, error } = await sb.auth.getUser(token);
+  if (error || !user) return false;
+  const { data: profile } = await sb.from('profiles').select('is_staff').eq('id', user.id).single();
+  return !!profile?.is_staff;
+}
+
 Deno.serve(async (req) => {
-  if (req.method === 'OPTIONS') return new Response(null, { status: 204, headers: { 'Access-Control-Allow-Origin': '*', 'Access-Control-Allow-Headers': 'authorization, content-type' } });
+  if (req.method === 'OPTIONS') return new Response(null, { status: 204, headers: { 'Access-Control-Allow-Origin': 'https://lifex.xgym.com.au', 'Access-Control-Allow-Headers': 'authorization, content-type' } });
 
   try {
+    if (!(await verifyStaff(req, createClient(SUPABASE_URL, SUPABASE_SERVICE_KEY, { auth: { autoRefreshToken: false, persistSession: false } })))) {
+      return cors(JSON.stringify({ error: 'Unauthorized' }), 401);
+    }
+
     const { pdfBase64, clientId, firstName: firstNameHint } = await req.json();
 
     if (!pdfBase64 || !clientId) {
       return cors(JSON.stringify({ error: 'Missing pdfBase64 or clientId' }), 400);
+    }
+    if (!UUID_RE.test(clientId)) {
+      return cors(JSON.stringify({ error: 'Invalid clientId' }), 400);
+    }
+    if (pdfBase64.length > MAX_PDF_BYTES) {
+      return cors(JSON.stringify({ error: 'PDF too large (max 15 MB)' }), 400);
     }
 
     // Send PDF to Claude for parsing

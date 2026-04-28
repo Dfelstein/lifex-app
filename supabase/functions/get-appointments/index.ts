@@ -11,16 +11,29 @@ function cors(body: string, status = 200) {
     status,
     headers: {
       'Content-Type': 'application/json',
-      'Access-Control-Allow-Origin': '*',
+      'Access-Control-Allow-Origin': 'https://lifex.xgym.com.au',
       'Access-Control-Allow-Headers': 'authorization, content-type',
     },
   });
 }
 
+async function verifyStaff(req: Request): Promise<boolean> {
+  const authHeader = req.headers.get('Authorization');
+  if (!authHeader?.startsWith('Bearer ')) return false;
+  const token = authHeader.slice(7);
+  const sb = createClient(SUPABASE_URL, SUPABASE_SERVICE_KEY, { auth: { autoRefreshToken: false, persistSession: false } });
+  const { data: { user }, error } = await sb.auth.getUser(token);
+  if (error || !user) return false;
+  const { data: profile } = await sb.from('profiles').select('is_staff').eq('id', user.id).single();
+  return !!profile?.is_staff;
+}
+
 Deno.serve(async (req) => {
-  if (req.method === 'OPTIONS') return new Response(null, { status: 204, headers: { 'Access-Control-Allow-Origin': '*', 'Access-Control-Allow-Headers': 'authorization, content-type' } });
+  if (req.method === 'OPTIONS') return new Response(null, { status: 204, headers: { 'Access-Control-Allow-Origin': 'https://lifex.xgym.com.au', 'Access-Control-Allow-Headers': 'authorization, content-type' } });
 
   try {
+    if (!(await verifyStaff(req))) return cors(JSON.stringify({ error: 'Unauthorized' }), 401);
+
     // Allow ?date=YYYY-MM-DD param, otherwise use today in Sydney time
     const urlParams = new URL(req.url).searchParams;
     let targetDate = urlParams.get('date') || '';

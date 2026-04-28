@@ -828,6 +828,23 @@ const SUPABASE_URL = 'https://shvpwgrjqskccsdzajkj.supabase.co';
 const SUPABASE_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InNodnB3Z3JqcXNrY2NzZHphamtqIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzM5MDUzNTIsImV4cCI6MjA4OTQ4MTM1Mn0.2dL3J9XbzU8q8ogPPqhwR4w7_vSB0FxVKMzsAOxCgk4';
 const sb = window.supabase.createClient(SUPABASE_URL, SUPABASE_KEY);
 
+// Sends edge function requests with the staff user's session token (not the public anon key)
+async function staffFetch(url, options = {}) {
+  const { data: { session } } = await sb.auth.getSession();
+  if (!session) { toast('Session expired — please refresh', 'error'); throw new Error('No session'); }
+  return fetch(url, {
+    ...options,
+    headers: { ...(options.headers || {}), 'Authorization': `Bearer ${session.access_token}` },
+  });
+}
+
+// Escapes HTML entities to prevent XSS when inserting DB values into HTML
+function escHtml(s) {
+  return (s == null ? '' : String(s))
+    .replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;')
+    .replace(/"/g,'&quot;').replace(/'/g,'&#39;');
+}
+
 let clients = [];
 let currentUserId = null;
 
@@ -988,7 +1005,7 @@ function renderTodayRow(a, hasScansSet) {
       <div>
         <div class="appt-name ${a.clientId ? 'clickable' : ''}"
           ${a.clientId ? `onclick="event.stopPropagation();viewClientProfile('${a.clientId}','${esc(a.firstName)}','${esc(a.lastName)}')"` : ''}
-        >${a.firstName} ${a.lastName}</div>
+        >${escHtml(a.firstName)} ${escHtml(a.lastName)}</div>
         <div class="appt-meta" style="margin-top:2px;display:flex;align-items:center;gap:6px;">${svcBadge}<span style="color:${sColor};">${sLabel}</span></div>
       </div>
       <div class="scan-badges" id="badges-${a.id}" style="justify-content:flex-end;"></div>
@@ -996,7 +1013,7 @@ function renderTodayRow(a, hasScansSet) {
     </div>
     <div class="appt-row-detail">
       ${a.clientId ? `
-        <div class="drop-zone" id="drop-${a.id}" data-client-id="${a.clientId}" data-first-name="${a.firstName}" style="margin-top:12px;">
+        <div class="drop-zone" id="drop-${a.id}" data-client-id="${a.clientId}" data-first-name="${escHtml(a.firstName)}" style="margin-top:12px;">
           <div class="drop-icon">📄</div>
           <div>Drop PDF here or click to browse</div>
           <div style="font-size:11px;margin-top:4px;opacity:0.6">DEXA · Blood · RMR · Hormones — auto-detected</div>
@@ -1038,14 +1055,14 @@ function renderApptCard(a) {
     <div class="appt-header" style="cursor:pointer;" onclick="${hasClient ? `event.target.closest('.card-toggle-btn')||viewClientProfile('${a.clientId}','${esc(a.firstName)}','${esc(a.lastName)}')` : `event.target.closest('.card-toggle-btn')||toggleNoAccountCard('${a.id}')`}">
       <div class="appt-avatar" style="background:linear-gradient(135deg,var(--blue),var(--teal));color:#000;">${initials}</div>
       <div style="flex:1">
-        <div class="appt-name clickable">${a.firstName} ${a.lastName}</div>
+        <div class="appt-name clickable">${escHtml(a.firstName)} ${escHtml(a.lastName)}</div>
         <div class="appt-meta" style="display:flex;align-items:center;gap:6px;">${svcBadge2}<span style="font-size:11px;color:var(--muted2);">${hasClient ? 'tap to view profile →' : 'tap to create account →'}</span></div>
       </div>
       <button class="card-toggle-btn" id="toggle-${a.id}" onclick="event.stopPropagation();${hasClient ? `toggleCardCollapse('${a.id}','${a.clientId}','${esc(a.firstName)}')` : `toggleNoAccountCard('${a.id}')`}">▼</button>
     </div>
     <div class="appt-body">
       ${hasClient ? `
-        <div class="drop-zone" id="drop-${a.id}" data-client-id="${a.clientId}" data-first-name="${a.firstName}">
+        <div class="drop-zone" id="drop-${a.id}" data-client-id="${a.clientId}" data-first-name="${escHtml(a.firstName)}">
           <div class="drop-icon">📄</div><div>Drop PDF here or click to browse</div>
           <div style="font-size:11px;margin-top:4px;opacity:0.6">DEXA · Blood · RMR · Hormones — auto-detected</div>
         </div>
@@ -1080,9 +1097,9 @@ async function handleDrop(e, appt) {
 
     zone.innerHTML = `<div class="drop-icon">🤖</div><div>Detecting scan type…</div>`;
 
-    const res = await fetch(`${SUPABASE_URL}/functions/v1/parse-pdf`, {
+    const res = await staffFetch(`${SUPABASE_URL}/functions/v1/parse-pdf`, {
       method: 'POST',
-      headers: { 'Authorization': `Bearer ${SUPABASE_KEY}`, 'Content-Type': 'application/json' },
+      headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ pdfBase64: base64, clientId: appt.clientId, firstName: appt.firstName })
     });
 
@@ -1221,9 +1238,7 @@ async function fetchAppts(date) {
   const url = date === 'today'
     ? `${SUPABASE_URL}/functions/v1/get-appointments`
     : `${SUPABASE_URL}/functions/v1/get-appointments?date=${date}`;
-  const res = await fetch(url, {
-    headers: { 'Authorization': `Bearer ${SUPABASE_KEY}` }
-  }).then(r => r.json()).catch(() => ({ appointments: [] }));
+  const res = await staffFetch(url).then(r => r.json()).catch(() => ({ appointments: [] }));
   apptCache.set(date, { data: res, ts: Date.now() });
   return res;
 }
@@ -1290,7 +1305,7 @@ function searchApptClients(q) {
       onmouseover="this.style.background='var(--surface2)'" onmouseout="this.style.background=''">
       <div style="width:34px;height:34px;border-radius:50%;background:linear-gradient(135deg,var(--blue),var(--teal));display:flex;align-items:center;justify-content:center;font-size:13px;font-weight:700;color:#000;flex-shrink:0;">${(c.initials||c.full_name?.slice(0,2)||'?').toUpperCase()}</div>
       <div style="flex:1;min-width:0;">
-        <div style="font-size:13px;font-weight:600;color:var(--text);">${c.full_name||'—'}${scanBadge}</div>
+        <div style="font-size:13px;font-weight:600;color:var(--text);">${escHtml(c.full_name)||'—'}${scanBadge}</div>
         <div style="font-size:11px;color:var(--muted2);">${c.member_level||'Standard'} Member</div>
       </div>
       <span style="font-size:12px;color:var(--muted2);">→</span>
@@ -1322,7 +1337,7 @@ function globalClientSearch(q) {
       onmouseover="this.style.background='var(--surface2)'" onmouseout="this.style.background=''">
       <div style="width:32px;height:32px;border-radius:50%;background:linear-gradient(135deg,var(--blue),var(--teal));display:flex;align-items:center;justify-content:center;font-size:12px;font-weight:700;color:#000;flex-shrink:0;">${(c.initials||c.full_name?.slice(0,2)||'?').toUpperCase()}</div>
       <div style="flex:1;min-width:0;">
-        <div style="font-size:13px;font-weight:600;color:var(--text);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;">${c.full_name||'—'}${scanBadge}</div>
+        <div style="font-size:13px;font-weight:600;color:var(--text);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;">${escHtml(c.full_name)||'—'}${scanBadge}</div>
         <div style="font-size:11px;color:var(--muted2);">${c.member_level||'Standard'}</div>
       </div>
     </div>`;
@@ -1495,9 +1510,9 @@ async function openEditProfile() {
 async function resendInvite(clientId) {
   const btn = document.getElementById('resend-btn');
   if (btn) { btn.disabled = true; btn.textContent = 'Sending…'; }
-  const res = await fetch(`${SUPABASE_URL}/functions/v1/client-ops`, {
+  const res = await staffFetch(`${SUPABASE_URL}/functions/v1/client-ops`, {
     method: 'POST',
-    headers: { 'Authorization': `Bearer ${SUPABASE_KEY}`, 'Content-Type': 'application/json' },
+    headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify({ action: 'resend_invite', clientId }),
   });
   const data = await res.json();
@@ -1516,9 +1531,9 @@ async function sendClientMessage(clientId) {
   const statusEl = document.getElementById('comms-status');
   if (!message) { toast('Enter a message first', 'error'); return; }
   if (statusEl) statusEl.textContent = 'Sending…';
-  const res = await fetch(`${SUPABASE_URL}/functions/v1/client-ops`, {
+  const res = await staffFetch(`${SUPABASE_URL}/functions/v1/client-ops`, {
     method: 'POST',
-    headers: { 'Authorization': `Bearer ${SUPABASE_KEY}`, 'Content-Type': 'application/json' },
+    headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify({ action: 'send_message', clientId, message, subject }),
   });
   const data = await res.json();
@@ -1590,9 +1605,9 @@ async function viewClientProfile(clientId, firstName, lastName) {
       sb.from('blood_panels').select('*').eq('client_id', clientId).order('panel_date', { ascending: false }).limit(1),
       sb.from('hormone_panels').select('*').eq('client_id', clientId).order('panel_date', { ascending: false }).limit(1),
       sb.from('client_activity').select('event,created_at').eq('client_id', clientId).order('created_at', { ascending: false }).limit(30),
-      fetch(`${SUPABASE_URL}/functions/v1/client-ops`, {
+      staffFetch(`${SUPABASE_URL}/functions/v1/client-ops`, {
         method: 'POST',
-        headers: { 'Authorization': `Bearer ${SUPABASE_KEY}`, 'Content-Type': 'application/json' },
+        headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ action: 'get_status', clientId }),
       }).then(r => r.json()).catch(() => null),
     ]);
@@ -2031,7 +2046,7 @@ async function viewClientProfile(clientId, firstName, lastName) {
           let scanStats = null;
           try {
             const statsUrl = `${SUPABASE_URL}/functions/v1/get-scan-stats?sex=${sex}&age=${age}&value=${bf}&ffmi=${ffmi}&almi=${almi}`;
-            const sr = await fetch(statsUrl, { headers: { 'Authorization': `Bearer ${SUPABASE_KEY}` } });
+            const sr = await staffFetch(statsUrl);
             scanStats = await sr.json();
           } catch(e) { /* fallback to reference */ }
           const compEl = document.getElementById(`cp-comparison-${clientId}`);
@@ -2227,9 +2242,9 @@ async function handleProfileDrop(event, clientId) {
 
     zone.innerHTML = `<div class="drop-icon">🤖</div><div>Detecting scan type…</div>`;
 
-    const resp = await fetch(`${SUPABASE_URL}/functions/v1/parse-pdf`, {
+    const resp = await staffFetch(`${SUPABASE_URL}/functions/v1/parse-pdf`, {
       method: 'POST',
-      headers: { 'Authorization': `Bearer ${SUPABASE_KEY}`, 'Content-Type': 'application/json' },
+      headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ pdfBase64: base64, clientId })
     });
     const result = await resp.json();
@@ -2265,9 +2280,9 @@ async function createAccountFromAppt(apptId, email, firstName, lastName) {
   statusEl.textContent = 'Setting up account…';
 
   try {
-    const res = await fetch(`${SUPABASE_URL}/functions/v1/create-client`, {
+    const res = await staffFetch(`${SUPABASE_URL}/functions/v1/create-client`, {
       method: 'POST',
-      headers: { 'Authorization': `Bearer ${SUPABASE_KEY}`, 'Content-Type': 'application/json' },
+      headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ email, firstName, lastName })
     });
     const result = await res.json();
@@ -2422,7 +2437,7 @@ async function searchClients() {
       return `<div class="client-card" onclick="viewClientProfile('${c.id}','${fn}','${ln}')">
         <div class="client-card-top">
           <div class="client-avatar" style="background:linear-gradient(${lm.gradient});border-color:${lm.border};">${c.initials||'??'}</div>
-          <div class="client-info"><div class="client-name">${c.full_name||'Unknown'}</div><div class="client-meta" style="color:${lm.color};font-weight:600;">${c.member_level||'Standard'}</div></div>
+          <div class="client-info"><div class="client-name">${escHtml(c.full_name)||'Unknown'}</div><div class="client-meta" style="color:${lm.color};font-weight:600;">${c.member_level||'Standard'}</div></div>
         </div>
         <div class="client-card-body">
           ${fat!=null?`<div class="client-fat-bar"><div style="display:flex;justify-content:space-between;"><span style="font-size:10px;color:var(--muted2);">Body Fat</span><span style="font-size:13px;font-weight:700;color:${fatColor(fat)};">${fat.toFixed(1)}%</span></div><div class="client-fat-bar-track"><div class="client-fat-bar-fill" style="width:${Math.min(fat,50)*2}%;background:${fatColor(fat)};"></div></div></div>`:c.lastScan?`<div style="font-size:11px;color:var(--muted2);">Last scan: ${fmtDate(c.lastScan)}</div>`:`<div style="font-size:11px;color:var(--muted2);">No scans yet</div>`}
@@ -2543,7 +2558,7 @@ function renderClientList() {
       <div class="client-card-top">
         <div class="client-avatar" style="background:linear-gradient(${lm.gradient});border-color:${lm.border};">${c.initials||'??'}</div>
         <div class="client-info">
-          <div class="client-name">${c.full_name||'Unknown'}</div>
+          <div class="client-name">${escHtml(c.full_name)||'Unknown'}</div>
           <div class="client-meta" style="color:${lm.color};font-weight:600;">${c.member_level||'Standard'}</div>
           <div class="client-meta">${c.sex ? c.sex.charAt(0).toUpperCase()+c.sex.slice(1) : ''}${memberSince ? (c.sex ? ' · ' : '') + 'Since ' + memberSince : ''}</div>
         </div>
@@ -2630,9 +2645,9 @@ async function createNewClient() {
   statusEl.textContent = 'Setting up account…';
 
   try {
-    const res = await fetch(`${SUPABASE_URL}/functions/v1/create-client`, {
+    const res = await staffFetch(`${SUPABASE_URL}/functions/v1/create-client`, {
       method: 'POST',
-      headers: { 'Authorization': `Bearer ${SUPABASE_KEY}`, 'Content-Type': 'application/json' },
+      headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ email, firstName, lastName })
     });
     const result = await res.json();
@@ -2997,10 +3012,9 @@ function signOut() {
 
 async function downloadScanPdf(path) {
   try {
-    const { data: { session } } = await sb.auth.getSession();
-    const res = await fetch(`${SUPABASE_URL}/functions/v1/get-scan-url`, {
+    const res = await staffFetch(`${SUPABASE_URL}/functions/v1/get-scan-url`, {
       method: 'POST',
-      headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${session.access_token}` },
+      headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ path }),
     });
     const json = await res.json();
@@ -3198,9 +3212,7 @@ async function startImport() {
   importGhosts = [];
 
   // Load all existing profiles via service role (bypasses RLS)
-  const profilesRes = await fetch(`${SUPABASE_URL}/functions/v1/list-profiles`, {
-    headers: { 'Authorization': `Bearer ${SUPABASE_KEY}` }
-  });
+  const profilesRes = await staffFetch(`${SUPABASE_URL}/functions/v1/list-profiles`);
   const profilesData = await profilesRes.json();
   importProfiles = profilesData.profiles || [];
 
@@ -3236,9 +3248,9 @@ async function startImport() {
           const nameParts = item.clientName.trim().split(/\s+/);
           const firstName = nameParts[0] || item.clientName;
           const lastName  = nameParts.slice(1).join(' ') || 'Unknown';
-          const res = await fetch(`${SUPABASE_URL}/functions/v1/import-client`, {
+          const res = await staffFetch(`${SUPABASE_URL}/functions/v1/import-client`, {
             method: 'POST',
-            headers: { 'Authorization': `Bearer ${SUPABASE_KEY}`, 'Content-Type': 'application/json' },
+            headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({ firstName, lastName }),
           });
           const ghost = await res.json();
@@ -3260,9 +3272,9 @@ async function startImport() {
       const pdfBase64 = btoa(binary);
 
       // Call parse-pdf edge function
-      const parseRes = await fetch(`${SUPABASE_URL}/functions/v1/parse-pdf`, {
+      const parseRes = await staffFetch(`${SUPABASE_URL}/functions/v1/parse-pdf`, {
         method: 'POST',
-        headers: { 'Authorization': `Bearer ${SUPABASE_KEY}`, 'Content-Type': 'application/json' },
+        headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ pdfBase64, clientId }),
       });
       const parseResult = await parseRes.json();
@@ -3343,9 +3355,9 @@ async function activateGhost(id, firstName, lastName) {
 
   try {
     // Update auth user email via create-client (will send invite)
-    const res = await fetch(`${SUPABASE_URL}/functions/v1/create-client`, {
+    const res = await staffFetch(`${SUPABASE_URL}/functions/v1/create-client`, {
       method: 'POST',
-      headers: { 'Authorization': `Bearer ${SUPABASE_KEY}`, 'Content-Type': 'application/json' },
+      headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ email, firstName, lastName, existingId: id }),
     });
     const result = await res.json();
@@ -3636,8 +3648,8 @@ function searchLinkClients() {
     <div onclick="confirmLinkScan('${c.id}','${escName(c.full_name)}')"
       style="padding:10px 12px;background:var(--surface2);border:1px solid var(--border2);border-radius:8px;cursor:pointer;font-size:13px;display:flex;justify-content:space-between;align-items:center;"
       onmouseover="this.style.borderColor='var(--blue)'" onmouseout="this.style.borderColor='var(--border2)'">
-      <span style="font-weight:600;">${c.full_name}</span>
-      <span style="font-size:12px;color:var(--muted2);">${c.email}</span>
+      <span style="font-weight:600;">${escHtml(c.full_name)}</span>
+      <span style="font-size:12px;color:var(--muted2);">${escHtml(c.email)}</span>
     </div>`).join('');
 }
 
@@ -4775,9 +4787,9 @@ async function createAccountFromModal(email, firstName, lastName, btn) {
   statusEl.style.color = 'var(--muted2)';
   statusEl.textContent = 'Setting up account…';
   try {
-    const res = await fetch(`${SUPABASE_URL}/functions/v1/create-client`, {
+    const res = await staffFetch(`${SUPABASE_URL}/functions/v1/create-client`, {
       method: 'POST',
-      headers: { 'Authorization': `Bearer ${SUPABASE_KEY}`, 'Content-Type': 'application/json' },
+      headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ email, firstName, lastName })
     });
     const result = await res.json();

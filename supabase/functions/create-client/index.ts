@@ -12,10 +12,20 @@ function cors(body: string, status = 200) {
     status,
     headers: {
       'Content-Type': 'application/json',
-      'Access-Control-Allow-Origin': '*',
+      'Access-Control-Allow-Origin': 'https://lifex.xgym.com.au',
       'Access-Control-Allow-Headers': 'authorization, content-type',
     },
   });
+}
+
+async function verifyStaff(req: Request, sb: any): Promise<boolean> {
+  const authHeader = req.headers.get('Authorization');
+  if (!authHeader?.startsWith('Bearer ')) return false;
+  const token = authHeader.slice(7);
+  const { data: { user }, error } = await sb.auth.getUser(token);
+  if (error || !user) return false;
+  const { data: profile } = await sb.from('profiles').select('is_staff').eq('id', user.id).single();
+  return !!profile?.is_staff;
 }
 
 async function sendInviteEmail(email: string, firstName: string, inviteLink: string) {
@@ -85,15 +95,19 @@ async function sendInviteEmail(email: string, firstName: string, inviteLink: str
 }
 
 Deno.serve(async (req) => {
-  if (req.method === 'OPTIONS') return new Response(null, { status: 204, headers: { 'Access-Control-Allow-Origin': '*', 'Access-Control-Allow-Headers': 'authorization, content-type' } });
+  if (req.method === 'OPTIONS') return new Response(null, { status: 204, headers: { 'Access-Control-Allow-Origin': 'https://lifex.xgym.com.au', 'Access-Control-Allow-Headers': 'authorization, content-type' } });
 
   try {
-    const { email, firstName, lastName, existingId } = await req.json();
-    if (!email) return cors(JSON.stringify({ error: 'Email required' }), 400);
-
     const sb = createClient(SUPABASE_URL, SUPABASE_SERVICE_KEY, {
       auth: { autoRefreshToken: false, persistSession: false }
     });
+
+    if (!(await verifyStaff(req, sb))) {
+      return cors(JSON.stringify({ error: 'Unauthorized' }), 401);
+    }
+
+    const { email, firstName, lastName, existingId } = await req.json();
+    if (!email) return cors(JSON.stringify({ error: 'Email required' }), 400);
 
     const fullName = `${firstName || ''} ${lastName || ''}`.trim();
     const initials = `${firstName?.[0] || ''}${lastName?.[0] || ''}`.toUpperCase() || 'CL';
