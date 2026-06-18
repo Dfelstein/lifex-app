@@ -5302,56 +5302,84 @@ function trnRenderPrescriptionTable(di, ei, si, weeks, sg) {
   const wks = Array.from({ length: weeks }, (_, i) => i + 1);
   const p = sg.prescriptions || [];
   const getP = (w) => p.find(x => x.week === w) || { loadType: 'absolute', loadValue: '', reps: '', sets: 3, rest: 180 };
-  return `<div style="overflow-x:auto;">
+  // Determine the dominant load type for this set group (use first week's, or absolute)
+  const dominantType = (p[0]?.loadType) || sg.loadType || 'absolute';
+  const unitLabel = { absolute:'kg', percent_1rm:'% 1RM (e.g. 80 = 80%)', rpe:'RPE (1–10)', bodyweight:'BW' }[dominantType] || 'kg';
+  const unitShort = { absolute:'kg', percent_1rm:'%', rpe:'RPE', bodyweight:'BW' }[dominantType] || 'kg';
+  const loadStep = dominantType === 'absolute' ? '2.5' : dominantType === 'percent_1rm' ? '1' : '0.5';
+
+  return `<div>
+    <div style="display:flex;align-items:center;gap:8px;margin-bottom:6px;flex-wrap:wrap;">
+      <div style="font-size:10px;color:var(--muted2);font-weight:600;text-transform:uppercase;letter-spacing:0.5px;">Load Type:</div>
+      <select onchange="trnSetGroupLoadType(${di},${ei},${si},this.value)"
+        style="background:var(--surface3);border:1px solid var(--border2);border-radius:6px;padding:4px 8px;color:var(--text);font-family:'Outfit',sans-serif;font-size:12px;outline:none;">
+        <option value="absolute" ${dominantType==='absolute'?'selected':''}>kg — enter exact weight</option>
+        <option value="percent_1rm" ${dominantType==='percent_1rm'?'selected':''}>% 1RM — auto-calculates kg (e.g. type 80 for 80%)</option>
+        <option value="rpe" ${dominantType==='rpe'?'selected':''}>RPE — auto-calculates kg from effort (e.g. 8, 9, 9.5)</option>
+        <option value="bodyweight" ${dominantType==='bodyweight'?'selected':''}>Bodyweight</option>
+      </select>
+      <button onclick="trnFillAllWeeks(${di},${ei},${si},${weeks})" style="padding:3px 10px;border-radius:5px;background:transparent;border:1px solid var(--border2);color:var(--muted2);font-family:'Outfit',sans-serif;font-size:11px;cursor:pointer;" title="Copy W1 values to all weeks">Copy W1 → all</button>
+    </div>
+    <div style="overflow-x:auto;">
     <table style="width:100%;border-collapse:collapse;font-size:11px;">
       <thead><tr>
-        <td style="color:var(--muted);padding:3px 6px;min-width:60px;"></td>
+        <td style="color:var(--muted);padding:3px 6px;min-width:80px;"></td>
         ${wks.map(w => `<td style="color:var(--muted2);padding:3px 6px;text-align:center;font-weight:600;">W${w}</td>`).join('')}
       </tr></thead>
       <tbody>
         <tr>
-          <td style="color:var(--muted2);padding:3px 6px;white-space:nowrap;">Load Type</td>
-          ${wks.map(w => { const pr = getP(w); return `<td style="padding:2px 3px;"><select onchange="trnSetPrescription(${di},${ei},${si},${w},'loadType',this.value)"
-            style="width:70px;background:var(--surface2);border:1px solid var(--border);border-radius:4px;padding:3px 4px;color:var(--text);font-family:'Outfit',sans-serif;font-size:10px;outline:none;">
-            <option value="absolute" ${pr.loadType==='absolute'?'selected':''}>kg</option>
-            <option value="percent_1rm" ${pr.loadType==='percent_1rm'?'selected':''}>% 1RM</option>
-            <option value="rpe" ${pr.loadType==='rpe'?'selected':''}>RPE</option>
-            <option value="bodyweight" ${pr.loadType==='bodyweight'?'selected':''}>BW</option>
-          </select></td>`; }).join('')}
-        </tr>
-        <tr>
-          <td style="color:var(--muted2);padding:3px 6px;">Load</td>
-          ${wks.map(w => { const pr = getP(w); return `<td style="padding:2px 3px;"><input type="number" step="0.5" value="${pr.loadValue}"
+          <td style="color:var(--gold);padding:3px 6px;white-space:nowrap;font-weight:600;">${unitShort} Load</td>
+          ${wks.map(w => { const pr = getP(w); return `<td style="padding:2px 3px;"><input type="number" step="${loadStep}" value="${pr.loadValue}"
             onchange="trnSetPrescription(${di},${ei},${si},${w},'loadValue',parseFloat(this.value)||null)"
-            style="width:60px;background:var(--surface2);border:1px solid var(--border);border-radius:4px;padding:3px 5px;color:var(--gold);font-family:'Outfit',sans-serif;font-size:11px;font-weight:600;outline:none;text-align:center;"></td>`; }).join('')}
+            style="width:60px;background:var(--surface2);border:1px solid var(--border);border-radius:4px;padding:4px 5px;color:var(--gold);font-family:'Outfit',sans-serif;font-size:12px;font-weight:700;outline:none;text-align:center;" placeholder="${unitShort}"></td>`; }).join('')}
         </tr>
         <tr>
           <td style="color:var(--muted2);padding:3px 6px;">Reps</td>
           ${wks.map(w => { const pr = getP(w); return `<td style="padding:2px 3px;"><input type="number" value="${pr.reps}"
             onchange="trnSetPrescription(${di},${ei},${si},${w},'reps',parseInt(this.value)||null)"
-            style="width:60px;background:var(--surface2);border:1px solid var(--border);border-radius:4px;padding:3px 5px;color:var(--text);font-family:'Outfit',sans-serif;font-size:11px;outline:none;text-align:center;"></td>`; }).join('')}
+            style="width:60px;background:var(--surface2);border:1px solid var(--border);border-radius:4px;padding:4px 5px;color:var(--text);font-family:'Outfit',sans-serif;font-size:12px;outline:none;text-align:center;" placeholder="reps"></td>`; }).join('')}
         </tr>
         <tr>
           <td style="color:var(--muted2);padding:3px 6px;">Sets</td>
           ${wks.map(w => { const pr = getP(w); return `<td style="padding:2px 3px;"><input type="number" value="${pr.sets||3}"
             onchange="trnSetPrescription(${di},${ei},${si},${w},'sets',parseInt(this.value)||3)"
-            style="width:60px;background:var(--surface2);border:1px solid var(--border);border-radius:4px;padding:3px 5px;color:var(--text);font-family:'Outfit',sans-serif;font-size:11px;outline:none;text-align:center;"></td>`; }).join('')}
+            style="width:60px;background:var(--surface2);border:1px solid var(--border);border-radius:4px;padding:4px 5px;color:var(--text);font-family:'Outfit',sans-serif;font-size:12px;outline:none;text-align:center;" placeholder="sets"></td>`; }).join('')}
         </tr>
         <tr>
           <td style="color:var(--muted2);padding:3px 6px;">Rest (s)</td>
           ${wks.map(w => { const pr = getP(w); return `<td style="padding:2px 3px;"><input type="number" step="30" value="${pr.rest||180}"
             onchange="trnSetPrescription(${di},${ei},${si},${w},'rest',parseInt(this.value)||180)"
-            style="width:60px;background:var(--surface2);border:1px solid var(--border);border-radius:4px;padding:3px 5px;color:var(--muted2);font-family:'Outfit',sans-serif;font-size:11px;outline:none;text-align:center;"></td>`; }).join('')}
+            style="width:60px;background:var(--surface2);border:1px solid var(--border);border-radius:4px;padding:4px 5px;color:var(--muted2);font-family:'Outfit',sans-serif;font-size:12px;outline:none;text-align:center;" placeholder="180"></td>`; }).join('')}
         </tr>
       </tbody>
-    </table></div>`;
+    </table></div></div>`;
 }
 
 function trnSetPrescription(di, ei, si, week, field, value) {
   const sg = trnState.days[di].exercises[ei].setGroups[si];
   let p = sg.prescriptions.find(x => x.week === week);
-  if (!p) { p = { week, loadType: 'absolute', loadValue: null, reps: null, sets: 3, rest: 180 }; sg.prescriptions.push(p); }
-  p[field === 'rest' ? 'rest' : field] = value;
+  if (!p) { p = { week, loadType: sg.loadType || 'absolute', loadValue: null, reps: null, sets: 3, rest: 180 }; sg.prescriptions.push(p); }
+  p[field] = value;
+}
+
+function trnSetGroupLoadType(di, ei, si, loadType) {
+  const sg = trnState.days[di].exercises[ei].setGroups[si];
+  sg.loadType = loadType;
+  // Apply to all existing prescriptions
+  (sg.prescriptions || []).forEach(p => { p.loadType = loadType; });
+  trnRenderDays();
+}
+
+function trnFillAllWeeks(di, ei, si, weeks) {
+  const sg = trnState.days[di].exercises[ei].setGroups[si];
+  const w1 = sg.prescriptions.find(p => p.week === 1);
+  if (!w1) { toast('Enter Week 1 values first', 'error'); return; }
+  for (let w = 2; w <= weeks; w++) {
+    let p = sg.prescriptions.find(x => x.week === w);
+    if (!p) { p = { week: w, loadType: w1.loadType, loadValue: w1.loadValue, reps: w1.reps, sets: w1.sets, rest: w1.rest }; sg.prescriptions.push(p); }
+    else { p.loadType = w1.loadType; p.loadValue = w1.loadValue; p.reps = w1.reps; p.sets = w1.sets; p.rest = w1.rest; }
+  }
+  trnRenderDays();
 }
 
 async function trnSaveProgram() {

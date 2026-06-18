@@ -3617,7 +3617,10 @@ function trnCalcKg(pr, exName) {
   const nameL = (exName || '').toLowerCase();
   for (const [key, val] of Object.entries(liftMap)) { if (nameL.includes(key) && val) { base1rm = val; break; } }
   if (!base1rm) return null;
-  if (pr.load_type === 'percent_1rm') return Math.round((pr.load_value * base1rm) / 2.5) * 2.5;
+  if (pr.load_type === 'percent_1rm') {
+    const pct = pr.load_value > 1 ? pr.load_value / 100 : pr.load_value; // accept 80 or 0.8
+    return Math.round((pct * base1rm) / 2.5) * 2.5;
+  }
   if (pr.load_type === 'rpe') {
     const rpeTable = { 10: 1, 9.5: 0.978, 9: 0.955, 8.5: 0.939, 8: 0.917, 7.5: 0.893, 7: 0.868 };
     const reps = pr.reps || 1;
@@ -3641,7 +3644,7 @@ function trnRenderExercises() {
       const prescribed = pr ? (() => {
         let loadStr = '';
         if (pr.load_type === 'absolute') loadStr = `${pr.load_value}kg`;
-        else if (pr.load_type === 'percent_1rm') loadStr = `${Math.round(pr.load_value * 100)}%${calcKg ? ` → ~${calcKg}kg` : ''}`;
+        else if (pr.load_type === 'percent_1rm') loadStr = `${pr.load_value > 1 ? Math.round(pr.load_value) : Math.round(pr.load_value * 100)}%${calcKg ? ` → ~${calcKg}kg` : ''}`;
         else if (pr.load_type === 'rpe') loadStr = `RPE ${pr.load_value}${calcKg ? ` → ~${calcKg}kg` : ''}`;
         else if (pr.load_type === 'bodyweight') loadStr = 'Bodyweight';
         return `${pr.sets}×${pr.reps} @ ${loadStr}${pr.rest_seconds ? ` · ${Math.round(pr.rest_seconds/60)}min rest` : ''}`;
