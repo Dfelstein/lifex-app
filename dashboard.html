@@ -400,6 +400,11 @@ body { background: var(--bg); color: var(--text); font-family: 'Outfit', sans-se
       <div class="nav-item" data-screen="rmr"><span class="nav-icon">🔥</span> RMR — Metabolism</div>
     </div>
     <div class="nav-group">
+      <div class="nav-group-label">Training</div>
+      <div class="nav-item" data-screen="training"><span class="nav-icon">🏋️</span> My Program</div>
+      <div class="nav-item" data-screen="nutrition"><span class="nav-icon">🥗</span> Nutrition</div>
+    </div>
+    <div class="nav-group">
       <div class="nav-group-label">Track</div>
       <div class="nav-item" data-screen="progress"><span class="nav-icon">📝</span> Progress Log</div>
     </div>
@@ -671,6 +676,66 @@ body { background: var(--bg); color: var(--text); font-family: 'Outfit', sans-se
     </div>
   </div>
 
+  <!-- ── TRAINING SCREEN ── -->
+  <div id="screen-training" class="screen">
+    <div class="page-header">
+      <div class="page-title">My Program</div>
+      <div class="page-subtitle" id="trn-program-subtitle">Loading…</div>
+    </div>
+    <div id="trn-no-program" style="display:none;">
+      <div class="alert warn" style="margin-bottom:20px;">
+        <div class="alert-icon">🏋️</div>
+        <div><div class="alert-title">No program assigned yet</div>
+        <div class="alert-body">Your trainer will assign a program. Come back once it's set up.</div></div>
+      </div>
+    </div>
+    <div id="trn-program-body" style="display:none;">
+      <!-- Week selector -->
+      <div style="display:flex;align-items:center;gap:12px;margin-bottom:20px;flex-wrap:wrap;">
+        <div style="font-size:11px;font-weight:600;text-transform:uppercase;letter-spacing:0.8px;color:var(--muted2);">Week</div>
+        <div id="trn-week-tabs" style="display:flex;gap:6px;flex-wrap:wrap;"></div>
+      </div>
+      <!-- Day tabs -->
+      <div id="trn-day-tabs" style="display:flex;gap:8px;margin-bottom:20px;flex-wrap:wrap;"></div>
+      <!-- Exercises for current day -->
+      <div id="trn-exercises-body"></div>
+    </div>
+  </div>
+
+  <!-- ── NUTRITION SCREEN ── -->
+  <div id="screen-nutrition" class="screen">
+    <div class="page-header">
+      <div class="page-title">Nutrition</div>
+      <div class="page-subtitle">Daily macros, weight, steps and sleep</div>
+    </div>
+    <!-- Targets row -->
+    <div id="nutr-targets-row" style="display:grid;grid-template-columns:repeat(4,1fr);gap:12px;margin-bottom:20px;"></div>
+    <!-- Date picker + today's log -->
+    <div class="card" style="margin-bottom:16px;">
+      <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:16px;">
+        <div class="card-title" style="margin-bottom:0;">Daily Log</div>
+        <input type="date" id="nutr-log-date" style="background:var(--surface2);border:1px solid var(--border2);border-radius:8px;padding:6px 10px;color:var(--text);font-family:'Outfit',sans-serif;font-size:12px;outline:none;" onchange="loadNutrDay()">
+      </div>
+      <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px;">
+        <div class="field"><label>Calories</label><input id="nutr-cals" type="number" placeholder="0"></div>
+        <div class="field"><label>Protein (g)</label><input id="nutr-protein" type="number" placeholder="0"></div>
+        <div class="field"><label>Carbs (g)</label><input id="nutr-carbs" type="number" placeholder="0"></div>
+        <div class="field"><label>Fat (g)</label><input id="nutr-fat" type="number" placeholder="0"></div>
+        <div class="field"><label>Steps</label><input id="nutr-steps" type="number" placeholder="0"></div>
+        <div class="field"><label>Sleep (hrs)</label><input id="nutr-sleep" type="number" step="0.5" placeholder="0"></div>
+        <div class="field"><label>Body Weight (kg)</label><input id="nutr-weight" type="number" step="0.1" placeholder="0"></div>
+        <div class="field"><label>Water (ml)</label><input id="nutr-water" type="number" step="100" placeholder="0"></div>
+        <div class="field" style="grid-column:1/-1;"><label>Notes</label><input id="nutr-notes" placeholder="How did you feel today?"></div>
+      </div>
+      <button class="btn btn-gold" onclick="saveNutrLog()" style="margin-top:16px;width:100%;">Save Today's Log</button>
+    </div>
+    <!-- Last 7 days mini chart -->
+    <div class="card">
+      <div class="card-title">Last 7 Days</div>
+      <div id="nutr-history"></div>
+    </div>
+  </div>
+
   <!-- SCAN DETAIL FULL SCREEN -->
   <div id="screen-scan-detail" class="screen" style="padding:0;display:flex;flex-direction:column;">
     <div class="sd-header">
@@ -882,6 +947,8 @@ function navigate(id) {
   if (nav) nav.classList.add('active');
   history.replaceState(null, '', '#' + id);
   if (id === 'body-map') setTimeout(initBodyMap, 60);
+  if (id === 'training') loadTrainingScreen();
+  if (id === 'nutrition') loadNutritionScreen();
 }
 document.querySelectorAll('.nav-item').forEach(item => {
   item.addEventListener('click', () => {
@@ -3274,6 +3341,296 @@ function showBMRegion(rKey) {
         <div style="font-size:20px;font-weight:700;color:var(--text);">${(r.fat_g/1000).toFixed(2)} <span style="font-size:12px;color:var(--muted2);">kg</span></div>
       </div>` : ''}
     ${r.extra ? `<div style="font-size:12px;padding:8px 10px;background:var(--surface2);border-radius:6px;color:var(--muted2);">${r.extra}</div>` : ''}`;
+}
+
+/* ══════════════════════════════════════════════
+   TRAINING MODULE — CLIENT SIDE
+══════════════════════════════════════════════ */
+let trnAssignment = null;
+let trnProgram = null;
+let trnDays = [];
+let trnCurrentWeek = 1;
+let trnCurrentDayIdx = 0;
+let trnStats = null;
+let trnLogs = {};
+
+async function loadTrainingScreen() {
+  const uid = (await sb.auth.getUser()).data.user?.id;
+  if (!uid) return;
+
+  const { data: assign } = await sb.from('program_assignments')
+    .select('*, training_programs(id,name,duration_weeks,description)')
+    .eq('client_id', uid).eq('status', 'active')
+    .order('created_at', { ascending: false }).limit(1).single();
+
+  if (!assign) {
+    document.getElementById('trn-no-program').style.display = 'block';
+    document.getElementById('trn-program-body').style.display = 'none';
+    document.getElementById('trn-program-subtitle').textContent = 'No program assigned';
+    return;
+  }
+  trnAssignment = assign;
+  trnProgram = assign.training_programs;
+  trnCurrentWeek = assign.current_week || 1;
+
+  const { data: days } = await sb.from('program_days').select('*').eq('program_id', trnProgram.id).order('day_order');
+  const dayIds = (days || []).map(d => d.id);
+  const { data: exercises } = dayIds.length ? await sb.from('program_exercises').select('*').in('day_id', dayIds).order('exercise_order') : { data: [] };
+  const exIds = (exercises || []).map(e => e.id);
+  const { data: setGroups } = exIds.length ? await sb.from('set_groups').select('*').in('exercise_id', exIds).order('group_order') : { data: [] };
+  const sgIds = (setGroups || []).map(s => s.id);
+  const { data: prescriptions } = sgIds.length ? await sb.from('weekly_prescriptions').select('*').in('set_group_id', sgIds) : { data: [] };
+  const { data: logs } = sgIds.length ? await sb.from('training_logs').select('*').eq('assignment_id', assign.id).in('set_group_id', sgIds) : { data: [] };
+  const { data: stats } = await sb.from('client_training_stats').select('*').eq('client_id', uid).single();
+
+  trnStats = stats;
+  trnDays = (days || []).map(d => ({
+    ...d,
+    exercises: (exercises || []).filter(e => e.day_id === d.id).map(ex => ({
+      ...ex,
+      setGroups: (setGroups || []).filter(sg => sg.exercise_id === ex.id).map(sg => ({
+        ...sg,
+        prescriptions: (prescriptions || []).filter(p => p.set_group_id === sg.id),
+        logs: (logs || []).filter(l => l.set_group_id === sg.id)
+      }))
+    }))
+  }));
+
+  document.getElementById('trn-no-program').style.display = 'none';
+  document.getElementById('trn-program-body').style.display = 'block';
+  document.getElementById('trn-program-subtitle').textContent = `${trnProgram.name} · Week ${trnCurrentWeek} of ${trnProgram.duration_weeks}`;
+
+  trnRenderWeekTabs();
+  trnRenderDayTabs();
+  trnRenderExercises();
+}
+
+function trnRenderWeekTabs() {
+  const weeks = trnProgram.duration_weeks || 8;
+  document.getElementById('trn-week-tabs').innerHTML = Array.from({ length: weeks }, (_, i) => i + 1).map(w => `
+    <button onclick="trnSelectWeek(${w})" style="padding:5px 12px;border-radius:20px;border:1px solid ${w===trnCurrentWeek?'var(--gold)':'var(--border2)'};background:${w===trnCurrentWeek?'rgba(245,200,66,0.12)':'transparent'};color:${w===trnCurrentWeek?'var(--gold)':'var(--muted2)'};font-family:'Outfit',sans-serif;font-size:12px;font-weight:600;cursor:pointer;">W${w}</button>`).join('');
+}
+
+function trnSelectWeek(w) { trnCurrentWeek = w; trnRenderWeekTabs(); trnRenderExercises(); }
+
+function trnRenderDayTabs() {
+  document.getElementById('trn-day-tabs').innerHTML = trnDays.map((d, i) => `
+    <button onclick="trnSelectDay(${i})" style="padding:7px 16px;border-radius:8px;border:1px solid ${i===trnCurrentDayIdx?'var(--blue)':'var(--border2)'};background:${i===trnCurrentDayIdx?'rgba(77,166,255,0.12)':'transparent'};color:${i===trnCurrentDayIdx?'var(--blue)':'var(--muted2)'};font-family:'Outfit',sans-serif;font-size:12px;font-weight:600;cursor:pointer;">${d.name || `Day ${d.day_number}`}</button>`).join('');
+}
+
+function trnSelectDay(i) { trnCurrentDayIdx = i; trnRenderDayTabs(); trnRenderExercises(); }
+
+function trnCalcKg(pr, exName) {
+  if (!pr || pr.load_value == null) return null;
+  if (pr.load_type === 'absolute') return pr.load_value;
+  if (pr.load_type === 'bodyweight') return null;
+  if (!trnStats) return null;
+  const liftMap = { squat: trnStats.squat_1rm, bench: trnStats.bench_1rm, deadlift: trnStats.deadlift_1rm, dead: trnStats.deadlift_1rm, ohp: trnStats.ohp_1rm, overhead: trnStats.ohp_1rm };
+  let base1rm = null;
+  const nameL = (exName || '').toLowerCase();
+  for (const [key, val] of Object.entries(liftMap)) { if (nameL.includes(key) && val) { base1rm = val; break; } }
+  if (!base1rm) return null;
+  if (pr.load_type === 'percent_1rm') return Math.round((pr.load_value * base1rm) / 2.5) * 2.5;
+  if (pr.load_type === 'rpe') {
+    const rpeTable = { 10: 1, 9.5: 0.978, 9: 0.955, 8.5: 0.939, 8: 0.917, 7.5: 0.893, 7: 0.868 };
+    const reps = pr.reps || 1;
+    const rpeKey = Math.min(10, Math.max(6, parseFloat(pr.load_value)));
+    const pct = rpeTable[rpeKey] || 0.9;
+    const repFactor = Math.max(0.6, 1 - (reps - 1) * 0.03);
+    return Math.round((pct * repFactor * base1rm) / 2.5) * 2.5;
+  }
+  return null;
+}
+
+function trnRenderExercises() {
+  const day = trnDays[trnCurrentDayIdx];
+  if (!day) { document.getElementById('trn-exercises-body').innerHTML = ''; return; }
+  const week = trnCurrentWeek;
+  document.getElementById('trn-exercises-body').innerHTML = day.exercises.map(ex => {
+    const sgHtml = ex.setGroups.map(sg => {
+      const pr = sg.prescriptions.find(p => p.week_number === week);
+      const log = sg.logs.find(l => l.week_number === week);
+      const calcKg = trnCalcKg(pr, ex.exercise_name);
+      const prescribed = pr ? (() => {
+        let loadStr = '';
+        if (pr.load_type === 'absolute') loadStr = `${pr.load_value}kg`;
+        else if (pr.load_type === 'percent_1rm') loadStr = `${Math.round(pr.load_value * 100)}%${calcKg ? ` → ~${calcKg}kg` : ''}`;
+        else if (pr.load_type === 'rpe') loadStr = `RPE ${pr.load_value}${calcKg ? ` → ~${calcKg}kg` : ''}`;
+        else if (pr.load_type === 'bodyweight') loadStr = 'Bodyweight';
+        return `${pr.sets}×${pr.reps} @ ${loadStr}${pr.rest_seconds ? ` · ${Math.round(pr.rest_seconds/60)}min rest` : ''}`;
+      })() : 'No prescription for this week';
+
+      const statusColor = { completed: 'var(--green)', failed: 'var(--red)', pending: 'var(--muted2)' }[log?.status || 'pending'];
+      const statusIcon = { completed: '✓', failed: '✗', pending: '…' }[log?.status || 'pending'];
+
+      return `<div style="background:var(--surface2);border-radius:8px;padding:10px 12px;margin-bottom:8px;display:flex;justify-content:space-between;align-items:center;gap:10px;flex-wrap:wrap;">
+        <div style="flex:1;min-width:0;">
+          <div style="font-size:12px;font-weight:600;color:var(--gold);margin-bottom:2px;">${sg.label}</div>
+          <div style="font-size:12px;color:var(--text);">${prescribed}</div>
+          ${log?.actual_weight_kg ? `<div style="font-size:11px;color:var(--muted2);margin-top:3px;">Logged: ${log.actual_weight_kg}kg × ${log.actual_reps} reps × ${log.actual_sets} sets</div>` : ''}
+          ${log?.client_notes ? `<div style="font-size:11px;color:var(--muted2);font-style:italic;">${log.client_notes}</div>` : ''}
+        </div>
+        <div style="display:flex;align-items:center;gap:8px;flex-shrink:0;">
+          <span style="font-size:14px;font-weight:700;color:${statusColor};">${statusIcon}</span>
+          <button onclick="trnOpenLog('${sg.id}','${ex.exercise_name.replace(/'/g,"\\'")}',${JSON.stringify(pr||null).replace(/"/g,'&quot;')},${JSON.stringify(log||null).replace(/"/g,'&quot;')},${week})"
+            style="padding:5px 12px;border-radius:6px;background:rgba(77,166,255,0.12);border:1px solid rgba(77,166,255,0.3);color:var(--blue);font-family:'Outfit',sans-serif;font-size:12px;cursor:pointer;">Log</button>
+        </div>
+      </div>`;
+    }).join('');
+    return `<div class="card" style="margin-bottom:14px;">
+      <div style="display:flex;justify-content:space-between;align-items:flex-start;margin-bottom:12px;">
+        <div>
+          <div style="font-weight:700;font-size:15px;">${ex.exercise_name}</div>
+          ${ex.tempo ? `<div style="font-size:11px;color:var(--muted2);">Tempo ${ex.tempo}</div>` : ''}
+          ${ex.notes ? `<div style="font-size:12px;color:var(--muted2);margin-top:3px;font-style:italic;">${ex.notes}</div>` : ''}
+        </div>
+        <span style="font-size:10px;padding:2px 7px;border-radius:8px;background:rgba(245,200,66,0.1);color:var(--gold);">${ex.lift_type.replace('_',' ')}</span>
+      </div>
+      ${sgHtml || '<div style="color:var(--muted2);font-size:12px;">No set groups.</div>'}
+    </div>`;
+  }).join('') || '<div style="color:var(--muted2);">No exercises for this day.</div>';
+}
+
+let trnLogModal = null;
+function trnOpenLog(sgId, exName, prescription, existingLog, week) {
+  const calcKg = trnCalcKg(prescription, exName);
+  const modal = document.createElement('div');
+  modal.id = 'trn-log-modal-wrap';
+  modal.style.cssText = 'position:fixed;inset:0;background:rgba(0,0,0,0.75);z-index:300;display:flex;align-items:flex-end;';
+  const defaultKg = existingLog?.actual_weight_kg ?? calcKg ?? prescription?.load_value ?? '';
+  const defaultReps = existingLog?.actual_reps ?? prescription?.reps ?? '';
+  const defaultSets = existingLog?.actual_sets ?? prescription?.sets ?? 3;
+  modal.innerHTML = `
+    <div style="background:var(--surface);border-radius:20px 20px 0 0;padding:24px;width:100%;max-height:85vh;overflow-y:auto;">
+      <div style="font-family:'Bebas Neue',sans-serif;font-size:22px;letter-spacing:2px;margin-bottom:4px;">${exName}</div>
+      <div style="font-size:12px;color:var(--gold);margin-bottom:20px;">${prescription ? `Prescribed: ${prescription.sets}×${prescription.reps}${calcKg ? ` @ ~${calcKg}kg` : ''}` : 'No prescription'}</div>
+      <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px;margin-bottom:12px;">
+        <div class="field"><label>Weight (kg)</label><input id="log-kg" type="number" step="0.5" value="${defaultKg}" placeholder="0"></div>
+        <div class="field"><label>Reps</label><input id="log-reps" type="number" value="${defaultReps}" placeholder="0"></div>
+        <div class="field"><label>Sets completed</label><input id="log-sets" type="number" value="${defaultSets}" placeholder="0"></div>
+        <div class="field"><label>Actual RPE</label><input id="log-rpe" type="number" step="0.5" min="1" max="10" value="${existingLog?.rpe_actual||''}" placeholder="—"></div>
+        <div class="field" style="grid-column:1/-1;"><label>Notes</label><input id="log-notes" value="${existingLog?.client_notes||''}" placeholder="How did it feel?"></div>
+      </div>
+      <div style="display:flex;gap:8px;flex-wrap:wrap;margin-bottom:16px;">
+        <button onclick="trnSaveLog('${sgId}',${week},'completed')" style="flex:1;padding:10px;border-radius:8px;background:rgba(57,224,122,0.15);border:1px solid rgba(57,224,122,0.3);color:var(--green);font-family:'Outfit',sans-serif;font-size:13px;font-weight:600;cursor:pointer;">✓ Completed</button>
+        <button onclick="trnSaveLog('${sgId}',${week},'failed')" style="flex:1;padding:10px;border-radius:8px;background:rgba(255,85,85,0.1);border:1px solid rgba(255,85,85,0.3);color:var(--red);font-family:'Outfit',sans-serif;font-size:13px;font-weight:600;cursor:pointer;">✗ Missed</button>
+      </div>
+      <button onclick="document.getElementById('trn-log-modal-wrap').remove()" style="width:100%;padding:10px;border-radius:8px;background:transparent;border:1px solid var(--border2);color:var(--muted2);font-family:'Outfit',sans-serif;font-size:13px;cursor:pointer;">Cancel</button>
+    </div>`;
+  document.body.appendChild(modal);
+}
+
+async function trnSaveLog(sgId, week, status) {
+  const uid = (await sb.auth.getUser()).data.user?.id;
+  const kg = parseFloat(document.getElementById('log-kg').value) || null;
+  const reps = parseInt(document.getElementById('log-reps').value) || null;
+  const sets = parseInt(document.getElementById('log-sets').value) || null;
+  const rpe = parseFloat(document.getElementById('log-rpe').value) || null;
+  const notes = document.getElementById('log-notes').value;
+  await sb.from('training_logs').upsert({
+    assignment_id: trnAssignment.id, set_group_id: sgId, week_number: week,
+    logged_date: new Date().toISOString().split('T')[0],
+    actual_weight_kg: kg, actual_reps: reps, actual_sets: sets, rpe_actual: rpe,
+    status, client_notes: notes
+  }, { onConflict: 'assignment_id,set_group_id,week_number' });
+  document.getElementById('trn-log-modal-wrap')?.remove();
+  await loadTrainingScreen();
+}
+
+/* ── NUTRITION SCREEN ── */
+async function loadNutritionScreen() {
+  const uid = (await sb.auth.getUser()).data.user?.id;
+  if (!uid) return;
+  const today = new Date().toISOString().split('T')[0];
+  document.getElementById('nutr-log-date').value = today;
+
+  const [{ data: target }, { data: log }] = await Promise.all([
+    sb.from('nutrition_targets').select('*').eq('client_id', uid).order('active_from', { ascending: false }).limit(1).single(),
+    sb.from('nutrition_logs').select('*').eq('client_id', uid).eq('log_date', today).single()
+  ]);
+
+  const row = document.getElementById('nutr-targets-row');
+  if (target) {
+    row.innerHTML = [
+      { label: 'Calories', val: target.calories, unit: 'kcal', color: 'gold' },
+      { label: 'Protein', val: target.protein_g ? `${target.protein_g}g` : '—', unit: '', color: 'blue' },
+      { label: 'Carbs', val: target.carbs_g ? `${target.carbs_g}g` : '—', unit: '', color: 'orange' },
+      { label: 'Fat', val: target.fat_g ? `${target.fat_g}g` : '—', unit: '', color: 'teal' }
+    ].map(t => `<div class="stat-tile ${t.color}"><div class="tile-label">${t.label} Target</div><div class="tile-value">${t.val||'—'}<span class="tile-unit">${t.unit}</span></div></div>`).join('');
+  } else {
+    row.innerHTML = `<div style="grid-column:1/-1;color:var(--muted2);font-size:13px;">No targets set. Ask your trainer to set macro targets.</div>`;
+  }
+
+  if (log) {
+    document.getElementById('nutr-cals').value = log.calories || '';
+    document.getElementById('nutr-protein').value = log.protein_g || '';
+    document.getElementById('nutr-carbs').value = log.carbs_g || '';
+    document.getElementById('nutr-fat').value = log.fat_g || '';
+    document.getElementById('nutr-steps').value = log.steps || '';
+    document.getElementById('nutr-sleep').value = log.sleep_hours || '';
+    document.getElementById('nutr-weight').value = log.weight_kg || '';
+    document.getElementById('nutr-water').value = log.water_ml || '';
+    document.getElementById('nutr-notes').value = log.notes || '';
+  } else {
+    ['nutr-cals','nutr-protein','nutr-carbs','nutr-fat','nutr-steps','nutr-sleep','nutr-weight','nutr-water','nutr-notes'].forEach(id => { document.getElementById(id).value = ''; });
+  }
+  await loadNutrHistory(uid);
+}
+
+async function loadNutrDay() {
+  const uid = (await sb.auth.getUser()).data.user?.id;
+  const date = document.getElementById('nutr-log-date').value;
+  const { data: log } = await sb.from('nutrition_logs').select('*').eq('client_id', uid).eq('log_date', date).single();
+  if (log) {
+    document.getElementById('nutr-cals').value = log.calories || '';
+    document.getElementById('nutr-protein').value = log.protein_g || '';
+    document.getElementById('nutr-carbs').value = log.carbs_g || '';
+    document.getElementById('nutr-fat').value = log.fat_g || '';
+    document.getElementById('nutr-steps').value = log.steps || '';
+    document.getElementById('nutr-sleep').value = log.sleep_hours || '';
+    document.getElementById('nutr-weight').value = log.weight_kg || '';
+    document.getElementById('nutr-water').value = log.water_ml || '';
+    document.getElementById('nutr-notes').value = log.notes || '';
+  } else {
+    ['nutr-cals','nutr-protein','nutr-carbs','nutr-fat','nutr-steps','nutr-sleep','nutr-weight','nutr-water','nutr-notes'].forEach(id => { document.getElementById(id).value = ''; });
+  }
+}
+
+async function saveNutrLog() {
+  const uid = (await sb.auth.getUser()).data.user?.id;
+  const date = document.getElementById('nutr-log-date').value;
+  await sb.from('nutrition_logs').upsert({
+    client_id: uid, log_date: date,
+    calories: parseInt(document.getElementById('nutr-cals').value)||null,
+    protein_g: parseFloat(document.getElementById('nutr-protein').value)||null,
+    carbs_g: parseFloat(document.getElementById('nutr-carbs').value)||null,
+    fat_g: parseFloat(document.getElementById('nutr-fat').value)||null,
+    steps: parseInt(document.getElementById('nutr-steps').value)||null,
+    sleep_hours: parseFloat(document.getElementById('nutr-sleep').value)||null,
+    weight_kg: parseFloat(document.getElementById('nutr-weight').value)||null,
+    water_ml: parseInt(document.getElementById('nutr-water').value)||null,
+    notes: document.getElementById('nutr-notes').value
+  }, { onConflict: 'client_id,log_date' });
+  const el = document.querySelector('#screen-nutrition .btn-gold');
+  const orig = el.textContent; el.textContent = '✓ Saved!'; el.style.background='var(--green)';el.style.color='#000';
+  setTimeout(() => { el.textContent = orig; el.style.background=''; el.style.color=''; }, 1500);
+  await loadNutrHistory(uid);
+}
+
+async function loadNutrHistory(uid) {
+  const { data: logs } = await sb.from('nutrition_logs').select('log_date,calories,protein_g,steps,weight_kg').eq('client_id', uid).order('log_date', { ascending: false }).limit(7);
+  const el = document.getElementById('nutr-history');
+  if (!logs || !logs.length) { el.innerHTML = '<div style="color:var(--muted2);font-size:13px;">No logs yet.</div>'; return; }
+  el.innerHTML = logs.reverse().map(l => `
+    <div style="display:flex;align-items:center;gap:8px;padding:8px 0;border-bottom:1px solid var(--border);">
+      <div style="width:70px;font-size:11px;color:var(--muted2);">${l.log_date}</div>
+      <div style="flex:1;display:flex;gap:12px;flex-wrap:wrap;">
+        ${l.calories ? `<span style="font-size:12px;"><span style="color:var(--gold);font-weight:600;">${l.calories}</span><span style="color:var(--muted2);font-size:10px;"> kcal</span></span>` : ''}
+        ${l.protein_g ? `<span style="font-size:12px;"><span style="color:var(--blue);font-weight:600;">${l.protein_g}g</span><span style="color:var(--muted2);font-size:10px;"> P</span></span>` : ''}
+        ${l.steps ? `<span style="font-size:12px;"><span style="color:var(--teal);font-weight:600;">${l.steps.toLocaleString()}</span><span style="color:var(--muted2);font-size:10px;"> steps</span></span>` : ''}
+        ${l.weight_kg ? `<span style="font-size:12px;"><span style="color:var(--text);font-weight:600;">${l.weight_kg}kg</span></span>` : ''}
+      </div>
+    </div>`).join('');
 }
 
 init();

@@ -346,6 +346,10 @@ html, body { height: 100%; background: var(--bg); color: var(--text); font-famil
     <div class="nav-item" data-panel="all-scans" onclick="showPanel('all-scans')"><span class="nav-icon">🔬</span> All Scans</div>
     <div class="nav-item" data-panel="new-client" onclick="showPanel('new-client')"><span class="nav-icon">➕</span> New Client</div>
 
+    <div class="nav-group-label" style="margin-top:8px;">Training</div>
+    <div class="nav-item" data-panel="training" onclick="showPanel('training')"><span class="nav-icon">🏋️</span> Programs</div>
+    <div class="nav-item" data-panel="nutrition-mgmt" onclick="showPanel('nutrition-mgmt')"><span class="nav-icon">🥗</span> Nutrition</div>
+
     <div class="nav-group-label" style="margin-top:8px;">Insights</div>
     <div class="nav-item" data-panel="analytics" onclick="showPanel('analytics')"><span class="nav-icon">📊</span> Analytics</div>
     <div class="nav-item" id="nav-marketing" onclick="window.location.href='marketing.html'" style="color:var(--gold);display:none;"><span class="nav-icon">🎯</span> Marketing Hub</div>
@@ -817,10 +821,110 @@ html, body { height: 100%; background: var(--bg); color: var(--text); font-famil
     </div>
   </div>
 
+  <!-- ── TRAINING PROGRAMS ── -->
+  <div id="panel-training" class="panel">
+    <div id="trn-list-view">
+      <div style="display:flex;align-items:flex-start;justify-content:space-between;margin-bottom:4px;">
+        <div>
+          <div class="page-title">Training Programs</div>
+          <div class="page-subtitle">Build precision programs with per-week load prescriptions</div>
+        </div>
+        <button class="btn btn-gold" onclick="trnNewProgram()" style="margin-top:6px;">+ New Program</button>
+      </div>
+      <div id="trn-programs-grid" style="display:grid;grid-template-columns:repeat(auto-fill,minmax(300px,1fr));gap:14px;margin-top:20px;"></div>
+    </div>
+    <div id="trn-editor-view" style="display:none;">
+      <div style="display:flex;align-items:center;gap:12px;margin-bottom:20px;">
+        <button class="btn btn-outline btn-sm" onclick="trnBackToList()">← Programs</button>
+        <div class="page-title" style="margin-bottom:0;" id="trn-editor-title">New Program</div>
+      </div>
+      <div class="card" style="margin-bottom:16px;">
+        <div class="card-title">Program Details</div>
+        <div class="form-grid">
+          <div class="field field-full"><label>Program Name</label><input id="trn-name" placeholder="e.g. Bonner Leg Conditioning Block 1"></div>
+          <div class="field"><label>Duration (weeks)</label><input id="trn-weeks" type="number" value="8" min="1" max="52"></div>
+          <div class="field"><label>Type</label><select id="trn-type">
+            <option value="pt_custom">PT Custom</option>
+            <option value="dexa_template">DEXA Template</option>
+          </select></div>
+          <div class="field field-full"><label>Description / Cues</label><input id="trn-desc" placeholder="Optional coach notes about this block"></div>
+        </div>
+      </div>
+      <div id="trn-days-container"></div>
+      <button onclick="trnAddDay()" class="btn btn-outline" style="margin-bottom:20px;">+ Add Training Day</button>
+      <div style="display:flex;gap:12px;flex-wrap:wrap;">
+        <button class="btn btn-gold" onclick="trnSaveProgram()" id="trn-save-btn">Save Program</button>
+        <button class="btn btn-blue" onclick="trnOpenAssign()" id="trn-assign-btn" style="display:none;">Assign to Client →</button>
+        <button class="btn btn-outline" onclick="trnBackToList()">Cancel</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- ── NUTRITION MANAGEMENT ── -->
+  <div id="panel-nutrition-mgmt" class="panel">
+    <div style="display:flex;align-items:flex-start;justify-content:space-between;margin-bottom:4px;">
+      <div>
+        <div class="page-title">Nutrition Management</div>
+        <div class="page-subtitle">Set macro targets and 1RMs for clients</div>
+      </div>
+    </div>
+    <div class="client-bar" style="margin-bottom:20px;">
+      <label>Client</label>
+      <select id="nutr-client-select" onchange="loadNutrMgmt()"><option value="">— Select Client —</option></select>
+    </div>
+    <div id="nutr-mgmt-body" style="display:none;">
+      <div style="display:grid;grid-template-columns:1fr 1fr;gap:16px;">
+        <!-- 1RMs card -->
+        <div class="card">
+          <div class="card-title">Strength — 1 Rep Maxes</div>
+          <div class="form-grid">
+            <div class="field"><label>Squat 1RM (kg)</label><input id="nm-squat" type="number" placeholder="0"></div>
+            <div class="field"><label>Bench 1RM (kg)</label><input id="nm-bench" type="number" placeholder="0"></div>
+            <div class="field"><label>Deadlift 1RM (kg)</label><input id="nm-dead" type="number" placeholder="0"></div>
+            <div class="field"><label>OHP 1RM (kg)</label><input id="nm-ohp" type="number" placeholder="0"></div>
+          </div>
+          <button class="btn btn-blue btn-sm" onclick="saveClientStats()" style="margin-top:12px;">Save 1RMs</button>
+        </div>
+        <!-- Macro targets card -->
+        <div class="card">
+          <div class="card-title">Daily Macro Targets</div>
+          <div class="form-grid">
+            <div class="field"><label>Calories</label><input id="nm-cals" type="number" placeholder="2000"></div>
+            <div class="field"><label>Protein (g)</label><input id="nm-protein" type="number" placeholder="160"></div>
+            <div class="field"><label>Carbs (g)</label><input id="nm-carbs" type="number" placeholder="220"></div>
+            <div class="field"><label>Fat (g)</label><input id="nm-fat" type="number" placeholder="70"></div>
+            <div class="field field-full"><label>Notes</label><input id="nm-notes" placeholder="e.g. 200 extra cals on training days"></div>
+          </div>
+          <button class="btn btn-gold btn-sm" onclick="saveNutrTargets()" style="margin-top:12px;">Save Targets</button>
+        </div>
+      </div>
+      <!-- Active assignment for this client -->
+      <div class="card" style="margin-top:16px;">
+        <div class="card-title">Active Training Program</div>
+        <div id="nm-active-program">No active program assigned.</div>
+      </div>
+    </div>
+  </div>
+
 </main>
 </div>
 
 <div class="toast" id="toast"></div>
+
+<!-- ASSIGN PROGRAM MODAL -->
+<div id="trn-assign-overlay" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,0.7);z-index:200;" onclick="trnCloseAssign()"></div>
+<div id="trn-assign-modal" style="display:none;position:fixed;top:50%;left:50%;transform:translate(-50%,-50%);background:var(--surface);border:1px solid var(--border2);border-radius:16px;padding:28px;width:420px;z-index:201;">
+  <div style="font-family:'Bebas Neue',sans-serif;font-size:24px;letter-spacing:2px;margin-bottom:16px;">Assign Program</div>
+  <div class="form-grid" style="grid-template-columns:1fr;">
+    <div class="field"><label>Client</label><select id="trn-assign-client"></select></div>
+    <div class="field"><label>Start Date</label><input id="trn-assign-date" type="date"></div>
+    <div class="field"><label>Notes</label><input id="trn-assign-notes" placeholder="Optional notes"></div>
+  </div>
+  <div style="display:flex;gap:10px;margin-top:20px;">
+    <button class="btn btn-gold" onclick="trnSaveAssignment()">Assign →</button>
+    <button class="btn btn-outline" onclick="trnCloseAssign()">Cancel</button>
+  </div>
+</div>
 
 <script>
 // Anthropic key handled server-side via edge functions
@@ -2659,6 +2763,8 @@ function showPanel(id) {
     setTimeout(() => { if (_leafletMap) _leafletMap.invalidateSize(); }, 100);
   }
   if (id === 'all-scans') loadAllScans();
+  if (id === 'training') loadTrainingPanel();
+  if (id === 'nutrition-mgmt') loadNutrMgmtPanel();
 }
 
 /* ══ TOAST ══ */
@@ -5022,6 +5128,386 @@ function closeStaffScanDetail() {
   document.getElementById('staffScanSheetOverlay').classList.remove('open');
   document.getElementById('staffScanSheet').classList.remove('open');
   document.body.style.overflow = '';
+}
+
+/* ══════════════════════════════════════════════
+   TRAINING PROGRAMS MODULE
+══════════════════════════════════════════════ */
+
+let trnState = { programId: null, name: '', weeks: 8, type: 'pt_custom', description: '', days: [] };
+let trnAllClients = [];
+let trnSavedProgramId = null;
+
+async function loadTrainingPanel() {
+  const { data: programs } = await sb.from('training_programs').select('*').order('created_at', { ascending: false });
+  const grid = document.getElementById('trn-programs-grid');
+  if (!programs || !programs.length) {
+    grid.innerHTML = `<div style="color:var(--muted2);font-size:13px;">No programs yet. Click + New Program to get started.</div>`;
+    return;
+  }
+  grid.innerHTML = programs.map(p => `
+    <div class="card" style="cursor:pointer;transition:border-color 0.2s;" onmouseenter="this.style.borderColor='var(--blue)'" onmouseleave="this.style.borderColor=''" onclick="trnEditProgram('${p.id}')">
+      <div style="display:flex;justify-content:space-between;align-items:flex-start;">
+        <div>
+          <div style="font-weight:600;font-size:14px;margin-bottom:4px;">${p.name}</div>
+          <div style="font-size:11px;color:var(--muted2);">${p.duration_weeks} weeks · ${p.program_type === 'pt_custom' ? 'PT Custom' : 'DEXA Template'}</div>
+          ${p.description ? `<div style="font-size:12px;color:var(--muted2);margin-top:6px;">${p.description}</div>` : ''}
+        </div>
+        <span style="font-size:10px;padding:3px 8px;border-radius:10px;background:rgba(77,166,255,0.12);color:var(--blue);">Edit</span>
+      </div>
+      <div style="margin-top:14px;display:flex;gap:8px;">
+        <button class="btn btn-gold btn-sm" onclick="event.stopPropagation();trnOpenAssignForProgram('${p.id}','${p.name.replace(/'/g,"\\'")}')">Assign to Client</button>
+        <button class="btn btn-danger btn-sm" onclick="event.stopPropagation();trnDeleteProgram('${p.id}')">Delete</button>
+      </div>
+    </div>`).join('');
+}
+
+function trnNewProgram() {
+  trnState = { programId: null, name: '', weeks: 8, type: 'pt_custom', description: '', days: [] };
+  trnSavedProgramId = null;
+  document.getElementById('trn-list-view').style.display = 'none';
+  document.getElementById('trn-editor-view').style.display = 'block';
+  document.getElementById('trn-editor-title').textContent = 'New Program';
+  document.getElementById('trn-assign-btn').style.display = 'none';
+  document.getElementById('trn-name').value = '';
+  document.getElementById('trn-weeks').value = 8;
+  document.getElementById('trn-type').value = 'pt_custom';
+  document.getElementById('trn-desc').value = '';
+  trnRenderDays();
+}
+
+async function trnEditProgram(id) {
+  const { data: prog } = await sb.from('training_programs').select('*').eq('id', id).single();
+  const { data: days } = await sb.from('program_days').select('*').eq('program_id', id).order('day_order');
+  const dayIds = (days || []).map(d => d.id);
+  const { data: exercises } = dayIds.length ? await sb.from('program_exercises').select('*').in('day_id', dayIds).order('exercise_order') : { data: [] };
+  const exIds = (exercises || []).map(e => e.id);
+  const { data: setGroups } = exIds.length ? await sb.from('set_groups').select('*').in('exercise_id', exIds).order('group_order') : { data: [] };
+  const sgIds = (setGroups || []).map(s => s.id);
+  const { data: prescriptions } = sgIds.length ? await sb.from('weekly_prescriptions').select('*').in('set_group_id', sgIds).order('week_number') : { data: [] };
+
+  trnState = {
+    programId: id,
+    name: prog.name, weeks: prog.duration_weeks, type: prog.program_type, description: prog.description || '',
+    days: (days || []).map(d => ({
+      id: d.id, dayNumber: d.day_number, name: d.name,
+      exercises: (exercises || []).filter(e => e.day_id === d.id).map(ex => ({
+        id: ex.id, name: ex.exercise_name, liftType: ex.lift_type, notes: ex.notes || '', tempo: ex.tempo || '',
+        setGroups: (setGroups || []).filter(sg => sg.exercise_id === ex.id).map(sg => ({
+          id: sg.id, label: sg.label, groupType: sg.group_type,
+          prescriptions: (prescriptions || []).filter(p => p.set_group_id === sg.id).map(p => ({
+            week: p.week_number, loadType: p.load_type, loadValue: p.load_value, reps: p.reps, sets: p.sets, rest: p.rest_seconds
+          }))
+        }))
+      }))
+    }))
+  };
+  trnSavedProgramId = id;
+  document.getElementById('trn-list-view').style.display = 'none';
+  document.getElementById('trn-editor-view').style.display = 'block';
+  document.getElementById('trn-editor-title').textContent = prog.name;
+  document.getElementById('trn-name').value = prog.name;
+  document.getElementById('trn-weeks').value = prog.duration_weeks;
+  document.getElementById('trn-type').value = prog.program_type;
+  document.getElementById('trn-desc').value = prog.description || '';
+  document.getElementById('trn-assign-btn').style.display = 'inline-flex';
+  trnRenderDays();
+}
+
+function trnBackToList() {
+  document.getElementById('trn-list-view').style.display = 'block';
+  document.getElementById('trn-editor-view').style.display = 'none';
+  loadTrainingPanel();
+}
+
+function trnAddDay() {
+  const n = trnState.days.length + 1;
+  trnState.days.push({ id: null, dayNumber: n, name: `Day ${n}`, exercises: [] });
+  trnRenderDays();
+}
+
+function trnRemoveDay(di) {
+  trnState.days.splice(di, 1);
+  trnState.days.forEach((d, i) => { d.dayNumber = i + 1; if (!d.name || d.name.match(/^Day \d+$/)) d.name = `Day ${i + 1}`; });
+  trnRenderDays();
+}
+
+function trnAddExercise(di) {
+  trnState.days[di].exercises.push({ id: null, name: '', liftType: 'accessory', notes: '', tempo: '', setGroups: [] });
+  trnRenderDays();
+}
+
+function trnRemoveExercise(di, ei) { trnState.days[di].exercises.splice(ei, 1); trnRenderDays(); }
+
+function trnAddSetGroup(di, ei) {
+  trnState.days[di].exercises[ei].setGroups.push({ id: null, label: 'Working Sets', groupType: 'volume', prescriptions: [] });
+  trnRenderDays();
+}
+
+function trnRemoveSetGroup(di, ei, si) { trnState.days[di].exercises[ei].setGroups.splice(si, 1); trnRenderDays(); }
+
+function trnRenderDays() {
+  const weeks = parseInt(document.getElementById('trn-weeks').value) || 8;
+  const c = document.getElementById('trn-days-container');
+  c.innerHTML = trnState.days.map((day, di) => `
+    <div class="card" style="margin-bottom:12px;border-color:rgba(77,166,255,0.2);">
+      <div style="display:flex;align-items:center;gap:10px;margin-bottom:12px;">
+        <span style="font-size:11px;font-weight:700;color:var(--blue);text-transform:uppercase;letter-spacing:1px;">Day ${day.dayNumber}</span>
+        <input value="${day.name}" onchange="trnState.days[${di}].name=this.value"
+          style="flex:1;background:var(--surface2);border:1px solid var(--border2);border-radius:6px;padding:6px 10px;color:var(--text);font-family:'Outfit',sans-serif;font-size:13px;outline:none;"
+          placeholder="Day name (e.g. Legs, Push, Pull)">
+        <button class="del-btn" onclick="trnRemoveDay(${di})">✕</button>
+      </div>
+      ${day.exercises.map((ex, ei) => `
+        <div style="background:var(--surface2);border-radius:10px;padding:14px;margin-bottom:10px;border:1px solid var(--border);">
+          <div style="display:flex;gap:8px;align-items:center;margin-bottom:10px;flex-wrap:wrap;">
+            <input value="${ex.name}" onchange="trnState.days[${di}].exercises[${ei}].name=this.value"
+              placeholder="Exercise name" style="flex:1;min-width:160px;background:var(--surface3);border:1px solid var(--border2);border-radius:6px;padding:7px 10px;color:var(--text);font-family:'Outfit',sans-serif;font-size:13px;outline:none;font-weight:600;">
+            <select onchange="trnState.days[${di}].exercises[${ei}].liftType=this.value"
+              style="background:var(--surface3);border:1px solid var(--border2);border-radius:6px;padding:7px 8px;color:var(--text);font-family:'Outfit',sans-serif;font-size:11px;outline:none;">
+              <option value="main_lift" ${ex.liftType==='main_lift'?'selected':''}>Main Lift</option>
+              <option value="secondary" ${ex.liftType==='secondary'?'selected':''}>Secondary</option>
+              <option value="accessory" ${ex.liftType==='accessory'?'selected':''}>Accessory</option>
+            </select>
+            <input value="${ex.tempo}" onchange="trnState.days[${di}].exercises[${ei}].tempo=this.value"
+              placeholder="Tempo e.g. 2.0.2" style="width:110px;background:var(--surface3);border:1px solid var(--border2);border-radius:6px;padding:7px 8px;color:var(--text);font-family:'Outfit',sans-serif;font-size:12px;outline:none;">
+            <button class="del-btn" onclick="trnRemoveExercise(${di},${ei})">✕</button>
+          </div>
+          <input value="${ex.notes}" onchange="trnState.days[${di}].exercises[${ei}].notes=this.value"
+            placeholder="Coach cues / notes for this exercise"
+            style="width:100%;background:var(--surface3);border:1px solid var(--border);border-radius:6px;padding:6px 10px;color:var(--muted2);font-family:'Outfit',sans-serif;font-size:12px;outline:none;margin-bottom:10px;">
+          ${ex.setGroups.map((sg, si) => `
+            <div style="background:var(--surface);border-radius:8px;padding:10px 12px;margin-bottom:8px;border:1px solid var(--border);">
+              <div style="display:flex;gap:8px;align-items:center;margin-bottom:8px;flex-wrap:wrap;">
+                <input value="${sg.label}" onchange="trnState.days[${di}].exercises[${ei}].setGroups[${si}].label=this.value"
+                  placeholder="Set group label" style="flex:1;min-width:120px;background:var(--surface2);border:1px solid var(--border2);border-radius:6px;padding:6px 9px;color:var(--gold);font-family:'Outfit',sans-serif;font-size:12px;font-weight:600;outline:none;">
+                <select onchange="trnState.days[${di}].exercises[${ei}].setGroups[${si}].groupType=this.value"
+                  style="background:var(--surface2);border:1px solid var(--border2);border-radius:6px;padding:6px 8px;color:var(--text);font-family:'Outfit',sans-serif;font-size:11px;outline:none;">
+                  <option value="top_set" ${sg.groupType==='top_set'?'selected':''}>Top Set</option>
+                  <option value="backoff" ${sg.groupType==='backoff'?'selected':''}>Back-off</option>
+                  <option value="volume" ${sg.groupType==='volume'?'selected':''}>Volume</option>
+                  <option value="warmup" ${sg.groupType==='warmup'?'selected':''}>Warm-up</option>
+                </select>
+                <button class="del-btn" onclick="trnRemoveSetGroup(${di},${ei},${si})">✕</button>
+              </div>
+              ${trnRenderPrescriptionTable(di, ei, si, weeks, sg)}
+            </div>`).join('')}
+          <button onclick="trnAddSetGroup(${di},${ei})" style="margin-top:4px;background:transparent;border:1px dashed var(--border2);border-radius:6px;padding:5px 12px;color:var(--muted2);font-family:'Outfit',sans-serif;font-size:12px;cursor:pointer;">+ Add Set Group</button>
+        </div>`).join('')}
+      <button onclick="trnAddExercise(${di})" style="background:transparent;border:1px dashed var(--border2);border-radius:6px;padding:6px 14px;color:var(--blue);font-family:'Outfit',sans-serif;font-size:12px;cursor:pointer;">+ Add Exercise</button>
+    </div>`).join('');
+}
+
+function trnRenderPrescriptionTable(di, ei, si, weeks, sg) {
+  const wks = Array.from({ length: weeks }, (_, i) => i + 1);
+  const p = sg.prescriptions || [];
+  const getP = (w) => p.find(x => x.week === w) || { loadType: 'absolute', loadValue: '', reps: '', sets: 3, rest: 180 };
+  return `<div style="overflow-x:auto;">
+    <table style="width:100%;border-collapse:collapse;font-size:11px;">
+      <thead><tr>
+        <td style="color:var(--muted);padding:3px 6px;min-width:60px;"></td>
+        ${wks.map(w => `<td style="color:var(--muted2);padding:3px 6px;text-align:center;font-weight:600;">W${w}</td>`).join('')}
+      </tr></thead>
+      <tbody>
+        <tr>
+          <td style="color:var(--muted2);padding:3px 6px;white-space:nowrap;">Load Type</td>
+          ${wks.map(w => { const pr = getP(w); return `<td style="padding:2px 3px;"><select onchange="trnSetPrescription(${di},${ei},${si},${w},'loadType',this.value)"
+            style="width:70px;background:var(--surface2);border:1px solid var(--border);border-radius:4px;padding:3px 4px;color:var(--text);font-family:'Outfit',sans-serif;font-size:10px;outline:none;">
+            <option value="absolute" ${pr.loadType==='absolute'?'selected':''}>kg</option>
+            <option value="percent_1rm" ${pr.loadType==='percent_1rm'?'selected':''}>% 1RM</option>
+            <option value="rpe" ${pr.loadType==='rpe'?'selected':''}>RPE</option>
+            <option value="bodyweight" ${pr.loadType==='bodyweight'?'selected':''}>BW</option>
+          </select></td>`; }).join('')}
+        </tr>
+        <tr>
+          <td style="color:var(--muted2);padding:3px 6px;">Load</td>
+          ${wks.map(w => { const pr = getP(w); return `<td style="padding:2px 3px;"><input type="number" step="0.5" value="${pr.loadValue}"
+            onchange="trnSetPrescription(${di},${ei},${si},${w},'loadValue',parseFloat(this.value)||null)"
+            style="width:60px;background:var(--surface2);border:1px solid var(--border);border-radius:4px;padding:3px 5px;color:var(--gold);font-family:'Outfit',sans-serif;font-size:11px;font-weight:600;outline:none;text-align:center;"></td>`; }).join('')}
+        </tr>
+        <tr>
+          <td style="color:var(--muted2);padding:3px 6px;">Reps</td>
+          ${wks.map(w => { const pr = getP(w); return `<td style="padding:2px 3px;"><input type="number" value="${pr.reps}"
+            onchange="trnSetPrescription(${di},${ei},${si},${w},'reps',parseInt(this.value)||null)"
+            style="width:60px;background:var(--surface2);border:1px solid var(--border);border-radius:4px;padding:3px 5px;color:var(--text);font-family:'Outfit',sans-serif;font-size:11px;outline:none;text-align:center;"></td>`; }).join('')}
+        </tr>
+        <tr>
+          <td style="color:var(--muted2);padding:3px 6px;">Sets</td>
+          ${wks.map(w => { const pr = getP(w); return `<td style="padding:2px 3px;"><input type="number" value="${pr.sets||3}"
+            onchange="trnSetPrescription(${di},${ei},${si},${w},'sets',parseInt(this.value)||3)"
+            style="width:60px;background:var(--surface2);border:1px solid var(--border);border-radius:4px;padding:3px 5px;color:var(--text);font-family:'Outfit',sans-serif;font-size:11px;outline:none;text-align:center;"></td>`; }).join('')}
+        </tr>
+        <tr>
+          <td style="color:var(--muted2);padding:3px 6px;">Rest (s)</td>
+          ${wks.map(w => { const pr = getP(w); return `<td style="padding:2px 3px;"><input type="number" step="30" value="${pr.rest||180}"
+            onchange="trnSetPrescription(${di},${ei},${si},${w},'rest',parseInt(this.value)||180)"
+            style="width:60px;background:var(--surface2);border:1px solid var(--border);border-radius:4px;padding:3px 5px;color:var(--muted2);font-family:'Outfit',sans-serif;font-size:11px;outline:none;text-align:center;"></td>`; }).join('')}
+        </tr>
+      </tbody>
+    </table></div>`;
+}
+
+function trnSetPrescription(di, ei, si, week, field, value) {
+  const sg = trnState.days[di].exercises[ei].setGroups[si];
+  let p = sg.prescriptions.find(x => x.week === week);
+  if (!p) { p = { week, loadType: 'absolute', loadValue: null, reps: null, sets: 3, rest: 180 }; sg.prescriptions.push(p); }
+  p[field === 'rest' ? 'rest' : field] = value;
+}
+
+async function trnSaveProgram() {
+  const name = document.getElementById('trn-name').value.trim();
+  if (!name) { toast('Enter a program name', 'error'); return; }
+  document.getElementById('trn-save-btn').disabled = true;
+  const weeks = parseInt(document.getElementById('trn-weeks').value) || 8;
+  const type = document.getElementById('trn-type').value;
+  const desc = document.getElementById('trn-desc').value.trim();
+
+  let programId = trnState.programId;
+  if (programId) {
+    await sb.from('training_programs').update({ name, duration_weeks: weeks, program_type: type, description: desc }).eq('id', programId);
+  } else {
+    const { data } = await sb.from('training_programs').insert({ name, duration_weeks: weeks, program_type: type, description: desc, created_by: (await sb.auth.getUser()).data.user.id }).select().single();
+    programId = data.id;
+    trnState.programId = programId;
+    trnSavedProgramId = programId;
+  }
+
+  for (let di = 0; di < trnState.days.length; di++) {
+    const day = trnState.days[di];
+    let dayId = day.id;
+    if (dayId) {
+      await sb.from('program_days').update({ day_number: day.dayNumber, name: day.name, day_order: di }).eq('id', dayId);
+    } else {
+      const { data } = await sb.from('program_days').insert({ program_id: programId, day_number: day.dayNumber, name: day.name, day_order: di }).select().single();
+      dayId = data.id; trnState.days[di].id = dayId;
+    }
+    for (let ei = 0; ei < day.exercises.length; ei++) {
+      const ex = day.exercises[ei];
+      let exId = ex.id;
+      if (exId) {
+        await sb.from('program_exercises').update({ exercise_name: ex.name, exercise_order: ei, lift_type: ex.liftType, notes: ex.notes, tempo: ex.tempo }).eq('id', exId);
+      } else {
+        const { data } = await sb.from('program_exercises').insert({ day_id: dayId, exercise_name: ex.name, exercise_order: ei, lift_type: ex.liftType, notes: ex.notes, tempo: ex.tempo }).select().single();
+        exId = data.id; trnState.days[di].exercises[ei].id = exId;
+      }
+      for (let si = 0; si < ex.setGroups.length; si++) {
+        const sg = ex.setGroups[si];
+        let sgId = sg.id;
+        if (sgId) {
+          await sb.from('set_groups').update({ label: sg.label, group_type: sg.groupType, group_order: si }).eq('id', sgId);
+        } else {
+          const { data } = await sb.from('set_groups').insert({ exercise_id: exId, label: sg.label, group_type: sg.groupType, group_order: si }).select().single();
+          sgId = data.id; trnState.days[di].exercises[ei].setGroups[si].id = sgId;
+        }
+        for (const pr of sg.prescriptions) {
+          if (pr.loadValue === null && !pr.reps) continue;
+          await sb.from('weekly_prescriptions').upsert({
+            set_group_id: sgId, week_number: pr.week, load_type: pr.loadType,
+            load_value: pr.loadValue, reps: pr.reps, sets: pr.sets || 3, rest_seconds: pr.rest || 180
+          }, { onConflict: 'set_group_id,week_number' });
+        }
+      }
+    }
+  }
+  document.getElementById('trn-save-btn').disabled = false;
+  document.getElementById('trn-assign-btn').style.display = 'inline-flex';
+  trnSavedProgramId = programId;
+  document.getElementById('trn-editor-title').textContent = name;
+  toast('Program saved!', 'success');
+}
+
+async function trnDeleteProgram(id) {
+  if (!confirm('Delete this program? This cannot be undone.')) return;
+  await sb.from('training_programs').delete().eq('id', id);
+  loadTrainingPanel();
+}
+
+async function trnOpenAssign() { trnOpenAssignForProgram(trnSavedProgramId, document.getElementById('trn-name').value); }
+async function trnOpenAssignForProgram(programId, programName) {
+  trnSavedProgramId = programId;
+  if (!trnAllClients.length) {
+    const { data } = await sb.from('profiles').select('id,full_name').eq('is_staff', false).order('full_name');
+    trnAllClients = data || [];
+  }
+  document.getElementById('trn-assign-client').innerHTML = trnAllClients.map(c => `<option value="${c.id}">${c.full_name}</option>`).join('');
+  document.getElementById('trn-assign-date').value = new Date().toISOString().split('T')[0];
+  document.getElementById('trn-assign-notes').value = '';
+  document.getElementById('trn-assign-overlay').style.display = 'block';
+  document.getElementById('trn-assign-modal').style.display = 'block';
+}
+function trnCloseAssign() {
+  document.getElementById('trn-assign-overlay').style.display = 'none';
+  document.getElementById('trn-assign-modal').style.display = 'none';
+}
+async function trnSaveAssignment() {
+  const clientId = document.getElementById('trn-assign-client').value;
+  const startDate = document.getElementById('trn-assign-date').value;
+  const notes = document.getElementById('trn-assign-notes').value;
+  if (!clientId || !startDate) { toast('Select a client and start date', 'error'); return; }
+  await sb.from('program_assignments').insert({ program_id: trnSavedProgramId, client_id: clientId, assigned_by: (await sb.auth.getUser()).data.user.id, start_date: startDate, notes });
+  trnCloseAssign();
+  toast('Program assigned!', 'success');
+}
+
+/* ── Nutrition Management ── */
+async function loadNutrMgmtPanel() {
+  if (!trnAllClients.length) {
+    const { data } = await sb.from('profiles').select('id,full_name').eq('is_staff', false).order('full_name');
+    trnAllClients = data || [];
+  }
+  const sel = document.getElementById('nutr-client-select');
+  const existing = sel.value;
+  sel.innerHTML = '<option value="">— Select Client —</option>' + trnAllClients.map(c => `<option value="${c.id}">${c.full_name}</option>`).join('');
+  if (existing) { sel.value = existing; loadNutrMgmt(); }
+}
+
+async function loadNutrMgmt() {
+  const clientId = document.getElementById('nutr-client-select').value;
+  const body = document.getElementById('nutr-mgmt-body');
+  if (!clientId) { body.style.display = 'none'; return; }
+  body.style.display = 'block';
+
+  const [{ data: stats }, { data: target }, { data: assignment }] = await Promise.all([
+    sb.from('client_training_stats').select('*').eq('client_id', clientId).single(),
+    sb.from('nutrition_targets').select('*').eq('client_id', clientId).order('active_from', { ascending: false }).limit(1).single(),
+    sb.from('program_assignments').select('*, training_programs(name)').eq('client_id', clientId).eq('status', 'active').order('created_at', { ascending: false }).limit(1).single()
+  ]);
+
+  document.getElementById('nm-squat').value = stats?.squat_1rm || '';
+  document.getElementById('nm-bench').value = stats?.bench_1rm || '';
+  document.getElementById('nm-dead').value = stats?.deadlift_1rm || '';
+  document.getElementById('nm-ohp').value = stats?.ohp_1rm || '';
+  document.getElementById('nm-cals').value = target?.calories || '';
+  document.getElementById('nm-protein').value = target?.protein_g || '';
+  document.getElementById('nm-carbs').value = target?.carbs_g || '';
+  document.getElementById('nm-fat').value = target?.fat_g || '';
+  document.getElementById('nm-notes').value = target?.notes || '';
+
+  const ap = document.getElementById('nm-active-program');
+  if (assignment?.training_programs?.name) {
+    ap.innerHTML = `<div style="display:flex;justify-content:space-between;align-items:center;">
+      <div><div style="font-weight:600;">${assignment.training_programs.name}</div>
+      <div style="font-size:11px;color:var(--muted2);">Week ${assignment.current_week} · Started ${assignment.start_date}</div></div>
+      <span style="font-size:11px;padding:3px 8px;border-radius:10px;background:rgba(57,224,122,0.12);color:var(--green);">Active</span></div>`;
+  } else {
+    ap.innerHTML = `<div style="color:var(--muted2);font-size:13px;">No active program assigned.</div>`;
+  }
+}
+
+async function saveClientStats() {
+  const clientId = document.getElementById('nutr-client-select').value;
+  if (!clientId) return;
+  const vals = { client_id: clientId, squat_1rm: parseFloat(document.getElementById('nm-squat').value)||null, bench_1rm: parseFloat(document.getElementById('nm-bench').value)||null, deadlift_1rm: parseFloat(document.getElementById('nm-dead').value)||null, ohp_1rm: parseFloat(document.getElementById('nm-ohp').value)||null, updated_at: new Date().toISOString() };
+  await sb.from('client_training_stats').upsert(vals, { onConflict: 'client_id' });
+  toast('1RMs saved!', 'success');
+}
+
+async function saveNutrTargets() {
+  const clientId = document.getElementById('nutr-client-select').value;
+  if (!clientId) return;
+  const staffId = (await sb.auth.getUser()).data.user.id;
+  await sb.from('nutrition_targets').insert({ client_id: clientId, assigned_by: staffId, calories: parseInt(document.getElementById('nm-cals').value)||null, protein_g: parseFloat(document.getElementById('nm-protein').value)||null, carbs_g: parseFloat(document.getElementById('nm-carbs').value)||null, fat_g: parseFloat(document.getElementById('nm-fat').value)||null, notes: document.getElementById('nm-notes').value });
+  toast('Nutrition targets saved!', 'success');
 }
 
 </script>
