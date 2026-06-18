@@ -717,10 +717,13 @@ body { background: var(--bg); color: var(--text); font-family: 'Outfit', sans-se
         <input type="date" id="nutr-log-date" style="background:var(--surface2);border:1px solid var(--border2);border-radius:8px;padding:6px 10px;color:var(--text);font-family:'Outfit',sans-serif;font-size:12px;outline:none;" onchange="loadNutrDay()">
       </div>
       <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px;">
-        <div class="field"><label>Calories</label><input id="nutr-cals" type="number" placeholder="0"></div>
-        <div class="field"><label>Protein (g)</label><input id="nutr-protein" type="number" placeholder="0"></div>
-        <div class="field"><label>Carbs (g)</label><input id="nutr-carbs" type="number" placeholder="0"></div>
-        <div class="field"><label>Fat (g)</label><input id="nutr-fat" type="number" placeholder="0"></div>
+        <div class="field"><label>Calories</label><input id="nutr-cals" type="number" placeholder="0" oninput="nutrAutoMacro('cals')"></div>
+        <div class="field"><label>Protein (g)</label><input id="nutr-protein" type="number" placeholder="0" oninput="nutrAutoMacro('protein')"></div>
+        <div class="field"><label>Carbs (g)</label><input id="nutr-carbs" type="number" placeholder="0" oninput="nutrAutoMacro('carbs')"></div>
+        <div class="field">
+          <label style="display:flex;align-items:center;gap:6px;">Fat (g) <span id="nutr-fat-auto" style="font-size:9px;color:var(--gold);display:none;background:rgba(245,200,66,0.12);padding:1px 5px;border-radius:4px;">auto</span></label>
+          <input id="nutr-fat" type="number" placeholder="0" oninput="nutrAutoMacro('fat')">
+        </div>
         <div class="field"><label>Steps</label><input id="nutr-steps" type="number" placeholder="0"></div>
         <div class="field"><label>Sleep (hrs)</label><input id="nutr-sleep" type="number" step="0.5" placeholder="0"></div>
         <div class="field"><label>Body Weight (kg)</label><input id="nutr-weight" type="number" step="0.1" placeholder="0"></div>
@@ -3728,6 +3731,28 @@ async function trnSaveLog(sgId, week, status) {
 }
 
 /* ── NUTRITION SCREEN ── */
+function nutrAutoMacro(changed) {
+  const cals    = parseFloat(document.getElementById('nutr-cals').value)    || null;
+  const protein = parseFloat(document.getElementById('nutr-protein').value) || null;
+  const carbs   = parseFloat(document.getElementById('nutr-carbs').value)   || null;
+  const fat     = parseFloat(document.getElementById('nutr-fat').value)     || null;
+  const autoEl  = document.getElementById('nutr-fat-auto');
+  autoEl.style.display = 'none';
+
+  if (cals != null && protein != null && carbs != null && fat == null) {
+    const derived = Math.round((cals - protein*4 - carbs*4) / 9);
+    if (derived >= 0) { document.getElementById('nutr-fat').value = derived; autoEl.style.display = 'inline'; }
+  } else if (cals != null && protein != null && fat != null && carbs == null) {
+    const derived = Math.round((cals - protein*4 - fat*9) / 4);
+    if (derived >= 0) document.getElementById('nutr-carbs').value = derived;
+  } else if (cals != null && carbs != null && fat != null && protein == null) {
+    const derived = Math.round((cals - carbs*4 - fat*9) / 4);
+    if (derived >= 0) document.getElementById('nutr-protein').value = derived;
+  } else if (protein != null && carbs != null && fat != null && cals == null) {
+    document.getElementById('nutr-cals').value = Math.round(protein*4 + carbs*4 + fat*9);
+  }
+}
+
 async function loadNutritionScreen() {
   const uid = (await sb.auth.getUser()).data.user?.id;
   if (!uid) return;
@@ -3783,6 +3808,7 @@ async function loadNutrDay() {
     document.getElementById('nutr-notes').value = log.notes || '';
   } else {
     ['nutr-cals','nutr-protein','nutr-carbs','nutr-fat','nutr-steps','nutr-sleep','nutr-weight','nutr-water','nutr-notes'].forEach(id => { document.getElementById(id).value = ''; });
+  document.getElementById('nutr-fat-auto').style.display = 'none';
   }
 }
 

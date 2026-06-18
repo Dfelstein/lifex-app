@@ -823,16 +823,64 @@ html, body { height: 100%; background: var(--bg); color: var(--text); font-famil
 
   <!-- ── TRAINING PROGRAMS ── -->
   <div id="panel-training" class="panel">
+
+    <!-- LIST VIEW -->
     <div id="trn-list-view">
       <div style="display:flex;align-items:flex-start;justify-content:space-between;margin-bottom:4px;">
         <div>
           <div class="page-title">Training Programs</div>
-          <div class="page-subtitle">Build precision programs with per-week load prescriptions</div>
+          <div class="page-subtitle">Build programs · set 1RMs · prescribe macros</div>
         </div>
         <button class="btn btn-gold" onclick="trnNewProgram()" style="margin-top:6px;">+ New Program</button>
       </div>
-      <div id="trn-programs-grid" style="display:grid;grid-template-columns:repeat(auto-fill,minmax(300px,1fr));gap:14px;margin-top:20px;"></div>
+
+      <!-- CLIENT SETUP — 1RMs + Macros + Active Program all in one place -->
+      <div class="card" style="margin-top:20px;margin-bottom:20px;border-top:3px solid var(--blue);">
+        <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:14px;flex-wrap:wrap;gap:10px;">
+          <div class="card-title" style="margin-bottom:0;">Client Setup</div>
+          <select id="nutr-client-select" onchange="loadNutrMgmt()" style="background:var(--surface2);border:1px solid var(--border2);border-radius:8px;padding:8px 12px;color:var(--text);font-family:'Outfit',sans-serif;font-size:13px;outline:none;min-width:200px;"><option value="">— Select Client —</option></select>
+        </div>
+        <div id="nutr-mgmt-body" style="display:none;">
+          <div style="display:grid;grid-template-columns:1fr 1fr;gap:16px;margin-bottom:16px;">
+            <!-- 1RMs -->
+            <div style="background:var(--surface2);border-radius:10px;padding:16px;">
+              <div style="font-size:11px;font-weight:600;letter-spacing:1px;text-transform:uppercase;color:var(--blue);margin-bottom:12px;">1 Rep Maxes</div>
+              <div class="form-grid">
+                <div class="field"><label>Squat (kg)</label><input id="nm-squat" type="number" placeholder="e.g. 140"></div>
+                <div class="field"><label>Bench (kg)</label><input id="nm-bench" type="number" placeholder="e.g. 100"></div>
+                <div class="field"><label>Deadlift (kg)</label><input id="nm-dead" type="number" placeholder="e.g. 180"></div>
+                <div class="field"><label>OHP (kg)</label><input id="nm-ohp" type="number" placeholder="e.g. 70"></div>
+              </div>
+              <button class="btn btn-blue btn-sm" onclick="saveClientStats()" style="margin-top:12px;width:100%;">Save 1RMs</button>
+            </div>
+            <!-- Macros -->
+            <div style="background:var(--surface2);border-radius:10px;padding:16px;">
+              <div style="font-size:11px;font-weight:600;letter-spacing:1px;text-transform:uppercase;color:var(--gold);margin-bottom:12px;">Daily Macro Targets</div>
+              <div class="form-grid">
+                <div class="field"><label>Calories</label><input id="nm-cals" type="number" placeholder="e.g. 2400" oninput="staffAutoMacro('cals')"></div>
+                <div class="field"><label>Protein (g)</label><input id="nm-protein" type="number" placeholder="e.g. 180" oninput="staffAutoMacro('protein')"></div>
+                <div class="field"><label>Carbs (g)</label><input id="nm-carbs" type="number" placeholder="e.g. 240" oninput="staffAutoMacro('carbs')"></div>
+                <div class="field">
+                  <label style="display:flex;align-items:center;gap:6px;">Fat (g) <span id="nm-fat-auto" style="font-size:9px;color:var(--gold);display:none;">auto</span></label>
+                  <input id="nm-fat" type="number" placeholder="e.g. 70" oninput="staffAutoMacro('fat')">
+                </div>
+                <div class="field field-full"><label>Notes</label><input id="nm-notes" placeholder="e.g. +200 kcal on training days"></div>
+              </div>
+              <button class="btn btn-gold btn-sm" onclick="saveNutrTargets()" style="margin-top:12px;width:100%;">Save Targets</button>
+            </div>
+          </div>
+          <!-- Active program for this client -->
+          <div style="background:var(--surface2);border-radius:10px;padding:14px;">
+            <div style="font-size:11px;font-weight:600;letter-spacing:1px;text-transform:uppercase;color:var(--muted2);margin-bottom:10px;">Active Program</div>
+            <div id="nm-active-program" style="font-size:13px;color:var(--muted2);">No active program.</div>
+          </div>
+        </div>
+      </div>
+
+      <div id="trn-programs-grid" style="display:grid;grid-template-columns:repeat(auto-fill,minmax(300px,1fr));gap:14px;"></div>
     </div>
+
+    <!-- EDITOR VIEW -->
     <div id="trn-editor-view" style="display:none;">
       <div style="display:flex;align-items:center;gap:12px;margin-bottom:20px;">
         <button class="btn btn-outline btn-sm" onclick="trnBackToList()">← Programs</button>
@@ -860,50 +908,11 @@ html, body { height: 100%; background: var(--bg); color: var(--text); font-famil
     </div>
   </div>
 
-  <!-- ── NUTRITION MANAGEMENT ── -->
+  <!-- ── NUTRITION MANAGEMENT (keep as redirect) ── -->
   <div id="panel-nutrition-mgmt" class="panel">
-    <div style="display:flex;align-items:flex-start;justify-content:space-between;margin-bottom:4px;">
-      <div>
-        <div class="page-title">Nutrition Management</div>
-        <div class="page-subtitle">Set macro targets and 1RMs for clients</div>
-      </div>
-    </div>
-    <div class="client-bar" style="margin-bottom:20px;">
-      <label>Client</label>
-      <select id="nutr-client-select" onchange="loadNutrMgmt()"><option value="">— Select Client —</option></select>
-    </div>
-    <div id="nutr-mgmt-body" style="display:none;">
-      <div style="display:grid;grid-template-columns:1fr 1fr;gap:16px;">
-        <!-- 1RMs card -->
-        <div class="card">
-          <div class="card-title">Strength — 1 Rep Maxes</div>
-          <div class="form-grid">
-            <div class="field"><label>Squat 1RM (kg)</label><input id="nm-squat" type="number" placeholder="0"></div>
-            <div class="field"><label>Bench 1RM (kg)</label><input id="nm-bench" type="number" placeholder="0"></div>
-            <div class="field"><label>Deadlift 1RM (kg)</label><input id="nm-dead" type="number" placeholder="0"></div>
-            <div class="field"><label>OHP 1RM (kg)</label><input id="nm-ohp" type="number" placeholder="0"></div>
-          </div>
-          <button class="btn btn-blue btn-sm" onclick="saveClientStats()" style="margin-top:12px;">Save 1RMs</button>
-        </div>
-        <!-- Macro targets card -->
-        <div class="card">
-          <div class="card-title">Daily Macro Targets</div>
-          <div class="form-grid">
-            <div class="field"><label>Calories</label><input id="nm-cals" type="number" placeholder="2000"></div>
-            <div class="field"><label>Protein (g)</label><input id="nm-protein" type="number" placeholder="160"></div>
-            <div class="field"><label>Carbs (g)</label><input id="nm-carbs" type="number" placeholder="220"></div>
-            <div class="field"><label>Fat (g)</label><input id="nm-fat" type="number" placeholder="70"></div>
-            <div class="field field-full"><label>Notes</label><input id="nm-notes" placeholder="e.g. 200 extra cals on training days"></div>
-          </div>
-          <button class="btn btn-gold btn-sm" onclick="saveNutrTargets()" style="margin-top:12px;">Save Targets</button>
-        </div>
-      </div>
-      <!-- Active assignment for this client -->
-      <div class="card" style="margin-top:16px;">
-        <div class="card-title">Active Training Program</div>
-        <div id="nm-active-program">No active program assigned.</div>
-      </div>
-    </div>
+    <div class="page-title">Nutrition</div>
+    <div class="page-subtitle" style="margin-bottom:20px;">Nutrition setup has moved into the Programs panel.</div>
+    <button class="btn btn-blue" onclick="showPanel('training')">→ Go to Programs & Client Setup</button>
   </div>
 
 </main>
@@ -5519,6 +5528,30 @@ async function loadNutrMgmt() {
       <span style="font-size:11px;padding:3px 8px;border-radius:10px;background:rgba(57,224,122,0.12);color:var(--green);">Active</span></div>`;
   } else {
     ap.innerHTML = `<div style="color:var(--muted2);font-size:13px;">No active program assigned.</div>`;
+  }
+}
+
+function staffAutoMacro(changed) {
+  const cals    = parseFloat(document.getElementById('nm-cals').value)    || null;
+  const protein = parseFloat(document.getElementById('nm-protein').value) || null;
+  const carbs   = parseFloat(document.getElementById('nm-carbs').value)   || null;
+  const fat     = parseFloat(document.getElementById('nm-fat').value)     || null;
+  const filled  = [cals!=null, protein!=null, carbs!=null, fat!=null].filter(Boolean).length;
+  const autoEl  = document.getElementById('nm-fat-auto');
+  if (filled < 3) { autoEl.style.display='none'; return; }
+
+  // Derive whichever is missing (priority: if cals unknown, derive it last)
+  if (cals != null && protein != null && carbs != null && fat == null) {
+    const derived = Math.round((cals - protein*4 - carbs*4) / 9);
+    if (derived >= 0) { document.getElementById('nm-fat').value = derived; autoEl.style.display='inline'; }
+  } else if (cals != null && protein != null && fat != null && carbs == null) {
+    const derived = Math.round((cals - protein*4 - fat*9) / 4);
+    if (derived >= 0) { document.getElementById('nm-carbs').value = derived; }
+  } else if (cals != null && carbs != null && fat != null && protein == null) {
+    const derived = Math.round((cals - carbs*4 - fat*9) / 4);
+    if (derived >= 0) { document.getElementById('nm-protein').value = derived; }
+  } else if (protein != null && carbs != null && fat != null && cals == null) {
+    document.getElementById('nm-cals').value = Math.round(protein*4 + carbs*4 + fat*9);
   }
 }
 
