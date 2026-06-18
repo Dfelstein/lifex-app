@@ -1209,6 +1209,8 @@ function renderDashboard() {
 
     ${forYouSection}
 
+    <div id="trn-dashboard-card"></div>
+
     <div class="grid-2">
       <div class="card">
         <div class="card-title">Recommended Actions</div>
@@ -1242,6 +1244,8 @@ function renderDashboard() {
         }).join('') : `<div style="text-align:center;padding:20px 0;"><div style="font-size:13px;color:var(--muted2);margin-bottom:12px;">No scans uploaded yet</div><a href="https://xgym.com.au/dexa-scan/" target="_blank" class="btn btn-gold" style="font-size:13px;padding:10px 20px;">📅 Book Your First Scan</a></div>`}
       </div>
     </div>`;
+  // Load training card async after DOM is set
+  setTimeout(loadTrnDashboardCard, 0);
 }
 
 // We need to keep the raw scans list for the dashboard
@@ -1944,7 +1948,12 @@ function renderBeforeAfter() {
       </div>`);
   }
 
-  el.innerHTML = historyHtml + pairCards.join('');
+  el.innerHTML = historyHtml + pairCards.join('') + `<div id="ba-correlation"></div>`;
+  // Load training correlation asynchronously so it doesn't block render
+  if (allScans.length >= 2) {
+    const sA = allScans[baIdxA], sB = allScans[baIdxB];
+    if (sA && sB) loadBACorrelation(sA.date, sB.date);
+  }
 }
 
 /* ══════════════════════════
@@ -3341,6 +3350,184 @@ function showBMRegion(rKey) {
         <div style="font-size:20px;font-weight:700;color:var(--text);">${(r.fat_g/1000).toFixed(2)} <span style="font-size:12px;color:var(--muted2);">kg</span></div>
       </div>` : ''}
     ${r.extra ? `<div style="font-size:12px;padding:8px 10px;background:var(--surface2);border-radius:6px;color:var(--muted2);">${r.extra}</div>` : ''}`;
+}
+
+/* ══════════════════════════════════════════════
+   DEXA → PROGRAM SUGGESTION ENGINE
+══════════════════════════════════════════════ */
+
+function getSuggestedProgram(scan, sex) {
+  if (!scan) return null;
+  const f = (sex||'').toLowerCase() === 'female';
+  const fatHigh      = scan.fat_pct != null && (f ? scan.fat_pct > 33 : scan.fat_pct > 25);
+  const fatVeryHigh  = scan.fat_pct != null && (f ? scan.fat_pct > 40 : scan.fat_pct > 32);
+  const vatHigh      = scan.vat_area_cm2 > 100;
+  const vatVeryHigh  = scan.vat_area_cm2 > 160;
+  const almiLow      = scan.almi  != null && (f ? scan.almi  < 5.5 : scan.almi  < 7.0);
+  const ffmiLow      = scan.ffmi  != null && (f ? scan.ffmi  < 15  : scan.ffmi  < 18);
+
+  if (vatVeryHigh || fatVeryHigh) return {
+    profile:'metabolic_conditioning', icon:'🔥', title:'Metabolic Reset',
+    subtitle:'High-priority fat loss with cardio + resistance training',
+    color:'var(--red)',
+    focus:['Reduce visceral fat first','150+ min cardio/week','Full-body resistance 3×/week','Calorie-controlled high-protein diet'],
+    urgency:'high'
+  };
+  if (fatHigh || vatHigh) return {
+    profile:'fat_loss', icon:'⚡', title:'Fat Loss + Muscle',
+    subtitle:'Reduce body fat while building or preserving lean mass',
+    color:'var(--orange)',
+    focus:['Moderate calorie deficit (300–500 kcal)','High protein ≥ 2g/kg','Resistance training 3–4×/week','LISS cardio 2×/week'],
+    urgency:'medium'
+  };
+  if (almiLow || ffmiLow) return {
+    profile:'muscle_build', icon:'💪', title:'Lean Mass Builder',
+    subtitle:'Build muscle to combat sarcopenia risk and improve ALMI/FFMI',
+    color:'var(--blue)',
+    focus:['Progressive overload — add weight every 1–2 weeks','Protein ≥ 2g/kg BW daily','Resistance training 4×/week','Caloric surplus (200–300 kcal)'],
+    urgency:'medium'
+  };
+  return {
+    profile:'performance', icon:'🏆', title:'Performance & Maintenance',
+    subtitle:'Great composition — optimise performance and maintain results',
+    color:'var(--green)',
+    focus:['Strength focus — periodised programs','Maintain calorie balance','Recovery: sleep 8hrs + mobility','DEXA every 3–4 months to track'],
+    urgency:'low'
+  };
+}
+
+async function loadTrnDashboardCard() {
+  const el = document.getElementById('trn-dashboard-card');
+  if (!el) return;
+  const uid = (await sb.auth.getUser()).data.user?.id;
+  if (!uid) return;
+
+  const { data: assign } = await sb.from('program_assignments')
+    .select('*, training_programs(name,duration_weeks)')
+    .eq('client_id', uid).eq('status','active')
+    .order('created_at', { ascending:false }).limit(1).single();
+
+  const sex = profile?.sex || scan2?.sex || '';
+  const suggestion = getSuggestedProgram(scan2, sex);
+
+  if (assign?.training_programs) {
+    // Show active program status
+    const prog = assign.training_programs;
+    const weekPct = Math.round((assign.current_week / prog.duration_weeks) * 100);
+    el.innerHTML = `
+      <div style="display:flex;justify-content:space-between;align-items:flex-start;flex-wrap:wrap;gap:10px;">
+        <div>
+          <div style="font-size:10px;font-weight:600;letter-spacing:1px;text-transform:uppercase;color:var(--muted2);margin-bottom:4px;">Active Program</div>
+          <div style="font-size:16px;font-weight:700;">${prog.name}</div>
+          <div style="font-size:12px;color:var(--muted2);margin-top:3px;">Week ${assign.current_week} of ${prog.duration_weeks}</div>
+        </div>
+        <button onclick="navigate('training')" style="padding:8px 18px;background:var(--gold);color:#000;border:none;border-radius:8px;font-family:'Outfit',sans-serif;font-size:13px;font-weight:700;cursor:pointer;">Open Program →</button>
+      </div>
+      <div style="margin-top:12px;background:var(--surface2);border-radius:8px;height:6px;overflow:hidden;">
+        <div style="height:100%;width:${weekPct}%;background:var(--gold);border-radius:8px;"></div>
+      </div>
+      <div style="font-size:11px;color:var(--muted2);margin-top:4px;">${weekPct}% through the block</div>`;
+  } else if (suggestion) {
+    // Show DEXA-based suggestion
+    el.innerHTML = `
+      <div style="display:flex;justify-content:space-between;align-items:flex-start;flex-wrap:wrap;gap:10px;margin-bottom:12px;">
+        <div>
+          <div style="font-size:10px;font-weight:600;letter-spacing:1px;text-transform:uppercase;color:var(--muted2);margin-bottom:4px;">Suggested Based on Your Scan</div>
+          <div style="display:flex;align-items:center;gap:8px;">
+            <span style="font-size:20px;">${suggestion.icon}</span>
+            <div>
+              <div style="font-size:15px;font-weight:700;color:${suggestion.color};">${suggestion.title}</div>
+              <div style="font-size:12px;color:var(--muted2);">${suggestion.subtitle}</div>
+            </div>
+          </div>
+        </div>
+        <button onclick="navigate('training')" style="padding:8px 18px;background:${suggestion.color};color:#000;border:none;border-radius:8px;font-family:'Outfit',sans-serif;font-size:13px;font-weight:700;cursor:pointer;white-space:nowrap;">Start Program →</button>
+      </div>
+      <div style="display:flex;flex-wrap:wrap;gap:6px;">
+        ${suggestion.focus.map(f => `<span style="font-size:11px;padding:3px 10px;border-radius:12px;background:var(--surface2);color:var(--muted2);border:1px solid var(--border);">${f}</span>`).join('')}
+      </div>`;
+  } else {
+    el.innerHTML = '';
+    return;
+  }
+  el.className = 'card mb20';
+  el.style.borderTopColor = (assign ? 'var(--gold)' : (suggestion?.color || 'var(--gold)'));
+  el.style.borderTopWidth = '3px';
+  el.style.display = 'block';
+}
+
+/* ── Training / Nutrition Correlation (Before vs After) ── */
+async function loadBACorrelation(dateA, dateB) {
+  const el = document.getElementById('ba-correlation');
+  if (!el) return;
+  const uid = (await sb.auth.getUser()).data.user?.id;
+  if (!uid) return;
+
+  const dateFrom = dateA < dateB ? dateA : dateB;
+  const dateTo   = dateA < dateB ? dateB : dateA;
+
+  const [{ data: assign }, { data: nutrlogs }] = await Promise.all([
+    sb.from('program_assignments').select('id,current_week').eq('client_id', uid).eq('status','active').limit(1).single(),
+    sb.from('nutrition_logs').select('log_date,calories,protein_g,steps,sleep_hours,weight_kg').eq('client_id', uid).gte('log_date', dateFrom).lte('log_date', dateTo).order('log_date')
+  ]);
+
+  let trnHtml = '';
+  if (assign?.id) {
+    const { data: logs } = await sb.from('training_logs').select('status,week_number,logged_date').eq('assignment_id', assign.id).gte('logged_date', dateFrom).lte('logged_date', dateTo);
+    if (logs?.length) {
+      const total = logs.length;
+      const completed = logs.filter(l => l.status === 'completed').length;
+      const failed    = logs.filter(l => l.status === 'failed').length;
+      const pct = Math.round((completed / total) * 100);
+      const barColor = pct >= 80 ? 'var(--green)' : pct >= 60 ? 'var(--orange)' : 'var(--red)';
+      trnHtml = `
+        <div style="margin-bottom:14px;">
+          <div style="font-size:11px;font-weight:600;text-transform:uppercase;letter-spacing:0.8px;color:var(--muted2);margin-bottom:8px;">Training Compliance</div>
+          <div style="display:flex;align-items:center;gap:12px;flex-wrap:wrap;">
+            <div style="font-family:'Bebas Neue',sans-serif;font-size:40px;color:${barColor};line-height:1;">${pct}<span style="font-size:18px;">%</span></div>
+            <div>
+              <div style="font-size:12px;color:var(--text);">${completed} of ${total} sets completed</div>
+              <div style="font-size:11px;color:var(--muted2);">${failed} missed · ${total - completed - failed} pending</div>
+            </div>
+          </div>
+          <div style="margin-top:8px;background:var(--surface2);border-radius:6px;height:6px;">
+            <div style="height:100%;width:${pct}%;background:${barColor};border-radius:6px;"></div>
+          </div>
+        </div>`;
+    }
+  }
+
+  let nutrHtml = '';
+  if (nutrlogs?.length) {
+    const days = nutrlogs.length;
+    const avgCals    = Math.round(nutrlogs.reduce((s,l) => s + (l.calories||0),0) / days);
+    const avgProtein = (nutrlogs.reduce((s,l) => s + (l.protein_g||0),0) / days).toFixed(0);
+    const avgSteps   = Math.round(nutrlogs.reduce((s,l) => s + (l.steps||0),0) / days);
+    const avgSleep   = (nutrlogs.reduce((s,l) => s + (l.sleep_hours||0),0) / days).toFixed(1);
+    const weights    = nutrlogs.filter(l => l.weight_kg).map(l => l.weight_kg);
+    const wtChange   = weights.length >= 2 ? (weights[weights.length-1] - weights[0]).toFixed(1) : null;
+    nutrHtml = `
+      <div style="margin-bottom:6px;">
+        <div style="font-size:11px;font-weight:600;text-transform:uppercase;letter-spacing:0.8px;color:var(--muted2);margin-bottom:8px;">Nutrition & Lifestyle <span style="color:var(--muted);font-weight:400;text-transform:none;">(${days} days logged)</span></div>
+        <div style="display:grid;grid-template-columns:repeat(2,1fr);gap:8px;">
+          ${avgCals ? `<div style="background:var(--surface2);border-radius:8px;padding:10px 12px;"><div style="font-size:10px;color:var(--muted2);text-transform:uppercase;letter-spacing:0.6px;">Avg Calories</div><div style="font-family:'Bebas Neue',sans-serif;font-size:24px;color:var(--gold);">${avgCals}<span style="font-size:12px;color:var(--muted2);"> kcal</span></div></div>` : ''}
+          ${avgProtein > 0 ? `<div style="background:var(--surface2);border-radius:8px;padding:10px 12px;"><div style="font-size:10px;color:var(--muted2);text-transform:uppercase;letter-spacing:0.6px;">Avg Protein</div><div style="font-family:'Bebas Neue',sans-serif;font-size:24px;color:var(--blue);">${avgProtein}<span style="font-size:12px;color:var(--muted2);">g</span></div></div>` : ''}
+          ${avgSteps ? `<div style="background:var(--surface2);border-radius:8px;padding:10px 12px;"><div style="font-size:10px;color:var(--muted2);text-transform:uppercase;letter-spacing:0.6px;">Avg Steps</div><div style="font-family:'Bebas Neue',sans-serif;font-size:24px;color:var(--teal);">${avgSteps.toLocaleString()}</div></div>` : ''}
+          ${avgSleep > 0 ? `<div style="background:var(--surface2);border-radius:8px;padding:10px 12px;"><div style="font-size:10px;color:var(--muted2);text-transform:uppercase;letter-spacing:0.6px;">Avg Sleep</div><div style="font-family:'Bebas Neue',sans-serif;font-size:24px;color:var(--purple);">${avgSleep}<span style="font-size:12px;color:var(--muted2);">hrs</span></div></div>` : ''}
+        </div>
+        ${wtChange !== null ? `<div style="margin-top:8px;font-size:12px;color:var(--muted2);">Scale weight: <strong style="color:${parseFloat(wtChange)<0?'var(--green)':'var(--orange)'};">${wtChange > 0 ? '+' : ''}${wtChange} kg</strong> over this period</div>` : ''}
+      </div>`;
+  }
+
+  if (!trnHtml && !nutrHtml) { el.innerHTML = ''; return; }
+
+  el.innerHTML = `
+    <div class="card" style="margin-top:16px;border-top:3px solid var(--purple);">
+      <div style="font-size:11px;font-weight:600;letter-spacing:1px;text-transform:uppercase;color:var(--muted2);margin-bottom:14px;">Training & Nutrition Between These Scans</div>
+      ${trnHtml}
+      ${nutrHtml}
+      ${(!trnHtml && !nutrHtml) ? '<div style="color:var(--muted2);font-size:13px;">No training or nutrition data logged during this period.</div>' : ''}
+    </div>`;
 }
 
 /* ══════════════════════════════════════════════
