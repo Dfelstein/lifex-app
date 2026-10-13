@@ -163,7 +163,7 @@ Deno.serve(async (req) => {
     ${linksSection}
     <hr style="border:none;border-top:1px solid #e7e0d1;margin:24px 0;">
     <p style="font-size:14px;color:#948d7f;">Due for a rescan? DEXA every 3–6 months shows exactly what's changed.</p>
-    <a href="https://app.acuityscheduling.com/schedule.php?owner=30827974" style="display:inline-block;background:#b98f3b;color:#1b1917;padding:12px 26px;border-radius:8px;font-size:15px;font-weight:700;text-decoration:none;margin-top:8px;">Book a rescan</a>
+    <a href="https://xgym.com.au/dexa-scan/?utm_source=resend-email&utm_medium=email&utm_campaign=rescan#book-now" style="display:inline-block;background:#b98f3b;color:#1b1917;padding:12px 26px;border-radius:8px;font-size:15px;font-weight:700;text-decoration:none;margin-top:8px;">Book a rescan</a>
     <p style="font-size:13px;color:#948d7f;margin-top:24px;">LifeX Clinic · 5/9 Salisbury Rd, Castle Hill NSW 2154<br>0424 023 601 · <a href="mailto:info@lifexclinic.com.au" style="color:#b98f3b;">info@lifexclinic.com.au</a></p>
   </div>
 </body></html>`;
