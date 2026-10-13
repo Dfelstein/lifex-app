@@ -1891,8 +1891,8 @@ const ABS_EXPANSION_DATA = [
   { suburb:'Kurrajong',      state:'NSW', lat:-33.5465, lng:150.7948, pop3064:1200,  medianIncome:2200, medianAge:43, growthScore:1 },
   { suburb:'Glossodia',      state:'NSW', lat:-33.5686, lng:150.8024, pop3064:1800,  medianIncome:2000, medianAge:42, growthScore:1 },
   // Western growth corridor
-  { suburb:'Marsden Park',   state:'NSW', lat:-33.6957, lng:150.8466, pop3064:5500,  medianIncome:2722, medianAge:32, growthScore:5 },
-  { suburb:'Schofields',     state:'NSW', lat:-33.6924, lng:150.8804, pop3064:6200,  medianIncome:2600, medianAge:31, growthScore:4 },
+  { suburb:'Marsden Park',   state:'NSW', lat:-33.6957, lng:150.8466, pop3064:7500,  medianIncome:2722, medianAge:32, growthScore:5 },
+  { suburb:'Schofields',     state:'NSW', lat:-33.6924, lng:150.8804, pop3064:8000,  medianIncome:2600, medianAge:31, growthScore:4 },
   { suburb:'Riverstone',     state:'NSW', lat:-33.6786, lng:150.8594, pop3064:4100,  medianIncome:2000, medianAge:36, growthScore:3 },
   { suburb:'Vineyard',       state:'NSW', lat:-33.6440, lng:150.8735, pop3064:1500,  medianIncome:2300, medianAge:34, growthScore:4 },
   // Penrith corridor
@@ -2064,7 +2064,8 @@ function renderExpansion(data) {
     const growthBonus = 1 + (s.growthScore / 5) * 0.6;
     // Disposable spend proxy = income compatibility × age factor
     const disposableProxy = incomeCompat * ageFactor;
-    const score = Math.round((s.pop3064 / (currentClients + 1)) * disposableProxy * growthBonus);
+    // Use sqrt(pop) so quality factors (income/age/growth) aren't drowned out by raw population size
+    const score = Math.round((Math.sqrt(s.pop3064) * 100 / (currentClients + 1)) * disposableProxy * growthBonus);
     return { ...s, dist, currentClients, incomeCompat, ageFactor, disposableProxy, score };
   }).filter(s => s.dist > radiusKm).sort((a,b) => b.score - a.score);
 
