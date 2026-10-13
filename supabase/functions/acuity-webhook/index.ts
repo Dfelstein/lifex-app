@@ -2,6 +2,64 @@ import { createClient } from 'https://esm.sh/@supabase/supabase-js@2';
 
 const SUPABASE_URL = Deno.env.get('SUPABASE_URL')!;
 const SUPABASE_SERVICE_KEY = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!;
+const META_ACCESS_TOKEN = Deno.env.get('META_ACCESS_TOKEN') || '';
+const META_PIXEL_ID = '1529714340852241';
+
+async function sha256(str: string): Promise<string> {
+  if (!str) return '';
+  const data = new TextEncoder().encode(str.toLowerCase().trim());
+  const hash = await crypto.subtle.digest('SHA-256', data);
+  return Array.from(new Uint8Array(hash)).map(b => b.toString(16).padStart(2, '0')).join('');
+}
+
+async function sendMetaCAPI(params: {
+  eventId: string;
+  email: string;
+  phone: string;
+  firstName: string;
+  lastName: string;
+  value: number;
+  eventTime: number;
+}) {
+  if (!META_ACCESS_TOKEN) return;
+
+  const [em, ph, fn, ln] = await Promise.all([
+    sha256(params.email),
+    sha256(params.phone.replace(/\D/g, '')),
+    sha256(params.firstName),
+    sha256(params.lastName),
+  ]);
+
+  const userData: Record<string, string[]> = {};
+  if (em) userData.em = [em];
+  if (ph) userData.ph = [ph];
+  if (fn) userData.fn = [fn];
+  if (ln) userData.ln = [ln];
+
+  const res = await fetch(`https://graph.facebook.com/v18.0/${META_PIXEL_ID}/events`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({
+      data: [{
+        event_name: 'Purchase',
+        event_time: params.eventTime,
+        action_source: 'website',
+        event_source_url: 'https://xgym.com.au/booking-confirmed/',
+        event_id: params.eventId,
+        user_data: userData,
+        custom_data: { value: params.value, currency: 'AUD' },
+      }],
+      access_token: META_ACCESS_TOKEN,
+    }),
+  });
+
+  const resText = await res.text();
+  if (!res.ok) {
+    console.error('Meta CAPI error:', resText);
+  } else {
+    console.log('Meta CAPI success:', resText);
+  }
+}
 
 function cors(body: string, status = 200) {
   return new Response(body, {
@@ -111,6 +169,21 @@ Deno.serve(async (req) => {
     if (error) {
       console.error('DB error:', error);
       // Still return 200 so Acuity doesn't retry
+    }
+
+    // Send Meta CAPI Purchase event for new bookings only (not rescheduled)
+    if (action === 'scheduled' && price > 0) {
+      const [firstName, ...rest] = clientName.split(' ');
+      const lastName = rest.join(' ');
+      await sendMetaCAPI({
+        eventId: String(appointmentId),
+        email: clientEmail,
+        phone,
+        firstName,
+        lastName,
+        value: price,
+        eventTime: Math.floor(Date.now() / 1000),
+      }).catch(e => console.error('Meta CAPI fire error:', e));
     }
 
     return cors(JSON.stringify({ ok: true, action, serviceType, clientName }));

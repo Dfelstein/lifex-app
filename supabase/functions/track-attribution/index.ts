@@ -35,11 +35,14 @@ Deno.serve(async (req) => {
 
   try {
     const body = await req.json();
+    console.log('track-attribution body:', JSON.stringify(body));
     const {
       appointment_id,
       utm_source, utm_medium, utm_campaign, utm_content,
       referrer, landing_page, landed_at,
     } = body;
+
+    console.log('appointment_id:', appointment_id, typeof appointment_id);
 
     const channel = classifyChannel(utm_source || '', utm_medium || '');
 
@@ -59,18 +62,30 @@ Deno.serve(async (req) => {
 
     // Always store in booking_attribution so we have a record
     if (appointment_id) {
-      await sb.from('booking_attribution').upsert(
-        { appointment_id: String(appointment_id), ...attribution },
-        { onConflict: 'appointment_id' }
-      );
+      const upsertRes = await fetch(`${SUPABASE_URL}/rest/v1/booking_attribution?on_conflict=appointment_id`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${SUPABASE_SERVICE_KEY}`,
+          'apikey': SUPABASE_SERVICE_KEY,
+          'Prefer': 'resolution=merge-duplicates',
+        },
+        body: JSON.stringify({ appointment_id: String(appointment_id), ...attribution }),
+      });
+      const upsertText = await upsertRes.text();
+      if (!upsertRes.ok) console.error('booking_attribution upsert error:', upsertRes.status, upsertText);
+      else console.log('booking_attribution upsert ok for:', appointment_id, upsertRes.status);
 
       // Also update marketing_conversions if the webhook has already fired
-      await sb.from('marketing_conversions')
+      const { error: updateError } = await sb.from('marketing_conversions')
         .update(attribution)
         .eq('acuity_appointment_id', String(appointment_id));
+      if (updateError) console.error('marketing_conversions update error:', updateError);
+    } else {
+      console.warn('track-attribution called with no appointment_id');
     }
 
-    return cors(JSON.stringify({ ok: true, channel }));
+    return cors(JSON.stringify({ ok: true, channel, appointment_id, had_id: !!appointment_id }));
   } catch (e) {
     return cors(JSON.stringify({ error: String(e) }), 500);
   }
