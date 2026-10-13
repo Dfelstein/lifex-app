@@ -62,9 +62,16 @@ Deno.serve(async (req) => {
     const { path } = await req.json();
     if (!path) return cors(JSON.stringify({ error: 'path required' }), 400);
 
-    // Staff can access any file; clients can only access their own (paths are {userId}/filename)
+    // Staff can access any file; clients only files attached to their own results.
+    // Ownership is checked on the row, not the path, because merged accounts keep
+    // PDFs under the old account's folder.
     if (!isStaff && !path.startsWith(userId + '/')) {
-      return cors(JSON.stringify({ error: 'Forbidden' }), 403);
+      const owned = await Promise.all(['dexa_scans', 'rmr_tests', 'blood_panels', 'hormone_panels'].map(t =>
+        adminClient.from(t).select('id', { count: 'exact', head: true }).eq('client_id', userId).eq('pdf_path', path)
+      ));
+      if (!owned.some(r => (r.count ?? 0) > 0)) {
+        return cors(JSON.stringify({ error: 'Forbidden' }), 403);
+      }
     }
 
     // R2 first, then Supabase Storage for files not yet moved
