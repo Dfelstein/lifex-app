@@ -1807,7 +1807,7 @@ async function viewClientProfile(clientId, firstName, lastName) {
         if (s.fat_pct != null) parts.push(`${s.fat_pct}% body fat`);
         if (s.lean_g != null) parts.push(`${(s.lean_g/1000).toFixed(1)} kg lean`);
         if (s.vat_area_cm2 != null) parts.push(`VAT ${s.vat_area_cm2} cm²`);
-        emailLog.push({ id: s.id, scanNum: s.scan_number, date: s.scan_date, icon: '🦴', type: 'DEXA', label: `DEXA Scan #${s.scan_number || '?'}`, detail: parts.join(' · ') });
+        emailLog.push({ id: s.id, scanNum: s.scan_number, pdfPath: s.pdf_path, date: s.scan_date, icon: '🦴', type: 'DEXA', label: `DEXA Scan #${s.scan_number || '?'}`, detail: parts.join(' · ') });
       });
       rmrAll.forEach(r => {
         if (!r.test_date) return;
@@ -1815,15 +1815,15 @@ async function viewClientProfile(clientId, firstName, lastName) {
         if (r.kcal != null) parts.push(`${r.kcal.toLocaleString()} kcal/day`);
         if (r.fat_pct != null) parts.push(`${r.fat_pct}% fat burning`);
         if (r.glucose_pct != null) parts.push(`${r.glucose_pct}% glucose`);
-        emailLog.push({ date: r.test_date, icon: '🔥', type: 'RMR', label: 'RMR Test', detail: parts.join(' · ') });
+        emailLog.push({ date: r.test_date, pdfPath: r.pdf_path, icon: '🔥', type: 'RMR', label: 'RMR Test', detail: parts.join(' · ') });
       });
       if (bp) {
         const opt = bm.filter(m => m.status === 'optimal').length;
         const nor = bm.filter(m => m.status === 'normal').length;
         const flagged = bm.filter(m => m.status === 'high' || m.status === 'low');
-        emailLog.push({ date: bp.panel_date, icon: '🩸', type: 'Blood', label: 'Blood Panel', detail: `${opt} optimal · ${nor} normal${flagged.length ? ` · ${flagged.length} flagged (${flagged.map(m=>m.name).join(', ')})` : ' · all in range'}` });
+        emailLog.push({ date: bp.panel_date, pdfPath: bp.pdf_path, icon: '🩸', type: 'Blood', label: 'Blood Panel', detail: `${opt} optimal · ${nor} normal${flagged.length ? ` · ${flagged.length} flagged (${flagged.map(m=>m.name).join(', ')})` : ' · all in range'}` });
       }
-      if (hp) emailLog.push({ date: hp.panel_date, icon: '⚗️', type: 'Hormones', label: 'Hormone Panel', detail: `${hm.length} markers reviewed` });
+      if (hp) emailLog.push({ date: hp.panel_date, pdfPath: hp.pdf_path, icon: '⚗️', type: 'Hormones', label: 'Hormone Panel', detail: `${hm.length} markers reviewed` });
       emailLog.sort((a,b) => b.date.localeCompare(a.date));
 
       html += `<div class="card" style="margin-bottom:20px;" id="comms-card">
@@ -1859,6 +1859,7 @@ async function viewClientProfile(clientId, firstName, lastName) {
                 <span style="font-size:15px;width:20px;text-align:center;">${e.icon}</span>
                 <span style="font-size:13px;font-weight:600;flex:1;">${e.label}</span>
                 <span style="font-size:11px;color:var(--muted2);white-space:nowrap;margin-right:4px;">${fmtDate(e.date)}</span>
+                ${e.pdfPath ? `<button onclick="event.stopPropagation();downloadScanPdf('${e.pdfPath}')" title="Download PDF" style="background:rgba(255,255,255,0.07);border:1px solid rgba(255,255,255,0.12);border-radius:6px;color:var(--muted2);font-size:11px;padding:4px 10px;cursor:pointer;white-space:nowrap;">⬇ PDF</button>` : ''}
                 ${e.id ? `<button onclick="confirmDeleteScan('${e.id}',${e.scanNum||'?'},'${fmtDate(e.date)}')" title="Delete scan" style="background:none;border:none;cursor:pointer;color:var(--muted);font-size:18px;padding:2px 6px;border-radius:4px;line-height:1;" onmouseover="this.style.color='var(--red)'" onmouseout="this.style.color='var(--muted)'">🗑</button>` : ''}
               </div>
               ${e.detail ? `<div style="font-size:12px;color:var(--muted2);margin-top:3px;padding-left:30px;">${e.detail}</div>` : ''}
@@ -2207,7 +2208,8 @@ async function viewClientProfile(clientId, firstName, lastName) {
                     <td style="padding:10px 8px;text-align:right;color:var(--muted2);" onclick='showStaffScanDetail(${JSON.stringify(s)},${scanNum})'>${s.lean_g!=null?(s.lean_g/1000).toFixed(1)+' kg':'—'}</td>
                     <td style="padding:10px 8px;text-align:right;color:${s.vat_area_cm2==null?'var(--muted2)':s.vat_area_cm2<100?'var(--green)':s.vat_area_cm2<160?'var(--gold)':'var(--red)'};" onclick='showStaffScanDetail(${JSON.stringify(s)},${scanNum})'>${s.vat_area_cm2!=null?s.vat_area_cm2+' cm²':'—'}</td>
                     <td style="padding:10px 0;text-align:right;color:${fatDelta===null?'var(--muted2)':parseFloat(fatDelta)<0?'var(--green)':'var(--red)'};" onclick='showStaffScanDetail(${JSON.stringify(s)},${scanNum})'>${fatDelta!==null?(parseFloat(fatDelta)>0?'+':'')+fatDelta+'%':'—'}</td>
-                    <td style="padding:10px 0;text-align:right;">
+                    <td style="padding:10px 0;text-align:right;white-space:nowrap;">
+                      ${s.pdf_path ? `<button onclick="event.stopPropagation();downloadScanPdf('${s.pdf_path}')" title="Download PDF" style="background:rgba(255,255,255,0.07);border:1px solid rgba(255,255,255,0.12);border-radius:6px;color:var(--muted2);font-size:11px;padding:4px 10px;cursor:pointer;white-space:nowrap;">⬇ PDF</button>` : ''}
                       <button onclick="event.stopPropagation();confirmDeleteScan('${s.id}',${scanNum},'${fmtD(s.scan_date)}')" title="Delete this scan" style="background:none;border:none;cursor:pointer;color:var(--muted);font-size:18px;padding:6px 8px;border-radius:4px;transition:color 0.15s;" onmouseover="this.style.color='var(--red)'" onmouseout="this.style.color='var(--muted)'">🗑</button>
                     </td>
                   </tr>`;
