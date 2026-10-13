@@ -1,11 +1,21 @@
 import "@supabase/functions-js/edge-runtime.d.ts"
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2';
+import { AwsClient } from 'https://esm.sh/aws4fetch@1.0.20';
 
 const ANTHROPIC_KEY = Deno.env.get('ANTHROPIC_KEY')!;
 const SUPABASE_URL = Deno.env.get('SUPABASE_URL')!;
 const SUPABASE_SERVICE_KEY = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!;
 const SUPABASE_ANON_KEY = Deno.env.get('SUPABASE_ANON_KEY')!;
 const RESEND_API_KEY = Deno.env.get('RESEND_API_KEY');
+const R2_ENDPOINT = 'https://20a98cdbaaa18ad93be74da2a7a145aa.r2.cloudflarestorage.com';
+const R2_BUCKET = 'lifex-app';
+
+const aws = new AwsClient({
+  accessKeyId: Deno.env.get('R2_ACCESS_KEY_ID')!,
+  secretAccessKey: Deno.env.get('R2_SECRET_ACCESS_KEY')!,
+  service: 's3',
+  region: 'auto',
+});
 
 function cors(body: string, status = 200) {
   return new Response(body, {
@@ -361,10 +371,25 @@ Return ONLY the JSON, no other text.`,
     const scanDate = parsed.scan_date || parsed.panel_date || parsed.test_date || new Date().toISOString().slice(0, 10);
     const pdfPath = `${clientId}/${scanDate}-${scanType.toLowerCase()}.pdf`;
     const pdfBytes = Uint8Array.from(atob(pdfBase64), c => c.charCodeAt(0));
-    await sb.storage.from('scans').upload(pdfPath, pdfBytes, {
-      contentType: 'application/pdf',
-      upsert: true,
-    });
+    // PDFs go to R2; Supabase Storage is only a fallback if R2 is unreachable
+    let r2Ok = false;
+    try {
+      const r2Res = await aws.fetch(`${R2_ENDPOINT}/${R2_BUCKET}/${pdfPath}`, {
+        method: 'PUT',
+        body: pdfBytes,
+        headers: { 'Content-Type': 'application/pdf' },
+      });
+      r2Ok = r2Res.ok;
+      if (!r2Ok) console.error('R2 upload failed:', r2Res.status, await r2Res.text());
+    } catch (e) {
+      console.error('R2 upload error:', e);
+    }
+    if (!r2Ok) {
+      await sb.storage.from('scans').upload(pdfPath, pdfBytes, {
+        contentType: 'application/pdf',
+        upsert: true,
+      });
+    }
     // (storage errors are non-fatal — data still saves)
 
     if (scanType === 'DEXA') {

@@ -1976,8 +1976,17 @@ async function showScanDetail(i) {
   // Generate signed download URL for the original PDF if available
   let pdfDownloadUrl = null;
   if (s.pdf_path) {
-    const { data } = await sb.storage.from('scans').createSignedUrl(s.pdf_path, 3600);
-    if (data?.signedUrl) pdfDownloadUrl = data.signedUrl;
+    // get-scan-url checks R2 first, then Supabase Storage
+    try {
+      const { data: { session } } = await sb.auth.getSession();
+      const res = await fetch(`${SUPABASE_URL}/functions/v1/get-scan-url`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${session.access_token}`, 'apikey': SUPABASE_KEY },
+        body: JSON.stringify({ path: s.pdf_path }),
+      });
+      const json = await res.json();
+      if (json.signedUrl) pdfDownloadUrl = json.signedUrl;
+    } catch { /* no download button if signing fails */ }
   }
 
   const weightKg = s.total_g ? (s.total_g/1000).toFixed(1) : null;
